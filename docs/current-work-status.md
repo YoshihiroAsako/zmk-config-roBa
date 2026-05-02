@@ -15,6 +15,8 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - `west.yml` / driver revision は今回は変更しない。
 - `zmk-pmw3610-driver` は確認時点のコミットハッシュだけ記録する。
 - Windows JIS 記号補正は、予測表で補正候補を作り、実機で答え合わせしてから確定表に基づいて補正する。
+- レイヤー 5 `SCROLL` は、トラックボールをスクロールモードにするための状態レイヤーとして扱う。
+- `&mo 5` をどのキーに置いても、押している間は同じスクロール操作ができる。
 
 ## 現在の進捗
 
@@ -30,15 +32,16 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - [x] `scroll_tap` の最小実装
 - [x] keymap-drawer 更新
 - [x] GitHub Actions ビルド確認
-- [ ] 実機検証 (2026-05-02: `I` 長押し案は `I` が連続入力され、スクロールできなかったため専用 `&mo 5` 案へ変更)
+- [x] 実機検証 (2026-05-02: 専用 `&mo 5` キーでトラックボールスクロール成功)
+- [x] Windows JIS 記号検証用に Layer 3 `ARROW` へ No. 1-23 の記号を順番配置
+- [ ] Windows JIS 記号実機検証
 
 ## 次にやること
 
-1. 変更をコミットして同期する。
-2. GitHub Actions の `build.yml` を実行し、`roBa_L` / `roBa_R` / `settings_reset` のビルドを確認する。
-3. Actions artifact `firmware` から左右の `.uf2` を書き込む。
-4. Windows JIS 環境で、左手親指の `SCROLL` キーを押しながらトラックボールを動かしてスクロールできるか確認する。
-5. `I` が通常キーとして単押し/長押しで想定どおり動くか確認する。
+1. `docs/windows-jis-symbol-validation.md` に沿って、Windows JIS 実機で Layer 3 `ARROW` の検証用記号と combo の実出力を確認する。
+2. 実機結果を `docs/windows-jis-symbol-validation.md` の「実機結果」欄に記録する。
+3. 実機結果に基づいて、Windows JIS 用の記号補正案を作る。
+4. 補正する場合は `config/roBa.keymap`、`keymap-drawer/roBa.yaml`、`keymap-drawer/roBa.svg` を更新する。
 
 ## 参照すべきファイル
 
@@ -46,6 +49,7 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - `docs/current-work-status.md`
 - `docs/keymap-multihost-scroll-plan.md`
 - `docs/keymap-flashing-guide.md`
+- `docs/windows-jis-symbol-validation.md`
 - `config/roBa.keymap`
 - `keymap-drawer/roBa.yaml`
 - `keymap-drawer/roBa.svg`
@@ -63,8 +67,9 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 ## 未決事項
 
 - `I` の `scroll_tap` 案は実機で `I` 連続入力になったため撤回。
-- 検証用に `LEFT_ALT` 位置を専用 `&mo 5` (`SCROLL`) へ置き換えた。左 Alt が必要なら最終配置を再検討する。
-- Windows JIS 記号補正は、第 1 段階のスクロール改善が完了してから別段階で扱う。
+- `LEFT_ALT` 位置の専用 `&mo 5` (`SCROLL`) は、ユーザーが ZMK Studio でも変更できるため、いったん現状位置で採用する。
+- `SCROLL` レイヤーは作り込まず、スクロール中にも必要なキーが出た場合だけ最小限追加する。
+- Windows JIS 記号補正は、`docs/windows-jis-symbol-validation.md` の実機結果を埋めてから行う。
 
 ## 事前調査結果
 
@@ -85,6 +90,7 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - 2026-05-02: `&st 5 I` を書き込んだが、`I` 長押しで `I` が連続入力され、トラックボールスクロールはできなかった。
 - Windows の UF2 コピー時に `0x800701B1` が出ることがあるが、コピー後に bootloader ドライブが消えてキーボードとして復帰するため、UF2 書き込み自体は成功している可能性が高い。
 - 2026-05-02: `I` は通常の `&kp I` に戻し、`LEFT_ALT` 位置を `&mo 5` に変更。専用キーで SCROLL レイヤーを確実に有効化する方針で再検証する。
+- 2026-05-02: 専用 `SCROLL` キーを押しながらトラックボールでスクロールできることを実機確認済み。
 
 ## 新しいチャットでの再開メモ
 

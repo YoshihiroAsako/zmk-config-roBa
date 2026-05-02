@@ -133,32 +133,31 @@ layers:
   - {t: ▽, type: trans}
   - '|'
   ARROW:
-  - ESCAPE
-  - Ctl+Sft+TAB
-  - UP ARROW
-  - Ctl+TAB
+  - '-'
+  - '+'
+  - '^'
+  - '&'
+  - '~'
+  - '('
+  - ')'
+  - '/'
+  - '*'
+  - '_'
+  - '!'
+  - '@'
+  - '#'
+  - '$'
+  - '%'
   - {t: ▽, type: trans}
   - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - HOME
-  - LEFT ARROW
-  - DOWN ARROW
-  - RIGHT ARROW
-  - END
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - {t: ▽, type: trans}
-  - LEFT SHIFT
-  - Gui+Sft+LEFT ARROW
-  - {t: ▽, type: trans}
-  - Gui+Sft+RIGHT ARROW
+  - '.'
+  - '='
+  - '['
+  - ']'
+  - '{'
+  - '}'
+  - '\'
+  - '|'
   - {t: ▽, type: trans}
   - {t: ▽, type: trans}
   - {t: ▽, type: trans}

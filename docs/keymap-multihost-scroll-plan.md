@@ -411,6 +411,7 @@ st: scroll_tap {
 1. 当初は `config/roBa.keymap` に `scroll_tap` behavior を追加し、`default_layer` の `&lt 5 I` を `&st 5 I` に変更した。
 2. 実機では `I` 長押しで `I` が連続入力され、トラックボールスクロールできなかったため、この案はいったん撤回する。
 3. 次の検証案として、`I` は通常の `&kp I` に戻し、左手親指の `LEFT_ALT` 位置を専用 `&mo 5` (`SCROLL`) に変更する。
+   - 2026-05-02 実機確認: 専用 `SCROLL` キーを押しながらトラックボールでスクロールできることを確認済み。
 4. 必要に応じて `keymap-drawer/roBa.yaml` を更新する。**手動編集が含まれていないか差分を確認してから上書きする** (AGENTS.md の注意事項に従う)。
 5. `keymap-drawer/roBa.svg` を再生成する。
 6. レイヤー数、キー数、物理レイアウト、keymap-editor 表示に影響する場合のみ `config/roBa.json` (keymap-editor 用メタデータ) との整合性を確認する。
