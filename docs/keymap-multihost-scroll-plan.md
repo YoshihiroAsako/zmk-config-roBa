@@ -398,6 +398,14 @@ st: scroll_tap {
    - **`revision: main` は移動標的のため、確認時点のコミットハッシュを本計画書または実装メモに記録**しておく。Actions ビルド後の挙動が予期と違った場合、その時点で driver HEAD を再確認し原因切り分けの手掛かりにする。
    - `config/west.yml` の revision 固定は今回は行わない。AGENTS.md のルール上、west.yml 変更は明示依頼かつ別作業扱いであり、ビルド再現性のための一時固定であってもこの計画の範囲外とする。将来「ビルド再現性を恒常的に確保したい」という別の動機が生じた場合のみ、独立タスクとして driver revision 固定を検討する。
 
+#### 7.1.2 事前調査結果 (2026-05-02)
+
+- `zmk@v0.3-branch` の `app/dts/bindings/behaviors/zmk,behavior-hold-tap.yaml` に `hold-while-undecided` が定義されていることを確認済み。
+- `zmk@v0.3-branch` の `app/include/dt-bindings/zmk/keys.h` に `INT1` / `INT_RO` / `INT3` / `INT_YEN` / `LANG1` / `LANG2` / `GLOBE` が定義されていることを確認済み。
+- `kumamuk-git/zmk-pmw3610-driver` `main` の確認時点コミットは `5e04553ab803d24405bd45621a41310ea3050e59`。
+- 上記 driver では `get_input_mode_for_current_layer()` が `scroll-layers` を `snipe-layers` / ball action より先に判定し、automouse 起動条件も `input_mode == MOVE` に限定されているため、SCROLL レイヤー中は scroll 優先と判断する。
+- ローカル環境では `keymap` コマンド未検出。今回の `&lt 5 I` → `&st 5 I` は表示上の `I` hold = `SCROLL` を変えないため、`keymap-drawer/roBa.yaml` / `keymap-drawer/roBa.svg` は更新不要と判断する。
+
 ### 7.2 第 1 段階：最小変更
 
 1. `config/roBa.keymap` に `scroll_tap` behavior を追加する。

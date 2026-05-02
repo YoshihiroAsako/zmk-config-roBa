@@ -26,18 +26,19 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - [x] 「先回り補正」表現を「補正候補作成 → 実機確認 → 確定表で補正」に修正
 - [x] 作業再開用の `docs/current-work-status.md` を作成
 - [x] `AGENTS.md` に作業再開ルールを追加
-- [ ] 事前調査
-- [ ] `scroll_tap` の最小実装
-- [ ] keymap-drawer 更新
+- [x] 事前調査
+- [x] `scroll_tap` の最小実装
+- [x] keymap-drawer 更新不要の確認
 - [ ] GitHub Actions ビルド確認
 - [ ] 実機検証
 
 ## 次にやること
 
-1. `hold-while-undecided` が `zmk@v0.3-branch` で使えるか確認する。
-2. `zmk-pmw3610-driver` の `scroll-layers` / `automouse-layer` 優先順位を確認する。
-3. driver の確認時点のコミットハッシュを記録する。
-4. 問題なければ `config/roBa.keymap` に `scroll_tap` を追加する。
+1. `config/roBa.keymap` の変更内容を確認する。
+2. GitHub Actions で `roBa_L` / `roBa_R` / `settings_reset` のビルドを確認する。
+3. Actions 成功後、左右に `.uf2` を書き込む。
+4. Windows JIS 環境で `I` 単押し / 連打 / 長押し + トラックボールスクロールを実機検証する。
+5. 併走で combo `double_quotation` / `eq` の Windows JIS 実出力を記録する。
 
 ## 参照すべきファイル
 
@@ -65,6 +66,14 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - `scroll_tap` の `quick-tap-ms` は初期値 `0` で進める。
 - 実機で違和感があれば `balanced` や `quick-tap-ms = <100>` を検討する。
 - Windows JIS 記号補正は、第 1 段階のスクロール改善が完了してから別段階で扱う。
+
+## 事前調査結果
+
+- 2026-05-02 時点で `zmk@v0.3-branch` の `zmk,behavior-hold-tap.yaml` に `hold-while-undecided` が定義されていることを確認済み。
+- 2026-05-02 時点で `zmk@v0.3-branch` の `keys.h` に `INT1` / `INT_RO` / `INT3` / `INT_YEN` / `LANG1` / `LANG2` / `GLOBE` が定義されていることを確認済み。
+- 2026-05-02 時点の `kumamuk-git/zmk-pmw3610-driver` `main` は `5e04553ab803d24405bd45621a41310ea3050e59`。
+- 上記 driver では `get_input_mode_for_current_layer()` が `scroll-layers` を先に判定し、automouse は `input_mode == MOVE` の場合だけ起動するため、SCROLL レイヤーでは scroll 優先と判断。
+- `keymap` コマンドはこのローカル環境では未検出。今回の表示内容は `I` hold = `SCROLL` のままで変わらないため、`keymap-drawer/roBa.yaml` と `keymap-drawer/roBa.svg` は更新不要。
 
 ## 新しいチャットでの再開メモ
 
