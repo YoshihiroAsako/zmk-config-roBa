@@ -42,13 +42,12 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - [x] Windows JIS 補正後の実機確認結果を `docs/windows-jis-symbol-validation.md` に入力
 - [x] 補正後再検証で外れた `*` を `&kp DOUBLE_QUOTES` に再補正
 - [x] combo 補正後再検証で `J` + `K` = `"`、`C` + `V` = `=` を確認
-- [ ] `*` 再補正後の実機確認
+- [x] `*` 再補正後の実機確認
 
 ## 次にやること
 
-1. 変更を commit / push して GitHub Actions でビルドする。
-2. 左右へ新しい `roBa_L.uf2` / `roBa_R.uf2` を書き込む。
-3. Windows JIS 環境で Layer 2 `NUM` の `*` が表示どおり出るか確認する。
+1. Windows JIS 記号補正の最終差分を確認する。
+2. 必要に応じて commit / push する。
 
 ## 参照すべきファイル
 
@@ -101,6 +100,7 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - 2026-05-03: Windows JIS 記号検証結果を入力済み。`-` / `/` / `!` / `#` / `$` / `%` / `.` は表示どおり、`+` は `~`、`^` は `&`、`&` は `'`、`_` は `=`、`@` は `"`、`=` は `^`、`[` は `@`、`\` は `]`、`|` は `}` として出ることを確認。`~` / `)` / `*` / `double_quotation` は追試候補。
 - 2026-05-03: Layer 2 `NUM` に Windows JIS 補正候補を反映。`_` は `LS(INT_RO)`、`\` は `INT_YEN`、`|` は `LS(INT_YEN)` を採用候補にしたため、実機確認が必要。`double_quotation` combo は `J` + `K` (`<18 19>`) へ修正し、binding は Windows JIS で `"` が出る `AT_SIGN` に変更。`eq` combo は `UNDERSCORE` に変更。
 - 2026-05-03: 補正後再検証では `*` 以外の Layer 2 `NUM` 記号は期待出力どおり。`*` は `&kp AT_SIGN` で `"` が出たため、`&kp DOUBLE_QUOTES` に変更。combo は `J` + `K` = `"`、`C` + `V` = `=` を確認済み。
+- 2026-05-03: `&kp DOUBLE_QUOTES` に再補正した `*` も実機で表示どおり出ることを確認。Windows JIS 記号補正は現時点で全項目 OK。
 
 ## 新しいチャットでの再開メモ
 

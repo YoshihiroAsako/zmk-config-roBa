@@ -147,7 +147,7 @@ combo は次の方針で補正する。
 | 6 | `(` | `&kp ASTERISK` | `(` | ( |  | 重点確認 |
 | 7 | `)` | `&kp LEFT_PARENTHESIS` | `)` | ) |  |  |
 | 8 | `/` | `&kp SLASH` | `/` | / |  |  |
-| 9 | `*` | `&kp DOUBLE_QUOTES` | `*` |  |  | 要再確認 |
+| 9 | `*` | `&kp DOUBLE_QUOTES` | `*` | * | OK | 再補正後に確認済み |
 | 10 | `_` | `&kp LS(INT_RO)` | `_` | _ |  | 重点確認 |
 | 11 | `!` | `&kp EXCLAMATION` | `!` | ! |  |  |
 | 12 | `@` | `&kp LEFT_BRACKET` | `@` | @ |  |  |
