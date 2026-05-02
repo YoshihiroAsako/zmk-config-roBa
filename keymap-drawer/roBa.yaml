@@ -8,7 +8,7 @@ layers:
   - T
   - Y
   - U
-  - {t: I, h: SCROLL}
+  - I
   - O
   - P
   - A
@@ -37,7 +37,7 @@ layers:
   - /
   - LCTRL
   - LEFT WIN
-  - LEFT ALT
+  - SCROLL
   - {t: '&to_layer_0 INT_HENKAN', h: '6'}
   - {t: SPACE, h: NUM}
   - {t: '&to_layer_0 INT_MUHENKAN', h: ARROW}

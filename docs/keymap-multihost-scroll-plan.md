@@ -408,15 +408,16 @@ st: scroll_tap {
 
 ### 7.2 第 1 段階：最小変更
 
-1. `config/roBa.keymap` に `scroll_tap` behavior を追加する。
-2. `default_layer` の `&lt 5 I` を `&st 5 I` に変更する。
-3. 必要に応じて `keymap-drawer/roBa.yaml` を更新する。**手動編集が含まれていないか差分を確認してから上書きする** (AGENTS.md の注意事項に従う)。
-4. `keymap-drawer/roBa.svg` を再生成する。
-5. レイヤー数、キー数、物理レイアウト、keymap-editor 表示に影響する場合のみ `config/roBa.json` (keymap-editor 用メタデータ) との整合性を確認する。
-6. GitHub Actions でビルドする。
-7. 左右に `.uf2` を書き込む。
-8. Windows JIS でトラックボールスクロールを確認する。
-9. 併走で既存 combo (`eq`、`double_quotation`) の JIS 実出力も記録する (§8.1 の検証項目に渡す)。
+1. 当初は `config/roBa.keymap` に `scroll_tap` behavior を追加し、`default_layer` の `&lt 5 I` を `&st 5 I` に変更した。
+2. 実機では `I` 長押しで `I` が連続入力され、トラックボールスクロールできなかったため、この案はいったん撤回する。
+3. 次の検証案として、`I` は通常の `&kp I` に戻し、左手親指の `LEFT_ALT` 位置を専用 `&mo 5` (`SCROLL`) に変更する。
+4. 必要に応じて `keymap-drawer/roBa.yaml` を更新する。**手動編集が含まれていないか差分を確認してから上書きする** (AGENTS.md の注意事項に従う)。
+5. `keymap-drawer/roBa.svg` を再生成する。
+6. レイヤー数、キー数、物理レイアウト、keymap-editor 表示に影響する場合のみ `config/roBa.json` (keymap-editor 用メタデータ) との整合性を確認する。
+7. GitHub Actions でビルドする。
+8. 左右に `.uf2` を書き込む。
+9. Windows JIS で、左手親指の `SCROLL` キーを押しながらトラックボールスクロールを確認する。
+10. 併走で既存 combo (`eq`、`double_quotation`) の JIS 実出力も記録する (§8.1 の検証項目に渡す)。
 
 ### 7.3 第 2 段階：Windows JIS 記号補正
 
