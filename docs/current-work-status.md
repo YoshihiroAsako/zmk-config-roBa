@@ -34,14 +34,18 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - [x] GitHub Actions ビルド確認
 - [x] 実機検証 (2026-05-02: 専用 `&mo 5` キーでトラックボールスクロール成功)
 - [x] Windows JIS 記号検証用に Layer 3 `ARROW` へ No. 1-23 の記号を順番配置
-- [ ] Windows JIS 記号実機検証
+- [x] Windows JIS 記号実機検証結果を `docs/windows-jis-symbol-validation.md` に入力
+- [x] Windows JIS 記号補正案の作成
+- [x] Layer 2 `NUM` と combo に Windows JIS 補正候補を反映
+- [x] `docs/windows-jis-symbol-validation.md` に補正後再検証用の入力表を追加
+- [ ] Windows JIS 補正後の実機確認
 
 ## 次にやること
 
-1. `docs/windows-jis-symbol-validation.md` に沿って、Windows JIS 実機で Layer 3 `ARROW` の検証用記号と combo の実出力を確認する。
-2. 実機結果を `docs/windows-jis-symbol-validation.md` の「実機結果」欄に記録する。
-3. 実機結果に基づいて、Windows JIS 用の記号補正案を作る。
-4. 補正する場合は `config/roBa.keymap`、`keymap-drawer/roBa.yaml`、`keymap-drawer/roBa.svg` を更新する。
+1. 変更を commit / push して GitHub Actions でビルドする。
+2. 左右へ新しい `roBa_L.uf2` / `roBa_R.uf2` を書き込む。
+3. Windows JIS 環境で Layer 2 `NUM` の記号が表示どおり出るか確認する。
+4. 特に `(` / `[` / `{` / `_` / `\` / `|` と `J` + `K` combo (`"`) を重点確認する。
 
 ## 参照すべきファイル
 
@@ -91,6 +95,8 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - Windows の UF2 コピー時に `0x800701B1` が出ることがあるが、コピー後に bootloader ドライブが消えてキーボードとして復帰するため、UF2 書き込み自体は成功している可能性が高い。
 - 2026-05-02: `I` は通常の `&kp I` に戻し、`LEFT_ALT` 位置を `&mo 5` に変更。専用キーで SCROLL レイヤーを確実に有効化する方針で再検証する。
 - 2026-05-02: 専用 `SCROLL` キーを押しながらトラックボールでスクロールできることを実機確認済み。
+- 2026-05-03: Windows JIS 記号検証結果を入力済み。`-` / `/` / `!` / `#` / `$` / `%` / `.` は表示どおり、`+` は `~`、`^` は `&`、`&` は `'`、`_` は `=`、`@` は `"`、`=` は `^`、`[` は `@`、`\` は `]`、`|` は `}` として出ることを確認。`~` / `)` / `*` / `double_quotation` は追試候補。
+- 2026-05-03: Layer 2 `NUM` に Windows JIS 補正候補を反映。`_` は `LS(INT_RO)`、`\` は `INT_YEN`、`|` は `LS(INT_YEN)` を採用候補にしたため、実機確認が必要。`double_quotation` combo は `J` + `K` (`<18 19>`) へ修正し、binding は Windows JIS で `"` が出る `AT_SIGN` に変更。`eq` combo は `UNDERSCORE` に変更。
 
 ## 新しいチャットでの再開メモ
 
