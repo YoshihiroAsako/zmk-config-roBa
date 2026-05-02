@@ -1,0 +1,38 @@
+---
+description: ZMK keymap DSL guidance for roBa keymap files
+globs:
+  - config/*.keymap
+alwaysApply: false
+---
+
+# ZMK Keymap Guidance
+
+Apply this rule when editing `config/*.keymap`.
+
+## Common Behaviors
+
+- `&kp KEY`: press a keycode.
+- `&mt HOLD TAP`: mod-tap behavior, hold for modifier and tap for key.
+- `&lt LAYER KEY`: layer-tap behavior, hold for layer and tap for key.
+- `&mo LAYER`: momentarily activate a layer while held.
+- `&to LAYER`: switch to a layer.
+- `&trans`: transparent key, falling through to lower layers.
+- `&none`: disabled key.
+- `&mkp BUTTON`: mouse button behavior.
+
+## Local Conventions
+
+- Do not automatically rename existing numbered layers such as `layer_6`.
+- Keep new layer names meaningful when adding new layers.
+- Keep combos under `/ { combos { ... }; };`.
+- Keep macros under `/ { macros { ... }; };`.
+- Keep custom behaviors under `/ { behaviors { ... }; };`.
+- Check keymap-drawer output when a visible key changes.
+- Do not infer side hardware placement from Kconfig flag names.
+
+## roBa Specific Notes
+
+- `roBa_R` is the physical trackball / PMW3610 / SPI side.
+- `roBa_L` is the physical encoder side.
+- `CONFIG_EC11` and `CONFIG_ZMK_POINTING` may intentionally exist in both side `.conf` files.
+- Visible keymap changes should update `keymap-drawer/roBa.yaml` and regenerate `keymap-drawer/roBa.svg`.

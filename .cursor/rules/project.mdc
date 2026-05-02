@@ -1,0 +1,17 @@
+---
+description: Project-wide rules for zmk-config-roBa
+alwaysApply: true
+---
+
+@AGENTS.md
+
+# Project Rules
+
+Use `AGENTS.md` as the source of truth for project rules. If this rule and `AGENTS.md` disagree about project behavior, follow `AGENTS.md`.
+
+Cursor-specific guidance in this file takes precedence for Cursor behavior only.
+
+- Respond in Japanese unless the user explicitly requests another language.
+- Assume Windows + PowerShell for shell commands.
+- Keep edits scoped to the user's request and the ZMK config files involved.
+- When editing `config/roBa.keymap`, also consider whether `.cursor/rules/zmk-keymap.mdc` applies.
