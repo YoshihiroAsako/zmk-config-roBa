@@ -39,6 +39,19 @@ Treat physical hardware placement and Kconfig flags as separate concepts.
   - `.west/`
   - `boards/shields/roBa/Kconfig.*`
 
+## Work Resumption
+
+When starting or resuming work, check whether `docs/current-work-status.md` exists.
+
+If it exists:
+
+1. Read `docs/current-work-status.md`.
+2. Use it to understand the current task, progress, next actions, pending decisions, and relevant files.
+3. Continue from the next actionable step unless the user gives a newer conflicting instruction.
+4. After making progress, update `docs/current-work-status.md` so a future session can resume from the latest state.
+
+If `docs/current-work-status.md` conflicts with the user's latest message, the user's latest message wins.
+
 ## Workflow
 
 For keymap changes:
