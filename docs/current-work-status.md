@@ -60,6 +60,10 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - `tools/roba-keymap-viewer/package.json` に `npm test` を追加済み。
 - 再開用の独立プロンプトファイルは廃止し、このファイルへ統合済み。
 - read-only MVP は `6df760b Add read-only roBa keymap viewer MVP` で commit 済み。
+- Windows JIS 表示ラベルを改善済み:
+  - `docs/windows-jis-symbol-validation.md` の実機検証・補正案を Viewer 表示に反映。
+  - `COLON` -> `+`、`SQT` -> `:`、`ASTERISK` -> `(`、`LEFT_PARENTHESIS` -> `)`、`RIGHT_BRACKET` -> `[`、`RIGHT_BRACE` -> `{` などを Windows JIS 出力として表示。
+  - `TILDE` と `RIGHT_PARENTHESIS` は未確定扱いとして note に要検証を表示。
 
 ## 検証状況
 
@@ -87,12 +91,20 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 確認後、dev server process と child process は停止済み。
   - `Invoke-WebRequest -UseBasicParsing http://localhost:5173` は HTTP 200。
   - `agent-browser` CLI は PATH 上になく、ブラウザ smoke check は未実施。
+- Windows JIS 表示改善後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - dev server は `http://localhost:5173` / `http://127.0.0.1:5173` で起動して確認済み。
+  - ユーザーが Windows JIS 表示改善を視覚確認して OK。
+  - 確認後、dev server process と child process は停止済み。
+  - `Invoke-WebRequest -UseBasicParsing http://localhost:5173` は HTTP 200。
+  - `agent-browser` CLI は PATH 上になく、ブラウザ smoke check は未実施。
 
 ## 次にやること
 
 優先順:
 
-1. 必要なら Windows JIS 表示ラベルを改善する。
+1. Windows JIS 表示改善を commit する。
 2. Phase 2 の source-range editing 設計とテストを追加する。
 
 ## 現在の注意点

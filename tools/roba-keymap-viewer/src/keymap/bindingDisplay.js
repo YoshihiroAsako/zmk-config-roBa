@@ -1,16 +1,29 @@
 const WINDOWS_JIS_OUTPUT = {
   AT_SIGN: "\"",
+  AMPERSAND: "'",
+  ASTERISK: "(",
+  COLON: "+",
   DOUBLE_QUOTES: "*",
-  UNDERSCORE: "=",
-  LS_INT_RO: "_",
-  INT_YEN: "\\",
-  LS_INT_YEN: "|",
   CARET: "&",
   EQUAL: "^",
-  PLUS: "~",
+  INT_YEN: "\\",
   LEFT_BRACKET: "@",
+  LEFT_BRACE: "`",
+  LEFT_PARENTHESIS: ")",
+  LS_INT_RO: "_",
+  LS_INT_YEN: "|",
+  PLUS: "~",
   BACKSLASH: "]",
   PIPE: "}",
+  RIGHT_BRACE: "{",
+  RIGHT_BRACKET: "[",
+  SQT: ":",
+  UNDERSCORE: "=",
+};
+
+const WINDOWS_JIS_UNVERIFIED = {
+  RIGHT_PARENTHESIS: "Windows JIS output needs verification; Shift+0 behaves differently on JIS.",
+  TILDE: "Windows JIS output needs verification; US grave/tilde may act as Hankaku/Zenkaku or IME toggle.",
 };
 
 const KEY_LABELS = {
@@ -41,10 +54,15 @@ const KEY_LABELS = {
   DOLLAR: "$",
   PERCENT: "%",
   ASTERISK: "*",
+  AMPERSAND: "&",
   LEFT_PARENTHESIS: "(",
   RIGHT_PARENTHESIS: ")",
+  LEFT_BRACKET: "[",
+  LEFT_BRACE: "{",
   RIGHT_BRACKET: "]",
   RIGHT_BRACE: "}",
+  PLUS: "+",
+  TILDE: "~",
   KP_NUMBER_0: "0",
   KP_NUMBER_1: "1",
   KP_NUMBER_2: "2",
@@ -67,9 +85,20 @@ function normalizeJisKey(key) {
 }
 
 function displayKeycode(key) {
+  return describeKeycode(key).display;
+}
+
+function describeKeycode(key) {
   const normalized = normalizeJisKey(key);
-  if (WINDOWS_JIS_OUTPUT[normalized]) return WINDOWS_JIS_OUTPUT[normalized];
-  if (KEY_LABELS[key]) return KEY_LABELS[key];
+  if (WINDOWS_JIS_OUTPUT[normalized]) {
+    return {
+      display: WINDOWS_JIS_OUTPUT[normalized],
+      note: `Windows JIS output: ${WINDOWS_JIS_OUTPUT[normalized]}`,
+    };
+  }
+
+  const note = WINDOWS_JIS_UNVERIFIED[normalized] || "";
+  if (KEY_LABELS[key]) return { display: KEY_LABELS[key], note };
 
   if (key.includes("(")) {
     const base = key.replace(/L[SGCA]\(/g, "").replace(/\)/g, "");
@@ -78,10 +107,10 @@ function displayKeycode(key) {
     if (key.includes("LA(")) mods.push("A");
     if (key.includes("LS(")) mods.push("S");
     if (key.includes("LG(")) mods.push("G");
-    return `${mods.join("+")}+${KEY_LABELS[base] || base}`;
+    return { display: `${mods.join("+")}+${KEY_LABELS[base] || base}`, note };
   }
 
-  return key.replace(/^KP_NUMBER_/, "").replace(/^NUMBER_/, "");
+  return { display: key.replace(/^KP_NUMBER_/, "").replace(/^NUMBER_/, ""), note };
 }
 
 export function describeBinding(raw, layerNames = []) {
@@ -94,15 +123,15 @@ export function describeBinding(raw, layerNames = []) {
   let match = /^&kp (.+)$/.exec(value);
   if (match) {
     const keycode = match[1];
-    const normalized = normalizeJisKey(keycode);
+    const keyInfo = describeKeycode(keycode);
     return {
       raw: value,
       behavior: "&kp",
       params: [keycode],
       kind: "keypress",
-      display: displayKeycode(keycode),
+      display: keyInfo.display,
       editability: "studio-direct",
-      note: WINDOWS_JIS_OUTPUT[normalized] ? `Windows JIS output: ${WINDOWS_JIS_OUTPUT[normalized]}` : "",
+      note: keyInfo.note,
     };
   }
 

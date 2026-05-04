@@ -48,6 +48,32 @@ describe("roBa keymap parser", () => {
     assert.equal(describeBinding(numLayer.bindings[33], layerNames).display, "\\");
   });
 
+  it("shows known Windows JIS output labels for symbol keycodes", () => {
+    assert.equal(describeBinding("&kp COLON").display, "+");
+    assert.equal(describeBinding("&kp SQT").display, ":");
+    assert.equal(describeBinding("&kp ASTERISK").display, "(");
+    assert.equal(describeBinding("&kp LEFT_PARENTHESIS").display, ")");
+    assert.equal(describeBinding("&kp DOUBLE_QUOTES").display, "*");
+    assert.equal(describeBinding("&kp AMPERSAND").display, "'");
+    assert.equal(describeBinding("&kp LEFT_BRACKET").display, "@");
+    assert.equal(describeBinding("&kp RIGHT_BRACKET").display, "[");
+    assert.equal(describeBinding("&kp RIGHT_BRACE").display, "{");
+    assert.equal(describeBinding("&kp BACKSLASH").display, "]");
+    assert.equal(describeBinding("&kp PIPE").display, "}");
+    assert.equal(describeBinding("&kp LS(INT_RO)").display, "_");
+    assert.equal(describeBinding("&kp LS(INT_YEN)").display, "|");
+  });
+
+  it("keeps uncertain Windows JIS symbol keycodes visibly marked", () => {
+    const tilde = describeBinding("&kp TILDE");
+    const rightParenthesis = describeBinding("&kp RIGHT_PARENTHESIS");
+
+    assert.equal(tilde.display, "~");
+    assert.match(tilde.note, /needs verification/);
+    assert.equal(rightParenthesis.display, ")");
+    assert.match(rightParenthesis.note, /needs verification/);
+  });
+
   it("counts the DTS physical layout keys and emits Markdown from parsed data", async () => {
     const keymapSource = await readRepoFile("config/roBa.keymap");
     const dtsiSource = await readRepoFile("boards/shields/roBa/roBa.dtsi");
