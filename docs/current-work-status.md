@@ -139,3 +139,13 @@ roBa 用 ZMK Studio 風ローカルアプリの計画検討。
 
 新しいチャットでは、エージェントが `AGENTS.md` の作業再開ルールに従い、このファイルを読んで続きから再開する想定。
 ユーザーの最新指示がこのファイルと矛盾する場合は、ユーザーの最新指示を優先する。
+
+## 2026-05-04 update: Claude Design output placed
+
+- Claude Design output was placed under `docs/claude-design-roba-app/`.
+- Confirmed these snapshot files matched the canonical files at the time of check:
+  - `docs/claude-design-roba-app/uploads/roBa.json` == `config/roBa.json`
+  - `docs/claude-design-roba-app/uploads/roBa.keymap` == `config/roBa.keymap`
+- Treat `config/roBa.json` and `config/roBa.keymap` as canonical. Files under `uploads/` are Claude Design snapshots only.
+- Created the next-chat prompt at `docs/zmk-studio-like-app-next-chat-prompt.md`.
+- Next recommended action: review the Claude Design mockup, then decide whether to keep it as documentation or migrate it into a Vite + React read-only MVP under `tools/roba-keymap-viewer/`.

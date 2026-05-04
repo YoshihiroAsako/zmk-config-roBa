@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>roBa Key Mapping</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      background: #0f1117;
+      color: #c8d0e0;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0f1117; }
+    ::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3d4168; }
+    button { font-family: 'Inter', sans-serif; }
+    input, select { font-family: 'Inter', sans-serif; }
+    * { transition: background 0.1s; }
+  </style>
+</head>
+<body>
+
+<script src="data/keymapData.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="components/KeyboardVisual.jsx"></script>
+<script type="text/babel" src="components/KeyDetail.jsx"></script>
+<script type="text/babel" src="components/TabPanels.jsx"></script>
+
+<div id="root" style="height:100%;"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "colorScheme": "dark",
+  "accentColor": "#3b82f6",
+  "keySize": 44,
+  "showPosition": true,
+  "density": "compact"
+}/*EDITMODE-END*/;
+
+/* ── Warning banner ── */
+function WarningBanner({ warnings, onDismiss }) {
+  if (!warnings.length) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '4px 12px', background: '#0a0c14', borderBottom: '1px solid #1f2235' }}>
+      {warnings.map(w => (
+        <div key={w.id} style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '3px 6px', borderRadius: '3px',
+          background: w.level === 'error' ? 'rgba(239,68,68,0.08)' : w.level === 'warning' ? 'rgba(245,158,11,0.06)' : 'rgba(59,130,246,0.06)',
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+            background: w.level === 'error' ? '#ef4444' : w.level === 'warning' ? '#f59e0b' : '#3b82f6',
+          }} />
+          <span style={{ fontSize: '10px', color: w.level === 'error' ? '#fca5a5' : w.level === 'warning' ? '#fcd34d' : '#93c5fd', flex: 1 }}>{w.message}</span>
+          {w.dismissible && (
+            <button onClick={() => onDismiss(w.id)} style={{
+              background: 'none', border: 'none', color: '#4b5563', fontSize: '11px', cursor: 'pointer', padding: '0 2px', lineHeight: 1,
+            }}>×</button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Header ── */
+function Header({ onOpenTweaks }) {
+  return (
+    <header style={{
+      display: 'flex', alignItems: 'center', gap: '0', height: '36px',
+      background: '#13151f', borderBottom: '1px solid #1f2235',
+      padding: '0 12px', flexShrink: 0,
+    }}>
+      {/* Logo */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: '4px', background: 'oklch(0.65 0.18 240)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '11px', fontWeight: 700, color: '#fff', fontFamily: 'JetBrains Mono',
+        }}>rB</div>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', letterSpacing: '-0.01em' }}>roBa</span>
+        <span style={{ fontSize: '11px', color: '#4b5563', letterSpacing: '-0.01em' }}>Keymap</span>
+      </div>
+
+      {/* File badges */}
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
+        {['config/roBa.keymap', 'config/roBa.json'].map(f => (
+          <div key={f} style={{
+            display: 'flex', alignItems: 'center', gap: '4px',
+            padding: '2px 7px', background: '#1a1d27', border: '1px solid #2d3148',
+            borderRadius: '4px', fontSize: '10px', fontFamily: 'JetBrains Mono',
+          }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} />
+            <span style={{ color: '#a5f3a0' }}>{f}</span>
+          </div>
+        ))}
+        <div style={{
+          padding: '2px 7px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+          borderRadius: '4px', fontSize: '10px', color: '#60a5fa',
+        }}>Read-only · canonical: .keymap</div>
+      </div>
+
+      {/* External tool links */}
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        {[
+          { label: 'ZMK Studio', href: 'https://zmk.studio/', color: '#34d399' },
+          { label: 'Keymap Editor', href: 'https://nickcoutsos.github.io/keymap-editor/', color: '#a78bfa' },
+        ].map(tool => (
+          <a key={tool.label} href={tool.href} target="_blank" rel="noreferrer" style={{
+            display: 'flex', alignItems: 'center', gap: '4px',
+            padding: '3px 8px', background: '#1a1d27', border: `1px solid ${tool.color}33`,
+            borderRadius: '4px', fontSize: '10px', color: tool.color, textDecoration: 'none',
+            fontWeight: 500,
+          }}>
+            <span>↗</span>{tool.label}
+          </a>
+        ))}
+        <button onClick={onOpenTweaks} style={{
+          padding: '3px 8px', background: '#1a1d27', border: '1px solid #2d3148',
+          borderRadius: '4px', color: '#6b7280', fontSize: '10px', cursor: 'pointer',
+        }}>Tweaks</button>
+      </div>
+    </header>
+  );
+}
+
+/* ── Layer sidebar ── */
+function LayerSidebar({ layers, currentLayer, onLayerSelect }) {
+  return (
+    <div style={{
+      width: '120px', flexShrink: 0, background: '#13151f',
+      borderRight: '1px solid #1f2235', display: 'flex', flexDirection: 'column',
+      overflowY: 'auto',
+    }}>
+      <div style={{ padding: '8px 10px 4px', fontSize: '9px', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+        Layers
+      </div>
+      {layers.map((name, i) => (
+        <button key={i} onClick={() => onLayerSelect(i)} style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '6px 10px', background: 'none',
+          border: 'none', borderLeft: `2px solid ${currentLayer === i ? '#3b82f6' : 'transparent'}`,
+          color: currentLayer === i ? '#e2e8f0' : '#6b7280',
+          fontSize: '11px', cursor: 'pointer', textAlign: 'left',
+          fontFamily: 'JetBrains Mono, monospace',
+          background: currentLayer === i ? '#1a1d27' : 'none',
+        }}
+          onMouseEnter={e => { if (currentLayer !== i) e.currentTarget.style.background = '#161928'; }}
+          onMouseLeave={e => { if (currentLayer !== i) e.currentTarget.style.background = 'none'; }}
+        >
+          <span style={{
+            fontSize: '9px', color: currentLayer === i ? '#3b82f6' : '#374151',
+            fontWeight: 600, minWidth: '14px',
+          }}>{i}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        </button>
+      ))}
+
+      {/* Source info */}
+      <div style={{ marginTop: 'auto', padding: '8px 10px', borderTop: '1px solid #1f2235' }}>
+        <div style={{ fontSize: '9px', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Source</div>
+        <div style={{ fontSize: '10px', color: '#4b5563', fontFamily: 'JetBrains Mono', lineHeight: 1.5 }}>
+          roBa.keymap<br />roBa.json<br />
+          <span style={{ color: '#374151' }}>43 keys · 7 layers</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Key detail sidebar ── */
+function DetailSidebar({ selectedKey, selectedParsed, currentLayer, layerName }) {
+  return (
+    <div style={{
+      width: '185px', flexShrink: 0, background: '#13151f',
+      borderLeft: '1px solid #1f2235', display: 'flex', flexDirection: 'column',
+      overflowY: 'auto',
+    }}>
+      <div style={{ padding: '8px 10px 4px', fontSize: '9px', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, borderBottom: '1px solid #1f2235', marginBottom: 0 }}>
+        Selected Key
+      </div>
+      <KeyDetail
+        selectedKey={selectedKey}
+        selectedParsed={selectedParsed}
+        layerName={layerName}
+        layerIndex={currentLayer}
+      />
+    </div>
+  );
+}
+
+/* ── Bottom tabs ── */
+const TABS = ['Bindings', 'Combos', 'Macros / Behaviors', 'Sensors', 'Markdown'];
+
+function BottomPanel({ currentLayer, keys, layerBindings, layerNames, combos, macros, behaviors, sensors, onKeySelect, onHighlightPositions, tabHeight, onResizeStart }) {
+  const [activeTab, setActiveTab] = useState('Bindings');
+
+  return (
+    <div style={{ height: tabHeight, flexShrink: 0, background: '#13151f', borderTop: '1px solid #1f2235', display: 'flex', flexDirection: 'column' }}>
+      {/* Resize handle */}
+      <div
+        onMouseDown={onResizeStart}
+        style={{
+          height: '4px', cursor: 'ns-resize', background: 'transparent',
+          flexShrink: 0,
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = '#2d3148'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      />
+      {/* Tab bar */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #1f2235', flexShrink: 0 }}>
+        {TABS.map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)} style={{
+            padding: '5px 14px', background: 'none', border: 'none',
+            borderBottom: activeTab === tab ? '2px solid #3b82f6' : '2px solid transparent',
+            color: activeTab === tab ? '#60a5fa' : '#6b7280',
+            fontSize: '11px', cursor: 'pointer', fontFamily: 'Inter',
+            whiteSpace: 'nowrap',
+          }}>
+            {tab}
+          </button>
+        ))}
+      </div>
+      {/* Tab content */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        {activeTab === 'Bindings' && (
+          <BindingsTab
+            keys={keys} layerBindings={layerBindings} layerNames={layerNames}
+            currentLayer={currentLayer} onKeySelect={onKeySelect}
+          />
+        )}
+        {activeTab === 'Combos' && (
+          <CombosTab combos={combos} layerNames={layerNames} onHighlightPositions={onHighlightPositions} />
+        )}
+        {activeTab === 'Macros / Behaviors' && (
+          <MacrosTab macros={macros} behaviors={behaviors} />
+        )}
+        {activeTab === 'Sensors' && (
+          <SensorsTab sensors={sensors} />
+        )}
+        {activeTab === 'Markdown' && (
+          <MarkdownTab
+            keys={keys} layerBindings={layerBindings} layerNames={layerNames}
+            combos={combos} macros={macros} behaviors={behaviors} sensors={sensors}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main App ── */
+function App() {
+  const { LAYER_NAMES, ROBA_KEYS_43, LAYER_BINDINGS, COMBOS, MACROS, BEHAVIORS, SENSORS, WARNINGS, parseBinding } = window.ROBA_DATA;
+
+  const [currentLayer, setCurrentLayer] = useState(0);
+  const [selectedKey, setSelectedKey] = useState(null);
+  const [selectedParsed, setSelectedParsed] = useState(null);
+  const [comboHighlightPositions, setComboHighlightPositions] = useState([]);
+  const [warnings, setWarnings] = useState(WARNINGS);
+  const [tabHeight, setTabHeight] = useState(180);
+  const [tweaksVisible, setTweaksVisible] = useState(false);
+  const { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakSelect, TweakColor, TweakSlider } = window;
+
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const handleKeySelect = useCallback((keyDef, parsed) => {
+    setSelectedKey(keyDef);
+    setSelectedParsed(parsed);
+  }, []);
+
+  const handleDismiss = useCallback((id) => {
+    setWarnings(ws => ws.filter(w => w.id !== id));
+  }, []);
+
+  // Resize bottom panel
+  const resizeRef = useRef(null);
+  const handleResizeStart = useCallback((e) => {
+    const startY = e.clientY;
+    const startH = tabHeight;
+    const onMove = (e2) => {
+      const delta = startY - e2.clientY;
+      setTabHeight(Math.max(100, Math.min(500, startH + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [tabHeight]);
+
+  // Tweaks panel protocol
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setTweaksVisible(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksVisible(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const handleTweaksClose = () => {
+    setTweaksVisible(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const currentBindings = LAYER_BINDINGS[currentLayer] || [];
+
+  return (
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f1117', overflow: 'hidden' }}>
+      <Header onOpenTweaks={() => setTweaksVisible(true)} />
+      <WarningBanner warnings={warnings} onDismiss={handleDismiss} />
+
+      {/* Main 3-column layout */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+        <LayerSidebar layers={LAYER_NAMES} currentLayer={currentLayer} onLayerSelect={setCurrentLayer} />
+
+        {/* Center: keyboard */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: '500px' }}>
+          <div style={{ flex: 1, overflow: 'hidden', padding: '8px 8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: 0 }}>
+            {/* Layer name */}
+            <div style={{ marginBottom: '10px', textAlign: 'center' }}>
+              <span style={{ fontSize: '11px', color: '#374151', fontFamily: 'JetBrains Mono' }}>Layer {currentLayer}: </span>
+              <span style={{ fontSize: '12px', color: '#60a5fa', fontFamily: 'JetBrains Mono', fontWeight: 600 }}>{LAYER_NAMES[currentLayer]}</span>
+            </div>
+            <KeyboardVisual
+              keys={ROBA_KEYS_43}
+              layerBindings={currentBindings}
+              selectedPos={selectedKey?.pos}
+              onKeySelect={handleKeySelect}
+              comboHighlightPositions={comboHighlightPositions}
+            />
+          </div>
+
+          {/* Bottom panel */}
+        <BottomPanel
+            currentLayer={currentLayer}
+            keys={ROBA_KEYS_43}
+            layerBindings={LAYER_BINDINGS}
+            layerNames={LAYER_NAMES}
+            combos={COMBOS}
+            macros={MACROS}
+            behaviors={BEHAVIORS}
+            sensors={SENSORS}
+            onKeySelect={handleKeySelect}
+            onHighlightPositions={setComboHighlightPositions}
+            tabHeight={tabHeight}
+            onResizeStart={handleResizeStart}
+          />
+        </div>
+
+        <DetailSidebar
+          selectedKey={selectedKey}
+          selectedParsed={selectedParsed}
+          currentLayer={currentLayer}
+          layerName={LAYER_NAMES[currentLayer]}
+        />
+      </div>
+
+      {/* Tweaks panel */}
+      {tweaksVisible && (
+        <TweaksPanel onClose={handleTweaksClose}>
+          <TweakSection title="Display">
+            <TweakSelect
+              label="Color scheme"
+              value={tweaks.colorScheme}
+              options={['dark', 'darker', 'dim']}
+              onChange={v => setTweak('colorScheme', v)}
+            />
+            <TweakColor
+              label="Accent color"
+              value={tweaks.accentColor}
+              onChange={v => setTweak('accentColor', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Keyboard">
+            <TweakSlider
+              label="Key size"
+              value={tweaks.keySize}
+              min={32} max={56} step={2}
+              onChange={v => setTweak('keySize', v)}
+            />
+            <TweakToggle
+              label="Show position index"
+              value={tweaks.showPosition}
+              onChange={v => setTweak('showPosition', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Table">
+            <TweakSelect
+              label="Density"
+              value={tweaks.density}
+              options={['compact', 'normal', 'comfortable']}
+              onChange={v => setTweak('density', v)}
+            />
+          </TweakSection>
+        </TweaksPanel>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body>
+</html>
