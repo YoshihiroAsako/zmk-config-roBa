@@ -7,6 +7,25 @@
 
 roBa のマルチホスト対応、Windows JIS 記号補正、トラックボールスクロール改善。
 
+## 2026-05-04 追加テーマ
+
+roBa 用 ZMK Studio 風ローカルアプリの計画検討。
+
+- [x] 他 AI レビュー用の独立計画書 `docs/zmk-studio-like-app-plan.md` を作成
+- [x] 他 AI レビュー結果 `docs/zmk-studio-like-app-plan-review.md` を再レビュー
+- [x] 再レビュー結果 `docs/zmk-studio-like-app-plan-rereview.md` を作成
+- [x] Claude Design でデザインモックアップを作る工程を計画に追加
+- [x] `docs/zmk-studio-like-app-plan.md` をレビュー結果込みの最新版に改訂
+- [x] Phase 0 の既存ツール調査メモ `docs/zmk-studio-like-app-phase0-research.md` を作成
+- [x] Phase 0 調査メモの他 AI レビュー依頼文 `docs/zmk-studio-like-app-phase0-review-request.md` を作成
+- [x] Phase 0 調査メモのレビューを実施 (DTS physical-layout 確認、Studio 永続化、編集 range 置換方針、PC キー割り当ての Phase 配置を追記)
+- [x] DTS `roba_physical_layout` の存在を確認 (`boards/shields/roBa/roBa.dtsi`)
+- [x] Phase 0 調査メモ更新後の再レビュー依頼文 `docs/zmk-studio-like-app-phase0-rereview-request.md` を作成
+- [x] Phase 0 調査メモの再レビュー結果 `docs/zmk-studio-like-app-phase0-rereview.md` を作成
+- [x] Phase 0 再レビュー結果を `docs/zmk-studio-like-app-phase0-research.md` に反映
+- [ ] Keymap Editor を roBa の `config/roBa.keymap` / `config/roBa.json` で実際に試す
+- [ ] Claude Design に渡す UI モックアップ依頼文を作成する
+
 ## 最新の結論
 
 - Windows JIS を主用途として扱う。
@@ -56,6 +75,12 @@ roBa のマルチホスト対応、Windows JIS 記号補正、トラックボー
 - `docs/keymap-multihost-scroll-plan.md`
 - `docs/keymap-flashing-guide.md`
 - `docs/windows-jis-symbol-validation.md`
+- `docs/zmk-studio-like-app-plan.md`
+- `docs/zmk-studio-like-app-plan-review.md`
+- `docs/zmk-studio-like-app-plan-rereview.md`
+- `docs/zmk-studio-like-app-phase0-research.md`
+- `docs/zmk-studio-like-app-phase0-review-request.md`
+- `docs/zmk-studio-like-app-phase0-rereview.md`
 - `config/roBa.keymap`
 - `keymap-drawer/roBa.yaml`
 - `keymap-drawer/roBa.svg`
