@@ -24,8 +24,10 @@ roBa 用 ZMK Studio 風ローカルアプリの計画検討。
 - [x] Phase 0 調査メモの再レビュー結果 `docs/zmk-studio-like-app-phase0-rereview.md` を作成
 - [x] Phase 0 再レビュー結果を `docs/zmk-studio-like-app-phase0-research.md` に反映
 - [x] combo / macro など高度編集 UI/UX メモ `docs/zmk-studio-like-app-advanced-editing-ux-notes.md` を作成
-- [ ] Keymap Editor を roBa の `config/roBa.keymap` / `config/roBa.json` で実際に試す
-- [ ] Claude Design に渡す UI モックアップ依頼文を作成する
+- [x] 新しいチャット再開用プロンプト `docs/zmk-studio-like-app-resume-prompt.md` を作成
+- [x] Keymap Editor を roBa の `config/roBa.keymap` / `config/roBa.json` で実際に試す
+- [x] Keymap Editor 実地確認メモ `docs/zmk-studio-like-app-keymap-editor-trial.md` を作成
+- [x] Claude Design に渡す UI モックアップ依頼文 `docs/zmk-studio-like-app-claude-design-request.md` を作成
 
 ## 最新の結論
 
@@ -66,8 +68,9 @@ roBa 用 ZMK Studio 風ローカルアプリの計画検討。
 
 ## 次にやること
 
-1. Windows JIS 記号補正の最終差分を確認する。
-2. 必要に応じて commit / push する。
+1. Claude Design に `docs/zmk-studio-like-app-claude-design-request.md` を渡して、read-only MVP のモックアップを作る。
+2. モックアップ結果を見て、Vite + React の read-only 補助 Web アプリを実装するか判断する。
+3. 実装する場合は、`.keymap` read-only parser の検証基準を先に固める。
 
 ## 参照すべきファイル
 
@@ -83,6 +86,9 @@ roBa 用 ZMK Studio 風ローカルアプリの計画検討。
 - `docs/zmk-studio-like-app-phase0-review-request.md`
 - `docs/zmk-studio-like-app-phase0-rereview.md`
 - `docs/zmk-studio-like-app-advanced-editing-ux-notes.md`
+- `docs/zmk-studio-like-app-keymap-editor-trial.md`
+- `docs/zmk-studio-like-app-claude-design-request.md`
+- `docs/zmk-studio-like-app-resume-prompt.md`
 - `config/roBa.keymap`
 - `keymap-drawer/roBa.yaml`
 - `keymap-drawer/roBa.svg`
