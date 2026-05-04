@@ -95,6 +95,32 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 長い `.keymap` 行は選択 binding 周辺だけを切り出し、`...` 付きで表示する。
   - POS38 の `&lt 2 SPACE` -> `&lt 1 TAB` が横スクロールの奥に隠れないようにした。
   - 長い行の切り出し幅と POS38 の表示を helper tests で固定。
+- 保存処理に進む前の設計メモを `docs/zmk-studio-like-app-phase2-save-design.md` に追加済み:
+  - Phase 2 初期の保存対象は preview 済みの 1 binding 置換だけに限定。
+  - ブラウザから直接 filesystem を書かず、dev-only の server endpoint で保存する方針。
+  - 保存前に `currentRaw` 一致、source range、Phase 2 対象 binding、再 parse、diagnostics 相当を確認する。
+  - backup 作成後に一時ファイル経由で `config/roBa.keymap` を更新する。
+  - 保存後も keymap-drawer 自動更新は対象外。
+- 保存 helper の初期実装を追加済み:
+  - `tools/roba-keymap-viewer/src/keymap/saveBindingChange.js` に `saveBindingChange` / `buildSaveDiagnostics` を追加。
+  - 保存対象 path は `config/roBa.keymap` のみに制限。
+  - 保存前に `currentRaw` 一致、`replaceBinding` validation、再 parse、layer/combo/macro/sensor diagnostics 維持を確認。
+  - `config/.roBa.keymap.bak/` に backup を作ってから temp file 経由で保存する。
+  - `tools/roba-keymap-viewer/src/keymap/saveBindingChange.test.js` に temp repo を使った helper tests を追加。
+- 保存 helper を dev-only endpoint と UI に接続済み:
+  - `tools/roba-keymap-viewer/vite.config.js` に `GET /__roba/keymap-source` と `POST /__roba/save-binding` を追加。
+  - `POST /__roba/save-binding` は `saveBindingChange` を呼び、保存後の source を返す。
+  - `tools/roba-keymap-viewer/src/App.jsx` で keymap source を state 化し、保存成功後に返却 source で再 parse する。
+  - detail panel の Save button は `editorState.canEdit && editorState.changed` の時だけ有効化。
+  - Save button は `import.meta.env.DEV` の時だけ有効化し、production build では実保存しない。
+  - 保存成功/失敗 status を detail panel と Preview tab に表示。
+  - 実ファイルを変更する保存の手動確認はまだ未実施。
+- 保存 UI status 表示を polish 済み:
+  - 保存中 / 成功 / 失敗の status を title・message・backup path に分けて表示するようにした。
+  - detail panel と Preview tab で同じ `SaveStatusPanel` 表示を使う。
+  - backup path は `Backup path` ラベル付きの別行 `code` 表示にした。
+  - backup path は省略表示をやめ、折り返し表示＋必要時だけ縦スクロールにした。
+  - Preview tab は status がない時も diff/source preview が残り高さを使うようにした。
 
 ## 検証状況
 
@@ -167,13 +193,57 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - Edge headless screenshot で画面描画を確認済み。
   - ユーザーが POS38 の Preview タブ Context Diff で変更前後が見えることを確認済み。
   - 確認後、dev server process と child process は停止済み。
+- 保存設計メモ追加後:
+  - ドキュメントのみの変更。`npm test` / `npm run build` は未実行。
+  - 作業前の `git status --short` は clean。
+- 保存 helper 追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。23 tests / 3 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - build 生成物 `dist/` は作業ツリーに残っていないことを確認済み。
+- dev-only endpoint / UI 接続後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。23 tests / 3 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - dev server を `http://127.0.0.1:5173` で起動し、トップページ HTTP 200 を確認。
+  - `GET /__roba/keymap-source` は HTTP 200 を確認。
+  - `POST /__roba/save-binding` は不正な保存要求に HTTP 400 を返すことを確認。
+  - `agent-browser` CLI は PATH 上になく、ブラウザ smoke check は未実施。
+  - 確認後、dev server process と port 5173 listener は停止済み。
+  - Save button の dev-only guard 追加後、再度 `npm test` 成功。23 tests / 3 suites。
+  - Save button の dev-only guard 追加後、再度 `npm run build` 成功。
+  - build 生成物 `dist/` は作業ツリーに残っていないことを確認済み。
+  - ユーザー確認用に dev server を再起動済み。`http://127.0.0.1:5173` は HTTP 200。起動 root PID は 26728、port 5173 listener PID は 27944。
+- UI 保存の往復確認後:
+  - ユーザーが UI で 1 binding を保存し、元の binding に戻す往復保存に成功したことを確認。
+  - `git diff -- config/roBa.keymap` は空。往復保存後、正本 keymap の内容差分は残っていない。
+  - `config/.roBa.keymap.bak/` に backup が 2 件作成されたことを確認。
+  - backup はローカル復旧用の生成物として扱い、`.gitignore` に `config/.roBa.keymap.bak/` を追加済み。
+- 保存 UI status polish 後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。23 tests / 3 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - 起動中の dev server `http://127.0.0.1:5173` は HTTP 200 を確認。
+- backup path 折り返し表示対応後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。23 tests / 3 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - 起動中の dev server `http://127.0.0.1:5173` は HTTP 200 を確認。
+  - `git diff -- config/roBa.keymap` は空。
+  - ユーザーが保存成功表示の `Backup path` 全体を画面内で確認できることを確認済み。
+  - 確認操作後も `git diff -- config/roBa.keymap` は空。backup は追加生成されたが `.gitignore` 済み。
+- commit-ready レビュー後:
+  - 実装差分、保存 helper、保存 helper tests、保存設計メモを確認済み。
+  - `tools/roba-keymap-viewer/src/App.jsx` の軽微なインデント崩れを修正。
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。23 tests / 3 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - `git diff -- config/roBa.keymap` は空。
+  - dev server は `http://127.0.0.1:5173` で起動中。port 5173 listener PID は 27944。
 
 ## 次にやること
 
 優先順:
 
-1. 保存処理に進む前に、バックアップ付き保存・再 parse・diagnostics 維持の設計を小さくまとめる。
-2. 保存処理は preview/diff とテストが安定するまで入れない。
+1. 必要ならこの変更セットを commit する。
+2. commit する場合の候補メッセージ: `Add guarded keymap save flow to roBa viewer`
+3. 保存対象拡張は別作業に分ける。
+4. 保存後の keymap-drawer 自動更新はまだ入れない。
 
 ## 現在の注意点
 
@@ -202,6 +272,7 @@ roBa Keymap Viewer:
 - `docs/zmk-studio-like-app-phase0-rereview.md`
 - `docs/zmk-studio-like-app-advanced-editing-ux-notes.md`
 - `docs/zmk-studio-like-app-phase2-source-range-editing.md`
+- `docs/zmk-studio-like-app-phase2-save-design.md`
 - `docs/zmk-studio-like-app-keymap-editor-trial.md`
 - `docs/zmk-studio-like-app-claude-design-request.md`
 - `docs/zmk-studio-like-app-claude-design-review.md`

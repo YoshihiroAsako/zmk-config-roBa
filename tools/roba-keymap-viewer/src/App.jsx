@@ -1,4 +1,4 @@
-import keymapSource from "../../../config/roBa.keymap?raw";
+import initialKeymapSource from "../../../config/roBa.keymap?raw";
 import roBaMetadata from "../../../config/roBa.json";
 import dtsiSource from "../../../boards/shields/roBa/roBa.dtsi?raw";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -12,8 +12,12 @@ const UNIT = 48;
 const TRACKBALL = { x: 10, y: 3.8, r: 0.62 };
 
 const TABS = ["Bindings", "Combos", "Macros", "Behaviors", "Sensors", "Preview", "Markdown", "Diagnostics"];
+const EMPTY_SAVE_STATUS = { tone: "idle", title: "", message: "", backupPath: "" };
 
 function App() {
+  const [keymapSource, setKeymapSource] = useState(initialKeymapSource);
+  const [saveStatus, setSaveStatus] = useState(EMPTY_SAVE_STATUS);
+  const saveEndpointAvailable = import.meta.env.DEV;
   const document = useMemo(() => {
     const parsed = parseKeymap(keymapSource);
     const physicalLayout = roBaMetadata.layouts.default_layout.layout.map((key, position) => ({
@@ -28,7 +32,7 @@ function App() {
       dtsPhysicalKeyCount: countDtsPhysicalKeys(dtsiSource),
       metadataSensors: roBaMetadata.sensors || [],
     };
-  }, []);
+  }, [keymapSource]);
 
   const [activeLayer, setActiveLayer] = useState(0);
   const [selectedPosition, setSelectedPosition] = useState(0);
@@ -54,9 +58,63 @@ function App() {
     setDraftBinding(selectedEntry?.raw || selectedBinding);
   }, [selectedEntry, selectedBinding]);
 
+  const saveSelectedBinding = async () => {
+    if (!editorState.canEdit || !editorState.changed || !selectedEntry?.sourceRange) return;
+    if (!saveEndpointAvailable) {
+      setSaveStatus({
+        tone: "error",
+        title: "Save unavailable",
+        message: "Save is available only on the local dev server.",
+        backupPath: "",
+      });
+      return;
+    }
+
+    setSaveStatus({
+      tone: "saving",
+      title: "Saving .keymap",
+      message: "Validating source and creating a backup.",
+      backupPath: "",
+    });
+    try {
+      const response = await fetch("/__roba/save-binding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourcePath: "config/roBa.keymap",
+          range: selectedEntry.sourceRange,
+          currentRaw: selectedEntry.raw,
+          nextRaw: effectiveDraftBinding,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || "Save failed.");
+      }
+
+      setKeymapSource(payload.source);
+      setDraftBinding(effectiveDraftBinding);
+      setSaveStatus({
+        tone: "ok",
+        title: "Saved .keymap",
+        message: "Backup created before writing config/roBa.keymap.",
+        backupPath: payload.backupPath,
+      });
+      setActiveTab("Preview");
+    } catch (error) {
+      setSaveStatus({
+        tone: "error",
+        title: "Save failed",
+        message: error.message,
+        backupPath: "",
+      });
+    }
+  };
+
   const selectBinding = (layerId, position) => {
     setActiveLayer(layerId);
     setSelectedPosition(position);
+    setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
   return (
@@ -90,6 +148,7 @@ function App() {
               onClick={() => {
                 setActiveLayer(layer.id);
                 setSelectedPosition((position) => Math.min(position, layer.bindings.length - 1));
+                setSaveStatus(EMPTY_SAVE_STATUS);
               }}
             >
               <span>{layer.id}</span>
@@ -171,12 +230,20 @@ function App() {
                 value={effectiveDraftBinding}
                 onChange={(event) => {
                   setDraftBinding(event.target.value);
+                  setSaveStatus(EMPTY_SAVE_STATUS);
                   setActiveTab("Preview");
                 }}
               />
             </label>
             <div className="editorStatus">{editorState.message}</div>
-            <button type="button" disabled>Save disabled</button>
+            <SaveStatusPanel status={saveStatus} compact />
+            <button
+              type="button"
+              disabled={!saveEndpointAvailable || !editorState.canEdit || !editorState.changed || saveStatus.tone === "saving"}
+              onClick={saveSelectedBinding}
+            >
+              {saveStatus.tone === "saving" ? "Saving..." : "Save .keymap"}
+            </button>
           </div>
         </aside>
       </main>
@@ -206,6 +273,7 @@ function App() {
           markdown={markdown}
           diagnostics={diagnostics}
           editorState={editorState}
+          saveStatus={saveStatus}
           selectedPosition={selectedPosition}
           onSelectBinding={selectBinding}
         />
@@ -272,7 +340,7 @@ function KeyCap({ keyDef, parsed, selected, onSelect }) {
   );
 }
 
-function PanelContent({ tab, document, activeLayer, layerNames, search, markdown, diagnostics, editorState, selectedPosition, onSelectBinding }) {
+function PanelContent({ tab, document, activeLayer, layerNames, search, markdown, diagnostics, editorState, saveStatus, selectedPosition, onSelectBinding }) {
   if (tab === "Bindings") {
     return (
       <BindingsTable
@@ -374,7 +442,7 @@ function PanelContent({ tab, document, activeLayer, layerNames, search, markdown
   }
 
   if (tab === "Preview") {
-    return <PreviewPanel editorState={editorState} />;
+    return <PreviewPanel editorState={editorState} saveStatus={saveStatus} />;
   }
 
   return (
@@ -442,9 +510,10 @@ function BindingsTable({ document, activeLayer, layerNames, search, selectedPosi
   );
 }
 
-function PreviewPanel({ editorState }) {
+function PreviewPanel({ editorState, saveStatus }) {
   return (
-    <div className="previewPanel">
+    <div className={saveStatus.message ? "previewPanel hasStatus" : "previewPanel"}>
+      <SaveStatusPanel status={saveStatus} />
       <div className="diffGrid">
         <div>
           <h3>Context Diff</h3>
@@ -455,6 +524,24 @@ function PreviewPanel({ editorState }) {
           <pre className="sourcePreview">{editorState.nextSource}</pre>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SaveStatusPanel({ status, compact = false }) {
+  if (!status.message) return null;
+
+  const className = `${compact ? "saveStatus" : "previewSaveStatus"} ${status.tone}`;
+  return (
+    <div className={className} role={status.tone === "error" ? "alert" : "status"}>
+      <strong>{status.title}</strong>
+      <span>{status.message}</span>
+      {status.backupPath && (
+        <div className="backupPathBlock">
+          <span className="backupPathLabel">Backup path</span>
+          <code className="backupPathValue">{status.backupPath}</code>
+        </div>
+      )}
     </div>
   );
 }
