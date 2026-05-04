@@ -1,0 +1,515 @@
+:root {
+  color: #18202f;
+  background: #f4f7fb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1120px;
+  min-height: 760px;
+  background: #f4f7fb;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+code,
+pre {
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.appShell {
+  display: grid;
+  grid-template-rows: 56px 48px minmax(360px, 1fr) 270px;
+  height: 100vh;
+  color: #18202f;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #dfe6f0;
+}
+
+.brandMark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 7px;
+  background: #087f8c;
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.topBar h1,
+.paneHeader h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.topBar p {
+  margin: 4px 0 0;
+  color: #65758b;
+  font-size: 12px;
+}
+
+.topBarActions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.topBarActions a {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+  color: #0f6571;
+  text-decoration: none;
+  font-weight: 650;
+  background: #f8fbff;
+}
+
+.statusStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 8px 18px;
+  background: #edf3f9;
+  border-bottom: 1px solid #dfe6f0;
+}
+
+.statusPill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #d7e0ec;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.statusPill span {
+  color: #65758b;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.statusPill strong {
+  overflow: hidden;
+  color: #263247;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusPill.ok {
+  border-left: 4px solid #2a9d8f;
+}
+
+.statusPill.info {
+  border-left: 4px solid #4277c8;
+}
+
+.statusPill.warn {
+  border-left: 4px solid #d18b21;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 190px minmax(680px, 1fr) 280px;
+  min-height: 0;
+  background: #f4f7fb;
+}
+
+.layerRail,
+.detailPane,
+.visualPane,
+.bottomPanel {
+  min-height: 0;
+  background: #ffffff;
+  border-color: #dfe6f0;
+}
+
+.layerRail {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border-right: 1px solid #dfe6f0;
+}
+
+.railTitle,
+.eyebrow {
+  color: #65758b;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.layerButton {
+  display: grid;
+  grid-template-columns: 22px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 38px;
+  margin-top: 6px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #44556b;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.layerButton span,
+.layerButton small {
+  color: #7d8da3;
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+.layerButton strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layerButton.active {
+  border-color: #b7dfe4;
+  background: #e9f7f8;
+  color: #0d5963;
+}
+
+.railNote {
+  display: grid;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #dfe6f0;
+  color: #65758b;
+  font-size: 12px;
+}
+
+.visualPane {
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr);
+  padding: 14px 18px 10px;
+}
+
+.paneHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.paneHeader.compact {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #dfe6f0;
+}
+
+.legend {
+  display: flex;
+  gap: 12px;
+  color: #65758b;
+  font-size: 12px;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend i {
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.editDirect {
+  background: #2a9d8f;
+}
+
+.editBuild {
+  background: #d18b21;
+}
+
+.editSource {
+  background: #c64f5f;
+}
+
+.keyboardSvg {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  overflow: visible;
+}
+
+.halfLabel,
+.trackballText {
+  fill: #8a99ac;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.splitLine {
+  stroke: #ccd6e4;
+  stroke-dasharray: 5 5;
+}
+
+.trackball {
+  fill: #eef2f7;
+  stroke: #c3cfde;
+  stroke-width: 2px;
+  stroke-dasharray: 5 4;
+}
+
+.keyCap {
+  cursor: pointer;
+}
+
+.keyCap rect {
+  fill: #fbfdff;
+  stroke: #c7d3e3;
+  stroke-width: 1.2px;
+}
+
+.keyCap.thumb rect {
+  fill: #eef9f7;
+  stroke: #a9d8d2;
+}
+
+.keyCap.transparent rect {
+  fill: #f3f6fa;
+  stroke: #e0e7f0;
+}
+
+.keyCap.selected rect {
+  fill: #dff5f3;
+  stroke: #087f8c;
+  stroke-width: 2px;
+}
+
+.keyDisplay {
+  fill: #202b3d;
+  font-size: 11px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.keyRaw {
+  fill: #65758b;
+  font-size: 7px;
+  font-weight: 700;
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+
+.keyIndex {
+  fill: #a1afc1;
+  font-size: 6px;
+  text-anchor: end;
+}
+
+.detailPane {
+  border-left: 1px solid #dfe6f0;
+}
+
+.detailList {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+}
+
+.detailList div {
+  display: grid;
+  gap: 4px;
+}
+
+.detailList dt {
+  color: #65758b;
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.detailList dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.disabledBox {
+  display: grid;
+  gap: 5px;
+  margin: 0 16px;
+  padding: 12px;
+  border: 1px solid #ead39a;
+  border-radius: 7px;
+  background: #fff8e8;
+  color: #6b4b12;
+}
+
+.bottomPanel {
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr);
+  border-top: 1px solid #dfe6f0;
+}
+
+.tabBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #dfe6f0;
+}
+
+.tabBar button {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #52647b;
+  cursor: pointer;
+}
+
+.tabBar button.active {
+  border-color: #b7dfe4;
+  background: #e9f7f8;
+  color: #0d5963;
+  font-weight: 750;
+}
+
+.tabBar input {
+  width: 280px;
+  height: 30px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+}
+
+.tableWrap {
+  height: 100%;
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e4eaf2;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fbff;
+  color: #65758b;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+tbody tr {
+  cursor: default;
+}
+
+tbody tr:hover {
+  background: #f3fbfb;
+}
+
+td code {
+  color: #315b9b;
+  font-size: 12px;
+}
+
+.splitPanel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+.splitPanel .tableWrap:first-child {
+  border-right: 1px solid #dfe6f0;
+}
+
+.markdownPreview {
+  height: 100%;
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  background: #fbfdff;
+  color: #263247;
+  font-size: 12px;
+  white-space: pre;
+}
+
+.diagnosticsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.diagnostic {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #d7e0ec;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.diagnostic span {
+  color: #65758b;
+  font-size: 12px;
+}
+
+.diagnostic strong {
+  font-size: 18px;
+}
+
+.diagnostic small {
+  font-weight: 750;
+}
+
+.diagnostic.ok {
+  border-left: 4px solid #2a9d8f;
+}
+
+.diagnostic.fail {
+  border-left: 4px solid #c64f5f;
+}

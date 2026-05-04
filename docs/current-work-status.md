@@ -149,3 +149,59 @@ roBa 用 ZMK Studio 風ローカルアプリの計画検討。
 - Treat `config/roBa.json` and `config/roBa.keymap` as canonical. Files under `uploads/` are Claude Design snapshots only.
 - Created the next-chat prompt at `docs/zmk-studio-like-app-next-chat-prompt.md`.
 - Next recommended action: review the Claude Design mockup, then decide whether to keep it as documentation or migrate it into a Vite + React read-only MVP under `tools/roba-keymap-viewer/`.
+
+## 2026-05-04 update: read-only MVP started
+
+- Reviewed the Claude Design mockup and documented the decision in `docs/zmk-studio-like-app-claude-design-review.md`.
+- Created a Vite + React read-only MVP at `tools/roba-keymap-viewer/`.
+- The MVP imports canonical files directly:
+  - `config/roBa.json`
+  - `config/roBa.keymap`
+  - `boards/shields/roBa/roBa.dtsi` for physical-layout count diagnostics
+- Implemented:
+  - 43-key visual layout from `config/roBa.json`
+  - 7-layer selector and key detail panel
+  - read-only `.keymap` parser for layer bindings, combos, macros, custom/reconfigured behaviors, and sensor-bindings
+  - Bindings / Combos / Macros / Behaviors / Sensors / Markdown / Diagnostics tabs
+  - Markdown preview generated from parsed canonical data
+  - Diagnostics for key count, DTS physical-layout count, layer count, binding count, combo count, macro count, and sensor-binding count
+- Added `.gitignore` for `node_modules/`, `dist/`, and `.vite/`.
+- Installed local npm dependencies under `tools/roba-keymap-viewer/`.
+- Verification:
+  - `npm run build` succeeded.
+  - Dev server was started with `npm run dev -- --port 5173`.
+  - `agent-browser` was unavailable in this environment, so Playwright with local Microsoft Edge was used instead.
+  - Browser smoke check succeeded: title rendered, body was non-empty, no Vite overlay, 43 `.keyCap` elements, 7 layer buttons, 7 tabs, and no console errors.
+  - Diagnostics tab showed all expected counts as OK.
+- Current dev server process was started from PowerShell as process id `24688` during this session. Stop it when no longer needed.
+
+Next recommended action:
+
+1. Open `http://localhost:5173` and inspect the MVP visually.
+2. If the layout is acceptable, refine labels and Windows JIS display mapping.
+3. Add a small automated parser test before expanding toward Phase 2 editing.
+
+## 2026-05-04 update: parser smoke tests added
+
+- Added Node built-in test coverage for the read-only MVP parser at `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js`.
+- Added `npm test` script to `tools/roba-keymap-viewer/package.json`.
+- Test coverage checks:
+  - canonical layer names and 7 layer count
+  - every layer has 43 bindings
+  - combo count is 5
+  - macro count is 1
+  - `lt_to_layer_0` custom behavior is detected
+  - sensor-binding count is 2
+  - important raw bindings such as position 36 `&mo 5` and `&lt_to_layer_0 6 INT_HENKAN` remain visible
+  - DTS physical-layout key count is 43
+  - Markdown output includes representative layer, combo, and sensor sections
+- Verification:
+  - `npm test` succeeded.
+  - `npm run build` succeeded.
+- Removed generated `dist/` after build verification.
+- Stopped the previously started dev server process and its child processes (`24688`, `20824`, `7552`).
+
+Next recommended action:
+
+1. Commit the read-only MVP and parser smoke tests as the current stable checkpoint.
+2. After that, refine Windows JIS display labels or add Phase 2 source-range editing design/tests.
