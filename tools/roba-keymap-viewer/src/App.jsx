@@ -58,6 +58,48 @@ function App() {
     setDraftBinding(selectedEntry?.raw || selectedBinding);
   }, [selectedEntry, selectedBinding]);
 
+  const reloadKeymapSource = async () => {
+    if (!saveEndpointAvailable) {
+      setSaveStatus({
+        tone: "error",
+        title: "Reload unavailable",
+        message: "Reload is available only on the local dev server.",
+        backupPath: "",
+      });
+      return;
+    }
+
+    setSaveStatus({
+      tone: "saving",
+      title: "Reloading source",
+      message: "Loading the latest config/roBa.keymap from disk.",
+      backupPath: "",
+    });
+    try {
+      const response = await fetch("/__roba/keymap-source");
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || "Reload failed.");
+      }
+
+      setKeymapSource(payload.source);
+      setDraftBinding(null);
+      setSaveStatus({
+        tone: "ok",
+        title: "Reloaded source",
+        message: "Loaded the latest config/roBa.keymap from disk.",
+        backupPath: "",
+      });
+    } catch (error) {
+      setSaveStatus({
+        tone: "error",
+        title: "Reload failed",
+        message: error.message,
+        backupPath: "",
+      });
+    }
+  };
+
   const saveSelectedBinding = async () => {
     if (!editorState.canEdit || !editorState.changed || !selectedEntry?.sourceRange) return;
     if (!saveEndpointAvailable) {
@@ -126,6 +168,9 @@ function App() {
           <p>Read-only MVP from canonical config files</p>
         </div>
         <div className="topBarActions">
+          <button type="button" disabled={!saveEndpointAvailable} onClick={reloadKeymapSource}>
+            Reload source
+          </button>
           <a href="https://zmk.studio/" target="_blank" rel="noreferrer">ZMK Studio</a>
           <a href="https://nickcoutsos.github.io/keymap-editor/" target="_blank" rel="noreferrer">Keymap Editor</a>
         </div>
@@ -136,6 +181,7 @@ function App() {
         <StatusPill label="Layout" value={`${document.physicalLayout.length} keys`} tone="ok" />
         <StatusPill label="Mode" value="read-only" tone="info" />
         <StatusPill label="Studio" value="official app only" tone="warn" />
+        <StatusPill label="Action" value={saveStatus.title || "ready"} tone={getStatusTone(saveStatus)} />
       </section>
 
       <main className="workspace">
@@ -566,6 +612,13 @@ function StatusPill({ label, value, tone }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function getStatusTone(status) {
+  if (status.tone === "ok") return "ok";
+  if (status.tone === "error") return "fail";
+  if (status.tone === "saving") return "info";
+  return "info";
 }
 
 function getDiagnostics(document) {

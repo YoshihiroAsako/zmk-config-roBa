@@ -121,6 +121,13 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - backup path は `Backup path` ラベル付きの別行 `code` 表示にした。
   - backup path は省略表示をやめ、折り返し表示＋必要時だけ縦スクロールにした。
   - Preview tab は status がない時も diff/source preview が残り高さを使うようにした。
+- 保存フロー一式は `7408f64 Add guarded keymap save flow to roBa viewer` で commit 済み。ユーザーが push 済み。
+- Reload source UI を追加中:
+  - top bar に `Reload source` button を追加。
+  - `GET /__roba/keymap-source` で最新の `config/roBa.keymap` を読み直す。
+  - 保存競合時の "Reload before saving." に対応できる UI として使う。
+  - Reload 成功/失敗は既存の `SaveStatusPanel` で表示。
+  - 上部 status strip に `Action` pill を追加し、`Reloaded source` / `Saved .keymap` / error などを常時見える位置に表示。
 
 ## 検証状況
 
@@ -235,13 +242,23 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `tools/roba-keymap-viewer/` で `npm run build` 成功。
   - `git diff -- config/roBa.keymap` は空。
   - dev server は `http://127.0.0.1:5173` で起動中。port 5173 listener PID は 27944。
+- Reload source UI 追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。23 tests / 3 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - `GET /__roba/keymap-source` は HTTP 200 を確認。
+  - `git diff -- config/roBa.keymap` は空。
+- Action status pill 追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。23 tests / 3 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - 起動中の dev server `http://127.0.0.1:5173` は HTTP 200 を確認。
+  - `git diff -- config/roBa.keymap` は空。
 
 ## 次にやること
 
 優先順:
 
-1. 必要ならこの変更セットを commit する。
-2. commit する場合の候補メッセージ: `Add guarded keymap save flow to roBa viewer`
+1. ユーザーに `Reload source` button と上部 `Action` 表示の見た目・動作を確認してもらう。
+2. 問題なければ Reload source UI を commit する。
 3. 保存対象拡張は別作業に分ける。
 4. 保存後の keymap-drawer 自動更新はまだ入れない。
 

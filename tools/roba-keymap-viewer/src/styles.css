@@ -77,7 +77,8 @@ pre {
   margin-left: auto;
 }
 
-.topBarActions a {
+.topBarActions a,
+.topBarActions button {
   display: inline-flex;
   align-items: center;
   height: 32px;
@@ -90,9 +91,18 @@ pre {
   background: #f8fbff;
 }
 
+.topBarActions button {
+  cursor: pointer;
+}
+
+.topBarActions button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .statusStrip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   padding: 8px 18px;
   background: #edf3f9;
@@ -134,6 +144,10 @@ pre {
 
 .statusPill.warn {
   border-left: 4px solid #d18b21;
+}
+
+.statusPill.fail {
+  border-left: 4px solid #c64f5f;
 }
 
 .workspace {
