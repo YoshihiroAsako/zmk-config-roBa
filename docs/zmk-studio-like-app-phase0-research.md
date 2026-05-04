@@ -284,6 +284,9 @@ ZMK Studio で行った keymap 変更は settings 側に保存され、repo `.ke
 
 Phase 2 の 1 キー編集では、key position に対応する binding expression 全体を `sourceRange` として置換する。behavior 名や引数 token の部分置換は行わない。
 
+Phase 2 の具体的な初期実装順は `docs/zmk-studio-like-app-phase2-source-range-editing.md` に切り出した。
+以後の実装では、まず `sourceRange` 付き parser、1 binding 置換、preview/diff、回帰テストを優先し、保存 UI はその後に追加する。
+
 例:
 
 - `&kp LS(LG(S))`

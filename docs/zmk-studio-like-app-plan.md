@@ -336,6 +336,9 @@ Markdown 出力例:
 
 この段階では `.keymap` をアプリから限定的に編集できるようにする。
 
+最初の実装順は `docs/zmk-studio-like-app-phase2-source-range-editing.md` を正として進める。
+Phase 2 初期は保存 UI を急がず、まず sourceRange 付き parser、1 binding 置換の純粋関数、preview/diff、回帰テストを固める。
+
 機能:
 
 - 画面上のキーをクリックして選択する
@@ -343,8 +346,8 @@ Markdown 出力例:
 - まずは `&kp A`、`&kp ENTER`、`&kp TAB` など基本的な key press から対応する
 - Windows JIS 向けの表示と ZMK keycode の変換を持たせる
 - 変更差分を表示する
-- `config/roBa.keymap` に保存する
-- 編集前自動バックアップを作る
+- 変更後 `.keymap` preview を表示する
+- preview/diff とテストが安定してから `config/roBa.keymap` 保存と編集前自動バックアップを追加する
 
 後回しにする編集:
 

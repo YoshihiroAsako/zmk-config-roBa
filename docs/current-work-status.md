@@ -64,6 +64,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `docs/windows-jis-symbol-validation.md` の実機検証・補正案を Viewer 表示に反映。
   - `COLON` -> `+`、`SQT` -> `:`、`ASTERISK` -> `(`、`LEFT_PARENTHESIS` -> `)`、`RIGHT_BRACKET` -> `[`、`RIGHT_BRACE` -> `{` などを Windows JIS 出力として表示。
   - `TILDE` と `RIGHT_PARENTHESIS` は未確定扱いとして note に要検証を表示。
+  - `94ba32b windows Jis表記検証_20260504` で commit 済み。
 
 ## 検証状況
 
@@ -104,8 +105,9 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 優先順:
 
-1. Windows JIS 表示改善を commit する。
-2. Phase 2 の source-range editing 設計とテストを追加する。
+1. Phase 2 の source-range editing 設計とテストを追加する。
+2. 編集 UI は read-only MVP の表示・診断を壊さない範囲で、まず `&kp` など限定的な binding から扱う。
+3. 詳細な実装順は `docs/zmk-studio-like-app-phase2-source-range-editing.md` を参照する。
 
 ## 現在の注意点
 
@@ -133,6 +135,7 @@ roBa Keymap Viewer:
 - `docs/zmk-studio-like-app-phase0-research.md`
 - `docs/zmk-studio-like-app-phase0-rereview.md`
 - `docs/zmk-studio-like-app-advanced-editing-ux-notes.md`
+- `docs/zmk-studio-like-app-phase2-source-range-editing.md`
 - `docs/zmk-studio-like-app-keymap-editor-trial.md`
 - `docs/zmk-studio-like-app-claude-design-request.md`
 - `docs/zmk-studio-like-app-claude-design-review.md`

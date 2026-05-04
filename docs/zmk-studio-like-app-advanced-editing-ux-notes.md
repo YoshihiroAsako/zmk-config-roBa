@@ -239,6 +239,10 @@ Phase 2 の 1 キー編集で復帰させる。
 - ビルド必要か
 - Studio 側 settings とずれる可能性
 
+Phase 2 初期では、保存ボタンより先に preview/diff を完成させる。
+sourceRange 置換と差分テストが安定するまでは、UI 上の編集は preview 生成までに留める。
+詳細な実装順は `docs/zmk-studio-like-app-phase2-source-range-editing.md` を参照する。
+
 保存時:
 
 - 自動バックアップを作成
