@@ -87,6 +87,14 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 右側 detail panel をスクロール可能にし、ブラウザ 100% 表示でも `Phase 2 Preview` に到達できるようにした。
   - キーマップ上でキーを選択したとき、下の Bindings 表でも対応行をハイライトし、自動スクロールするようにした。
   - Bindings 表で検索結果など別レイヤーの行をクリックした場合も、そのレイヤーへ切り替えて選択する。
+- Preview タブの diff 表示を改善済み:
+  - binding 1行だけの diff に加えて、`.keymap` 内の周辺行つき Context Diff を表示するようにした。
+  - `buildContextDiff(source, range, nextRaw)` を `editorPreview.js` に追加し、CRLF の source range offset を保持して行内置換位置を計算する。
+  - Context Diff の helper tests を追加。
+- POS38 など長い keymap 行の Context Diff を改善済み:
+  - 長い `.keymap` 行は選択 binding 周辺だけを切り出し、`...` 付きで表示する。
+  - POS38 の `&lt 2 SPACE` -> `&lt 1 TAB` が横スクロールの奥に隠れないようにした。
+  - 長い行の切り出し幅と POS38 の表示を helper tests で固定。
 
 ## 検証状況
 
@@ -147,15 +155,25 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - ユーザーがブラウザ 100% 表示で右 detail panel をスクロールして `Phase 2 Preview` が見えることを確認済み。
   - ユーザーが `bindingEntries` を変更すると Preview タブの diff に反映されることを確認済み。
   - ユーザー確認後、dev server process は停止済み。
+- Context Diff 改善後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。17 tests / 2 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - Edge headless screenshot で画面描画を確認済み。
+  - 確認後、dev server process と child process は停止済み。
+- POS38 Context Diff 改善後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。18 tests / 2 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - `buildContextDiff` の実出力で `&lt 2 SPACE` / `&lt 1 TAB` が短い行内に表示されることを確認済み。
+  - Edge headless screenshot で画面描画を確認済み。
+  - ユーザーが POS38 の Preview タブ Context Diff で変更前後が見えることを確認済み。
+  - 確認後、dev server process と child process は停止済み。
 
 ## 次にやること
 
 優先順:
 
-1. 置換後 preview の差分表示を binding 1行だけでなく、周辺行つきに改善する。
-2. Preview helper に周辺行 diff 用の pure function を追加し、テストする。
-3. その後、保存処理に進む前に、バックアップ付き保存・再 parse・diagnostics 維持の設計を小さくまとめる。
-4. 保存処理は preview/diff とテストが安定するまで入れない。
+1. 保存処理に進む前に、バックアップ付き保存・再 parse・diagnostics 維持の設計を小さくまとめる。
+2. 保存処理は preview/diff とテストが安定するまで入れない。
 
 ## 現在の注意点
 

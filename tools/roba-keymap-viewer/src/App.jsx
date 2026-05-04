@@ -447,8 +447,8 @@ function PreviewPanel({ editorState }) {
     <div className="previewPanel">
       <div className="diffGrid">
         <div>
-          <h3>Diff</h3>
-          <pre className="diffPreview">{editorState.diff || "No change."}</pre>
+          <h3>Context Diff</h3>
+          <pre className="diffPreview">{editorState.contextDiff || editorState.diff || "No change."}</pre>
         </div>
         <div>
           <h3>.keymap Preview</h3>

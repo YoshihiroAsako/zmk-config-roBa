@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildEditorState, isPhase2Editable } from "./editorPreview.js";
+import { buildContextDiff, buildEditorState, isPhase2Editable } from "./editorPreview.js";
 import { parseKeymap } from "./parseKeymap.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,6 +34,9 @@ describe("editor preview state", () => {
     assert.equal(state.canEdit, true);
     assert.equal(state.changed, true);
     assert.equal(state.diff, "- &kp Q\n+ &kp B");
+    assert.match(state.contextDiff, /-84 &kp Q/);
+    assert.match(state.contextDiff, /\+84 &kp B/);
+    assert.match(state.contextDiff, /&kp W/);
     assert.match(state.message, /Preview ready/);
     assert.equal(
       state.nextSource,
@@ -51,6 +54,7 @@ describe("editor preview state", () => {
     assert.equal(state.canEdit, true);
     assert.equal(state.changed, false);
     assert.equal(state.diff, "");
+    assert.equal(state.contextDiff, "");
     assert.equal(state.message, "No change.");
     assert.equal(state.nextSource, source);
   });
@@ -64,9 +68,13 @@ describe("editor preview state", () => {
 
     assert.equal(momentary.canEdit, true);
     assert.equal(momentary.diff, "- &mo 5\n+ &mo 4");
+    assert.match(momentary.contextDiff, /-87 .*&mo 5/);
+    assert.match(momentary.contextDiff, /\+87 .*&mo 4/);
     assert.equal(parseKeymap(momentary.nextSource).layers[0].bindings[36], "&mo 4");
     assert.equal(layerTap.canEdit, true);
     assert.equal(layerTap.diff, "- &lt 2 SPACE\n+ &lt 1 TAB");
+    assert.match(layerTap.contextDiff, /-87 .*&lt 2 SPACE/);
+    assert.match(layerTap.contextDiff, /\+87 .*&lt 1 TAB/);
     assert.equal(parseKeymap(layerTap.nextSource).layers[0].bindings[38], "&lt 1 TAB");
     assert.equal(modTap.canEdit, true);
     assert.equal(modTap.diff, "- &mt LEFT_SHIFT Z\n+ &mt LEFT_CONTROL X");
@@ -97,5 +105,31 @@ describe("editor preview state", () => {
     assert.equal(spaced.nextSource, source);
     assert.match(unsupported.message, /not supported/);
     assert.equal(unsupported.nextSource, source);
+  });
+
+  it("builds source context diff around a selected binding range", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const range = parsed.layers[0].bindingEntries[38].sourceRange;
+    const diff = buildContextDiff(source, range, "&lt 1 TAB");
+
+    assert.match(diff, /^ 86 /m);
+    assert.match(diff, /^-87 .*&lt 2 SPACE/m);
+    assert.match(diff, /^\+87 .*&lt 1 TAB/m);
+    assert.match(diff, /^ 88 /m);
+    assert.equal(diff.split("\n").every((line) => line.length <= 108), true);
+    assert.doesNotMatch(diff, /undefined/);
+  });
+
+  it("keeps long line diffs focused on the edited binding", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const range = parsed.layers[0].bindingEntries[38].sourceRange;
+    const diff = buildContextDiff(source, range, "&lt 1 TAB", 1, 72);
+
+    assert.match(diff, /&lt 2 SPACE/);
+    assert.match(diff, /&lt 1 TAB/);
+    assert.match(diff, /\.\.\./);
+    assert.equal(diff.split("\n").every((line) => line.length <= 84), true);
   });
 });
