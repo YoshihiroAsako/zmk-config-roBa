@@ -59,6 +59,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - Parser smoke tests を `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js` に追加済み。
 - `tools/roba-keymap-viewer/package.json` に `npm test` を追加済み。
 - 再開用の独立プロンプトファイルは廃止し、このファイルへ統合済み。
+- read-only MVP は `6df760b Add read-only roBa keymap viewer MVP` で commit 済み。
 
 ## 検証状況
 
@@ -78,15 +79,21 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - diagnostics counts OK
 - 検証後、dev server process と child process は停止済み。
 - build 検証で生成された `dist/` は削除済み。
+- 2026-05-04 再開時確認:
+  - `npm test` 成功。
+  - `npm run build` 成功。生成された `dist/` は削除済み。
+  - dev server は `http://localhost:5173` / `http://127.0.0.1:5173` で起動して確認済み。
+  - ユーザーが `http://localhost:5173` を視覚確認して OK。
+  - 確認後、dev server process と child process は停止済み。
+  - `Invoke-WebRequest -UseBasicParsing http://localhost:5173` は HTTP 200。
+  - `agent-browser` CLI は PATH 上になく、ブラウザ smoke check は未実施。
 
 ## 次にやること
 
 優先順:
 
-1. read-only MVP と parser smoke tests を安定チェックポイントとして commit する。
-2. `http://localhost:5173` でユーザーが視覚確認する。
-3. 必要なら Windows JIS 表示ラベルを改善する。
-4. Phase 2 の source-range editing 設計とテストを追加する。
+1. 必要なら Windows JIS 表示ラベルを改善する。
+2. Phase 2 の source-range editing 設計とテストを追加する。
 
 ## 現在の注意点
 
