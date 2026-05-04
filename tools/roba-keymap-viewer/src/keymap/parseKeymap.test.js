@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { describeBinding } from "./bindingDisplay.js";
-import { countDtsPhysicalKeys, parseKeymap } from "./parseKeymap.js";
+import { countDtsPhysicalKeys, parseKeymap, replaceBinding, replaceBindings } from "./parseKeymap.js";
 import { buildMarkdown } from "../export/markdown.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -86,5 +86,102 @@ describe("roBa keymap parser", () => {
     assert.match(markdown, /## Combos/);
     assert.match(markdown, /\| double_quotation \| 18 \+ 19 \| `&kp AT_SIGN` \|/);
     assert.match(markdown, /## Sensor Bindings/);
+  });
+
+  it("tracks source ranges for layer binding expressions without changing display bindings", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const defaultLayer = parsed.layers[0];
+
+    assert.equal(defaultLayer.bindingEntries.length, defaultLayer.bindings.length);
+    assert.equal(defaultLayer.bindingEntries[0].raw, "&kp Q");
+    assert.equal(defaultLayer.bindings[0], "&kp Q");
+    assert.equal(
+      source.slice(defaultLayer.bindingEntries[0].sourceRange.start, defaultLayer.bindingEntries[0].sourceRange.end),
+      "&kp Q",
+    );
+    assert.equal(defaultLayer.bindingEntries[37].raw, "&lt_to_layer_0 6 INT_HENKAN");
+  });
+
+  it("replaces one key binding while preserving every other byte of the keymap source", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const range = parsed.layers[0].bindingEntries[0].sourceRange;
+    const updated = replaceBinding(source, range, "&kp B");
+
+    assert.equal(updated, `${source.slice(0, range.start)}&kp B${source.slice(range.end)}`);
+
+    const reparsed = parseKeymap(updated);
+    assert.equal(reparsed.layers[0].bindings[0], "&kp B");
+    assert.deepEqual(
+      reparsed.layers.map((layer) => layer.bindings.length),
+      parsed.layers.map((layer) => layer.bindings.length),
+    );
+  });
+
+  it("replaces transparent, none, and parenthesized keypress bindings from source ranges", () => {
+    const source = `/
+{
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            bindings = <
+&trans  &none  &kp LS(INT_YEN)
+            >;
+        };
+    };
+};
+`;
+    const parsed = parseKeymap(source);
+    const [transparent, none, yen] = parsed.layers[0].bindingEntries;
+    const updated = replaceBindings(source, [
+      { range: transparent.sourceRange, nextRaw: "&kp A" },
+      { range: none.sourceRange, nextRaw: "&trans" },
+      { range: yen.sourceRange, nextRaw: "&none" },
+    ]);
+    const reparsed = parseKeymap(updated);
+
+    assert.deepEqual(reparsed.layers[0].bindings, ["&kp A", "&trans", "&none"]);
+    assert.equal(updated.includes("&kp LS(INT_YEN)"), false);
+  });
+
+  it("replaces momentary, layer-tap, and mod-tap bindings from source ranges", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const replacements = [
+      { range: parsed.layers[0].bindingEntries[36].sourceRange, nextRaw: "&mo 4" },
+      { range: parsed.layers[0].bindingEntries[38].sourceRange, nextRaw: "&lt 1 TAB" },
+      { range: parsed.layers[0].bindingEntries[22].sourceRange, nextRaw: "&mt LEFT_CONTROL X" },
+    ];
+    const updated = replaceBindings(source, replacements);
+    const reparsed = parseKeymap(updated);
+
+    assert.equal(reparsed.layers[0].bindings[36], "&mo 4");
+    assert.equal(reparsed.layers[0].bindings[38], "&lt 1 TAB");
+    assert.equal(reparsed.layers[0].bindings[22], "&mt LEFT_CONTROL X");
+    assert.deepEqual(
+      reparsed.layers.map((layer) => layer.bindings.length),
+      parsed.layers.map((layer) => layer.bindings.length),
+    );
+  });
+
+  it("rejects unsupported or overlapping source-range replacements", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const first = parsed.layers[0].bindingEntries[0].sourceRange;
+    const second = parsed.layers[0].bindingEntries[1].sourceRange;
+
+    assert.throws(() => replaceBinding(source, first, "&bt BT_SEL 0"), /not supported/);
+    assert.throws(() => replaceBinding(source, first, " &kp A"), /trimmed/);
+    assert.throws(() => replaceBinding(source, { start: first.start, end: second.end }, "&kp A"), /one binding/);
+    assert.throws(
+      () =>
+        replaceBindings(source, [
+          { range: first, nextRaw: "&kp A" },
+          { range: first, nextRaw: "&kp B" },
+        ]),
+      /overlap/,
+    );
   });
 });

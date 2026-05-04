@@ -1,16 +1,17 @@
 import keymapSource from "../../../config/roBa.keymap?raw";
 import roBaMetadata from "../../../config/roBa.json";
 import dtsiSource from "../../../boards/shields/roBa/roBa.dtsi?raw";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarkdown } from "./export/markdown.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
+import { buildEditorState } from "./keymap/editorPreview.js";
 import { countDtsPhysicalKeys, parseKeymap } from "./keymap/parseKeymap.js";
 
 const KEY_SIZE = 44;
 const UNIT = 48;
 const TRACKBALL = { x: 10, y: 3.8, r: 0.62 };
 
-const TABS = ["Bindings", "Combos", "Macros", "Behaviors", "Sensors", "Markdown", "Diagnostics"];
+const TABS = ["Bindings", "Combos", "Macros", "Behaviors", "Sensors", "Preview", "Markdown", "Diagnostics"];
 
 function App() {
   const document = useMemo(() => {
@@ -33,13 +34,30 @@ function App() {
   const [selectedPosition, setSelectedPosition] = useState(0);
   const [activeTab, setActiveTab] = useState("Bindings");
   const [search, setSearch] = useState("");
+  const [draftBinding, setDraftBinding] = useState(null);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
   const selectedBinding = currentLayer.bindings[selectedPosition] || "&trans";
+  const selectedEntry = currentLayer.bindingEntries?.[selectedPosition];
   const selectedParsed = describeBinding(selectedBinding, layerNames);
+  const selectedRange = selectedEntry?.sourceRange;
+  const effectiveDraftBinding = draftBinding ?? selectedEntry?.raw ?? selectedBinding;
+  const editorState = useMemo(
+    () => buildEditorState(keymapSource, selectedEntry, effectiveDraftBinding, document.layers),
+    [selectedEntry, effectiveDraftBinding, document],
+  );
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
+
+  useEffect(() => {
+    setDraftBinding(selectedEntry?.raw || selectedBinding);
+  }, [selectedEntry, selectedBinding]);
+
+  const selectBinding = (layerId, position) => {
+    setActiveLayer(layerId);
+    setSelectedPosition(position);
+  };
 
   return (
     <div className="appShell">
@@ -103,7 +121,7 @@ function App() {
             bindings={currentLayer.bindings}
             layerNames={layerNames}
             selectedPosition={selectedPosition}
-            onSelect={setSelectedPosition}
+            onSelect={(position) => selectBinding(activeLayer, position)}
           />
         </section>
 
@@ -124,6 +142,10 @@ function App() {
               <dd><code>{selectedBinding}</code></dd>
             </div>
             <div>
+              <dt>Source range</dt>
+              <dd>{selectedRange ? `${selectedRange.start}..${selectedRange.end}` : "Unavailable"}</dd>
+            </div>
+            <div>
               <dt>Kind</dt>
               <dd>{selectedParsed.kind}</dd>
             </div>
@@ -136,9 +158,25 @@ function App() {
               <dd>{selectedParsed.note || "No special note."}</dd>
             </div>
           </dl>
-          <div className="disabledBox">
-            <strong>Phase 1</strong>
-            <span>Editing and firmware writes are intentionally disabled in this MVP.</span>
+          <div className={editorState.canEdit ? "editorBox" : "editorBox disabled"}>
+            <div className="editorHeader">
+              <strong>Phase 2 Preview</strong>
+              <span>{editorState.canEdit ? "preview only" : "read-only"}</span>
+            </div>
+            <label>
+              <span>Raw binding</span>
+              <input
+                aria-label="Raw binding"
+                disabled={!editorState.canEdit}
+                value={effectiveDraftBinding}
+                onChange={(event) => {
+                  setDraftBinding(event.target.value);
+                  setActiveTab("Preview");
+                }}
+              />
+            </label>
+            <div className="editorStatus">{editorState.message}</div>
+            <button type="button" disabled>Save disabled</button>
           </div>
         </aside>
       </main>
@@ -167,7 +205,9 @@ function App() {
           search={search}
           markdown={markdown}
           diagnostics={diagnostics}
-          onSelectPosition={setSelectedPosition}
+          editorState={editorState}
+          selectedPosition={selectedPosition}
+          onSelectBinding={selectBinding}
         />
       </section>
     </div>
@@ -232,36 +272,16 @@ function KeyCap({ keyDef, parsed, selected, onSelect }) {
   );
 }
 
-function PanelContent({ tab, document, activeLayer, layerNames, search, markdown, diagnostics, onSelectPosition }) {
+function PanelContent({ tab, document, activeLayer, layerNames, search, markdown, diagnostics, editorState, selectedPosition, onSelectBinding }) {
   if (tab === "Bindings") {
-    const rows = document.layers.flatMap((layer) =>
-      layer.bindings.map((binding, position) => ({
-        layer,
-        position,
-        binding,
-        parsed: describeBinding(binding, layerNames),
-      })),
-    );
-    const needle = search.trim().toLowerCase();
-    const filtered = rows.filter((row) => {
-      if (!needle) return row.layer.id === activeLayer;
-      return [row.layer.name, row.binding, row.parsed.display, row.parsed.kind, row.parsed.note].join(" ").toLowerCase().includes(needle);
-    });
     return (
-      <Table
-        columns={["Pos", "Layer", "Display", "Binding", "Kind", "Editability", "Notes"]}
-        rows={filtered}
-        renderRow={(row) => (
-          <tr key={`${row.layer.id}-${row.position}`} onClick={() => onSelectPosition(row.position)}>
-            <td>{row.position}</td>
-            <td>{row.layer.name}</td>
-            <td><strong>{row.parsed.display}</strong></td>
-            <td><code>{row.binding}</code></td>
-            <td>{row.parsed.kind}</td>
-            <td>{row.parsed.editability}</td>
-            <td>{row.parsed.note}</td>
-          </tr>
-        )}
+      <BindingsTable
+        document={document}
+        activeLayer={activeLayer}
+        layerNames={layerNames}
+        search={search}
+        selectedPosition={selectedPosition}
+        onSelectBinding={onSelectBinding}
       />
     );
   }
@@ -353,6 +373,10 @@ function PanelContent({ tab, document, activeLayer, layerNames, search, markdown
     return <pre className="markdownPreview">{markdown}</pre>;
   }
 
+  if (tab === "Preview") {
+    return <PreviewPanel editorState={editorState} />;
+  }
+
   return (
     <div className="diagnosticsGrid">
       {diagnostics.map((item) => (
@@ -362,6 +386,75 @@ function PanelContent({ tab, document, activeLayer, layerNames, search, markdown
           <small>{item.ok ? "OK" : "Check needed"}</small>
         </div>
       ))}
+    </div>
+  );
+}
+
+function BindingsTable({ document, activeLayer, layerNames, search, selectedPosition, onSelectBinding }) {
+  const selectedRowRef = useRef(null);
+  const rows = document.layers.flatMap((layer) =>
+    layer.bindings.map((binding, position) => ({
+      layer,
+      position,
+      binding,
+      parsed: describeBinding(binding, layerNames),
+    })),
+  );
+  const needle = search.trim().toLowerCase();
+  const filtered = rows.filter((row) => {
+    if (!needle) return row.layer.id === activeLayer;
+    return [row.layer.name, row.binding, row.parsed.display, row.parsed.kind, row.parsed.note].join(" ").toLowerCase().includes(needle);
+  });
+
+  useEffect(() => {
+    selectedRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [activeLayer, selectedPosition, search]);
+
+  return (
+    <div className="tableWrap">
+      <table>
+        <thead>
+          <tr>{["Pos", "Layer", "Display", "Binding", "Kind", "Editability", "Notes"].map((column) => <th key={column}>{column}</th>)}</tr>
+        </thead>
+        <tbody>
+          {filtered.map((row) => {
+            const selected = row.layer.id === activeLayer && row.position === selectedPosition;
+            return (
+              <tr
+                className={selected ? "selectedRow" : ""}
+                key={`${row.layer.id}-${row.position}`}
+                onClick={() => onSelectBinding(row.layer.id, row.position)}
+                ref={selected ? selectedRowRef : null}
+              >
+                <td>{row.position}</td>
+                <td>{row.layer.name}</td>
+                <td><strong>{row.parsed.display}</strong></td>
+                <td><code>{row.binding}</code></td>
+                <td>{row.parsed.kind}</td>
+                <td>{row.parsed.editability}</td>
+                <td>{row.parsed.note}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PreviewPanel({ editorState }) {
+  return (
+    <div className="previewPanel">
+      <div className="diffGrid">
+        <div>
+          <h3>Diff</h3>
+          <pre className="diffPreview">{editorState.diff || "No change."}</pre>
+        </div>
+        <div>
+          <h3>.keymap Preview</h3>
+          <pre className="sourcePreview">{editorState.nextSource}</pre>
+        </div>
+      </div>
     </div>
   );
 }

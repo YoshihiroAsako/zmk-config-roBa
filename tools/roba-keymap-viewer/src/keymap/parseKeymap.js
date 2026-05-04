@@ -25,7 +25,7 @@ function findMatchingBrace(source, openIndex) {
   return -1;
 }
 
-function directChildBlocks(body) {
+function directChildBlocks(body, baseOffset = 0) {
   const children = [];
   let cursor = 0;
   while (cursor < body.length) {
@@ -40,11 +40,16 @@ function directChildBlocks(body) {
     const name = getNodeName(head);
 
     if (name) {
+      const rawStart = boundary + 1;
       children.push({
         name,
         rawHead: head,
         body: body.slice(open + 1, close),
+        bodyStart: baseOffset + open + 1,
+        bodyEnd: baseOffset + close,
         raw: body.slice(boundary + 1, close + 1).trim(),
+        rawStart: baseOffset + rawStart,
+        rawEnd: baseOffset + close + 1,
       });
     }
     cursor = close + 1;
@@ -60,8 +65,24 @@ function getNodeName(head) {
 }
 
 function getAngleProperty(body, propName) {
+  return getAnglePropertyInfo(body, propName)?.value || "";
+}
+
+function getAnglePropertyInfo(body, propName, baseOffset = 0) {
   const match = new RegExp(`${propName}\\s*=\\s*<([\\s\\S]*?)>\\s*;`).exec(body);
-  return match ? match[1] : "";
+  if (!match) return null;
+
+  const valueStart = body.indexOf("<", match.index) + 1;
+  const valueEnd = body.indexOf(">", valueStart);
+  if (valueStart < 1 || valueEnd < valueStart) return null;
+
+  return {
+    value: body.slice(valueStart, valueEnd),
+    sourceRange: {
+      start: baseOffset + valueStart,
+      end: baseOffset + valueEnd,
+    },
+  };
 }
 
 function getStringProperty(body, propName) {
@@ -75,11 +96,55 @@ function getNumberProperty(body, propName) {
 }
 
 function splitBindingExpressions(value) {
-  return value
-    .replace(/\/\/.*$/gm, "")
-    .split(/(?=&)/g)
-    .map((item) => item.replace(/\s+/g, " ").trim())
-    .filter(Boolean);
+  return splitBindingEntries(value).map((entry) => entry.raw);
+}
+
+function splitBindingEntries(value, sourceStart = 0) {
+  const starts = findBindingStarts(value);
+  return starts
+    .map((start, index) => {
+      const nextStart = starts[index + 1] ?? value.length;
+      const end = trimBindingExpressionEnd(value, start, nextStart);
+      const raw = value.slice(start, end).replace(/\s+/g, " ").trim();
+      return {
+        raw,
+        sourceRange: {
+          start: sourceStart + start,
+          end: sourceStart + end,
+        },
+      };
+    })
+    .filter((entry) => entry.raw);
+}
+
+function findBindingStarts(value) {
+  const starts = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "/" && value[index + 1] === "/") {
+      index = findLineEnd(value, index);
+      continue;
+    }
+    if (value[index] === "&") starts.push(index);
+  }
+  return starts;
+}
+
+function trimBindingExpressionEnd(value, start, fallbackEnd) {
+  let end = fallbackEnd;
+  for (let index = start; index < fallbackEnd; index += 1) {
+    if (value[index] === "/" && value[index + 1] === "/") {
+      end = index;
+      break;
+    }
+  }
+
+  while (end > start && /\s/.test(value[end - 1])) end -= 1;
+  return end;
+}
+
+function findLineEnd(value, start) {
+  const newline = value.indexOf("\n", start);
+  return newline < 0 ? value.length : newline;
 }
 
 function parseCombos(source) {
@@ -163,14 +228,22 @@ function parseBehaviors(source) {
 
 export function parseKeymap(source) {
   const keymap = findBlock(source, "keymap");
-  const layerBlocks = keymap ? directChildBlocks(keymap.body) : [];
-  const layers = layerBlocks.map((layer, index) => ({
-    id: index,
-    name: layer.name,
-    bindings: splitBindingExpressions(getAngleProperty(layer.body, "bindings")),
-    sensorBindings: splitBindingExpressions(getAngleProperty(layer.body, "sensor-bindings")),
-    raw: layer.raw,
-  }));
+  const layerBlocks = keymap ? directChildBlocks(keymap.body, keymap.start + 1) : [];
+  const layers = layerBlocks.map((layer, index) => {
+    const bindingProperty = getAnglePropertyInfo(layer.body, "bindings", layer.bodyStart);
+    const bindingEntries = bindingProperty
+      ? splitBindingEntries(bindingProperty.value, bindingProperty.sourceRange.start)
+      : [];
+
+    return {
+      id: index,
+      name: layer.name,
+      bindings: bindingEntries.map((entry) => entry.raw),
+      bindingEntries,
+      sensorBindings: splitBindingExpressions(getAngleProperty(layer.body, "sensor-bindings")),
+      raw: layer.raw,
+    };
+  });
 
   return {
     layers,
@@ -182,4 +255,71 @@ export function parseKeymap(source) {
 
 export function countDtsPhysicalKeys(source) {
   return (source.match(/&key_physical_attrs/g) || []).length;
+}
+
+export function replaceBinding(source, range, nextRaw) {
+  validateSourceRange(source, range);
+  validateEditableBindingExpression(nextRaw);
+  return `${source.slice(0, range.start)}${nextRaw}${source.slice(range.end)}`;
+}
+
+export function replaceBindings(source, replacements) {
+  const ordered = [...replacements].sort((a, b) => b.range.start - a.range.start);
+  for (let index = 0; index < ordered.length; index += 1) {
+    validateSourceRange(source, ordered[index].range);
+    validateEditableBindingExpression(ordered[index].nextRaw);
+    const next = ordered[index + 1];
+    if (next && next.range.end > ordered[index].range.start) {
+      throw new Error("Replacement ranges must not overlap.");
+    }
+  }
+
+  return ordered.reduce(
+    (updated, replacement) => replaceBinding(updated, replacement.range, replacement.nextRaw),
+    source,
+  );
+}
+
+function validateSourceRange(source, range) {
+  if (
+    !range ||
+    !Number.isInteger(range.start) ||
+    !Number.isInteger(range.end) ||
+    range.start < 0 ||
+    range.end < range.start ||
+    range.end > source.length
+  ) {
+    throw new Error("Invalid source range.");
+  }
+
+  const currentRaw = source.slice(range.start, range.end).trim();
+  const entries = splitBindingEntries(source.slice(range.start, range.end), range.start);
+  if (
+    !currentRaw.startsWith("&") ||
+    entries.length !== 1 ||
+    entries[0].sourceRange.start !== range.start ||
+    entries[0].sourceRange.end !== range.end
+  ) {
+    throw new Error("Source range must cover one binding expression.");
+  }
+}
+
+function validateEditableBindingExpression(nextRaw) {
+  if (typeof nextRaw !== "string" || nextRaw !== nextRaw.trim() || nextRaw.length === 0) {
+    throw new Error("Replacement binding must be a trimmed string.");
+  }
+  if (/[<>\r\n;]/.test(nextRaw)) {
+    throw new Error("Replacement binding contains unsupported characters.");
+  }
+  if (isEditableBindingExpression(nextRaw)) return;
+  throw new Error("Replacement binding is not supported in Phase 2.");
+}
+
+export function isEditableBindingExpression(raw) {
+  return raw === "&trans" ||
+    raw === "&none" ||
+    /^&kp \S+$/.test(raw) ||
+    /^&mo \d+$/.test(raw) ||
+    /^&lt \d+ \S+$/.test(raw) ||
+    /^&mt \S+ \S+$/.test(raw);
 }

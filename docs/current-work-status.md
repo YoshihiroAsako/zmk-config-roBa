@@ -65,6 +65,28 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `COLON` -> `+`、`SQT` -> `:`、`ASTERISK` -> `(`、`LEFT_PARENTHESIS` -> `)`、`RIGHT_BRACKET` -> `[`、`RIGHT_BRACE` -> `{` などを Windows JIS 出力として表示。
   - `TILDE` と `RIGHT_PARENTHESIS` は未確定扱いとして note に要検証を表示。
   - `94ba32b windows Jis表記検証_20260504` で commit 済み。
+- Phase 2 source-range editing の土台を追加済み:
+  - `parseKeymap` が各 layer binding に `bindingEntries[].sourceRange` を持つようにした。
+  - 既存互換の `layers[].bindings` は維持。
+  - `replaceBinding(source, range, nextRaw)` / `replaceBindings(source, replacements)` の純粋関数を追加。
+  - Phase 2 初期の置換対象は `&kp KEYCODE` / `&trans` / `&none` に限定。
+  - source-range 置換の parser smoke tests を追加。
+- Phase 2 preview UI を追加済み:
+  - 選択キー detail panel に source range と raw binding 編集欄を表示。
+  - `&kp KEYCODE` / `&trans` / `&none` だけ編集可能にし、それ以外は read-only 表示。
+  - Preview タブに対象 binding の diff と置換後 `.keymap` 全文 preview を表示。
+  - 保存ボタンは disabled のまま。実ファイルへの書き込みは未実装。
+- Phase 2 preview state を helper 化済み:
+  - `tools/roba-keymap-viewer/src/keymap/editorPreview.js` に `buildEditorState` / `isPhase2Editable` を切り出し。
+  - `tools/roba-keymap-viewer/src/keymap/editorPreview.test.js` に helper 単体テストを追加。
+- Phase 2 preview editing の対象を拡張済み:
+  - `&kp KEYCODE` / `&trans` / `&none` に加えて、`&mo N` / `&lt N KEYCODE` / `&mt MOD KEYCODE` の preview 置換に対応。
+  - `replaceBinding` の validation と Preview UI の editable 判定は同じ `isEditableBindingExpression` を参照。
+  - `&bt` など対象外 binding は read-only のまま。
+- Preview UI の見やすさを改善済み:
+  - 右側 detail panel をスクロール可能にし、ブラウザ 100% 表示でも `Phase 2 Preview` に到達できるようにした。
+  - キーマップ上でキーを選択したとき、下の Bindings 表でも対応行をハイライトし、自動スクロールするようにした。
+  - Bindings 表で検索結果など別レイヤーの行をクリックした場合も、そのレイヤーへ切り替えて選択する。
 
 ## 検証状況
 
@@ -100,14 +122,40 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 確認後、dev server process と child process は停止済み。
   - `Invoke-WebRequest -UseBasicParsing http://localhost:5173` は HTTP 200。
   - `agent-browser` CLI は PATH 上になく、ブラウザ smoke check は未実施。
+- Phase 2 source-range parser 追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+- Phase 2 preview UI 追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - dev server は `http://127.0.0.1:5173` で HTTP 200 を確認。
+  - `agent-browser` CLI は PATH 上になく、agent-browser smoke check は未実施。
+  - Edge headless screenshot で画面描画を確認済み。Preview editor が detail panel に表示されることを確認。
+  - dev server は `http://localhost:5173` / `http://127.0.0.1:5173` で起動中。現時点の listening process は PID 19076。
+- Phase 2 preview helper 切り出し後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。14 tests / 2 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+- Phase 2 preview editing 対象拡張後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。16 tests / 2 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - dev server は `http://127.0.0.1:5173` で HTTP 200 を確認。
+  - Edge headless screenshot で画面描画を確認済み。初期 raw binding が空表示になる一瞬の問題は修正済み。
+- Preview UI visibility / selection sync 改善後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。16 tests / 2 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - Edge headless screenshot で右 detail panel のスクロールバー、`Phase 2 Preview` 表示、Bindings 表の選択行ハイライトを確認済み。
+  - ユーザーがブラウザ 100% 表示で右 detail panel をスクロールして `Phase 2 Preview` が見えることを確認済み。
+  - ユーザーが `bindingEntries` を変更すると Preview タブの diff に反映されることを確認済み。
+  - ユーザー確認後、dev server process は停止済み。
 
 ## 次にやること
 
 優先順:
 
-1. Phase 2 の source-range editing 設計とテストを追加する。
-2. 編集 UI は read-only MVP の表示・診断を壊さない範囲で、まず `&kp` など限定的な binding から扱う。
-3. 詳細な実装順は `docs/zmk-studio-like-app-phase2-source-range-editing.md` を参照する。
+1. 置換後 preview の差分表示を binding 1行だけでなく、周辺行つきに改善する。
+2. Preview helper に周辺行 diff 用の pure function を追加し、テストする。
+3. その後、保存処理に進む前に、バックアップ付き保存・再 parse・diagnostics 維持の設計を小さくまとめる。
+4. 保存処理は preview/diff とテストが安定するまで入れない。
 
 ## 現在の注意点
 
