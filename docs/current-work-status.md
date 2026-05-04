@@ -23,6 +23,7 @@ roBa 用 ZMK Studio 風ローカルアプリの計画検討。
 - [x] Phase 0 調査メモ更新後の再レビュー依頼文 `docs/zmk-studio-like-app-phase0-rereview-request.md` を作成
 - [x] Phase 0 調査メモの再レビュー結果 `docs/zmk-studio-like-app-phase0-rereview.md` を作成
 - [x] Phase 0 再レビュー結果を `docs/zmk-studio-like-app-phase0-research.md` に反映
+- [x] combo / macro など高度編集 UI/UX メモ `docs/zmk-studio-like-app-advanced-editing-ux-notes.md` を作成
 - [ ] Keymap Editor を roBa の `config/roBa.keymap` / `config/roBa.json` で実際に試す
 - [ ] Claude Design に渡す UI モックアップ依頼文を作成する
 
@@ -81,6 +82,7 @@ roBa 用 ZMK Studio 風ローカルアプリの計画検討。
 - `docs/zmk-studio-like-app-phase0-research.md`
 - `docs/zmk-studio-like-app-phase0-review-request.md`
 - `docs/zmk-studio-like-app-phase0-rereview.md`
+- `docs/zmk-studio-like-app-advanced-editing-ux-notes.md`
 - `config/roBa.keymap`
 - `keymap-drawer/roBa.yaml`
 - `keymap-drawer/roBa.svg`

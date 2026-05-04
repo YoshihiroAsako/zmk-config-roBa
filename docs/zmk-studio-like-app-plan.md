@@ -413,6 +413,8 @@ Phase 4C:
 
 基本編集が安定してから追加する。
 
+UI/UX の初期メモは `docs/zmk-studio-like-app-advanced-editing-ux-notes.md` を参照する。
+
 候補:
 
 - combo 編集
