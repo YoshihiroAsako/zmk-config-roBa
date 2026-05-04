@@ -1,207 +1,124 @@
 # Current Work Status
 
-このファイルは、新しいチャットや別の AI エージェントでも作業をすぐ再開できるようにするための引き継ぎメモです。
-詳細な理由やレビュー経緯は各計画書に置き、このファイルには「今どこまで進んでいて、次に何をするか」を短く残します。
+このファイルは、新しいチャットで作業をすぐ再開するための最小メモです。
+詳細な設計史やレビュー結果は関連ドキュメントに置き、このファイルには「今どこまで進んだか」と「次に何をするか」だけを残します。
+
+## 使い方
+
+新しいチャットでは、まず次の2ファイルだけを `@` 参照すれば再開できます。
+
+- `@AGENTS.md`
+- `@docs/current-work-status.md`
+
+過去の計画書やレビュー文書は必要になった時だけ読むこと。最初から全部読ませない。
+
+## 再開用メッセージ
+
+新しいチャットで具体的な依頼文が必要な場合は、次の短い文で足ります。
+
+```md
+このリポジトリ `zmk-config-roBa` で、現在の作業を続けてください。回答は日本語でお願いします。
+
+まず `@AGENTS.md` と `@docs/current-work-status.md` を読んで、現在の進捗・制約・次アクションを把握してください。
+必要になった時だけ、`docs/current-work-status.md` の「関連ファイル」にある詳細資料を追加で読んでください。
+
+ユーザーの最新指示が `docs/current-work-status.md` と矛盾する場合は、ユーザーの最新指示を優先してください。
+```
 
 ## 現在の作業テーマ
 
-roBa のマルチホスト対応、Windows JIS 記号補正、トラックボールスクロール改善。
+roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/` の read-only MVP。
 
-## 2026-05-04 追加テーマ
+目的:
 
-roBa 用 ZMK Studio 風ローカルアプリの計画検討。
+- `config/roBa.keymap` を正本として読み取る。
+- `config/roBa.json` を物理レイアウトの主な参照元として使う。
+- ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
+- 初期段階は read-only。`.keymap` 直接編集や保存は Phase 2 以降。
 
-- [x] 他 AI レビュー用の独立計画書 `docs/zmk-studio-like-app-plan.md` を作成
-- [x] 他 AI レビュー結果 `docs/zmk-studio-like-app-plan-review.md` を再レビュー
-- [x] 再レビュー結果 `docs/zmk-studio-like-app-plan-rereview.md` を作成
-- [x] Claude Design でデザインモックアップを作る工程を計画に追加
-- [x] `docs/zmk-studio-like-app-plan.md` をレビュー結果込みの最新版に改訂
-- [x] Phase 0 の既存ツール調査メモ `docs/zmk-studio-like-app-phase0-research.md` を作成
-- [x] Phase 0 調査メモの他 AI レビュー依頼文 `docs/zmk-studio-like-app-phase0-review-request.md` を作成
-- [x] Phase 0 調査メモのレビューを実施 (DTS physical-layout 確認、Studio 永続化、編集 range 置換方針、PC キー割り当ての Phase 配置を追記)
-- [x] DTS `roba_physical_layout` の存在を確認 (`boards/shields/roBa/roBa.dtsi`)
-- [x] Phase 0 調査メモ更新後の再レビュー依頼文 `docs/zmk-studio-like-app-phase0-rereview-request.md` を作成
-- [x] Phase 0 調査メモの再レビュー結果 `docs/zmk-studio-like-app-phase0-rereview.md` を作成
-- [x] Phase 0 再レビュー結果を `docs/zmk-studio-like-app-phase0-research.md` に反映
-- [x] combo / macro など高度編集 UI/UX メモ `docs/zmk-studio-like-app-advanced-editing-ux-notes.md` を作成
-- [x] 新しいチャット再開用プロンプト `docs/zmk-studio-like-app-resume-prompt.md` を作成
-- [x] Keymap Editor を roBa の `config/roBa.keymap` / `config/roBa.json` で実際に試す
-- [x] Keymap Editor 実地確認メモ `docs/zmk-studio-like-app-keymap-editor-trial.md` を作成
-- [x] Claude Design に渡す UI モックアップ依頼文 `docs/zmk-studio-like-app-claude-design-request.md` を作成
+## 最新チェックポイント
 
-## 最新の結論
+2026-05-04:
 
-- Windows JIS を主用途として扱う。
-- Mac / iPad / iPhone / Android は補助レイヤーで吸収する。
-- 第 1 段階はトラックボールスクロール改善だけに絞る。
-- `west.yml` / driver revision は今回は変更しない。
-- `zmk-pmw3610-driver` は確認時点のコミットハッシュだけ記録する。
-- Windows JIS 記号補正は、予測表で補正候補を作り、実機で答え合わせしてから確定表に基づいて補正する。
-- レイヤー 5 `SCROLL` は、トラックボールをスクロールモードにするための状態レイヤーとして扱う。
-- `&mo 5` をどのキーに置いても、押している間は同じスクロール操作ができる。
+- Claude Design 出力を `docs/claude-design-roba-app/` に配置済み。
+- Claude Design の `uploads/roBa.json` と `uploads/roBa.keymap` は確認時点で `config/roBa.json` / `config/roBa.keymap` と一致していた。ただし正本は常に `config/` 側。
+- Claude Design レビューを `docs/zmk-studio-like-app-claude-design-review.md` に記録済み。
+- Vite + React の read-only MVP を `tools/roba-keymap-viewer/` に作成済み。
+- MVP は canonical files を直接 import する:
+  - `config/roBa.json`
+  - `config/roBa.keymap`
+  - `boards/shields/roBa/roBa.dtsi`
+- 実装済み:
+  - 43キーの表示
+  - 7レイヤー切り替え
+  - key detail panel
+  - read-only `.keymap` parser
+  - bindings / combos / macros / behaviors / sensors / markdown / diagnostics tabs
+  - parsed data からの Markdown preview
+  - key count、DTS physical-layout count、layer count などの diagnostics
+- Parser smoke tests を `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js` に追加済み。
+- `tools/roba-keymap-viewer/package.json` に `npm test` を追加済み。
+- 再開用の独立プロンプトファイルは廃止し、このファイルへ統合済み。
 
-## 現在の進捗
+## 検証状況
 
-- [x] マルチホスト・Windows JIS・トラックボールスクロール対応の初期計画書を作成
-- [x] Claude Code Opus による一次レビューを反映
-- [x] Codex による二次レビューを反映
-- [x] Claude Code Opus による三次レビューを反映
-- [x] 四次レビューで `west.yml` 固定案を撤回し、コミットハッシュ記録のみへ修正
-- [x] 「先回り補正」表現を「補正候補作成 → 実機確認 → 確定表で補正」に修正
-- [x] 作業再開用の `docs/current-work-status.md` を作成
-- [x] `AGENTS.md` に作業再開ルールを追加
-- [x] 事前調査
-- [x] `scroll_tap` の最小実装
-- [x] keymap-drawer 更新
-- [x] GitHub Actions ビルド確認
-- [x] 実機検証 (2026-05-02: 専用 `&mo 5` キーでトラックボールスクロール成功)
-- [x] Windows JIS 記号検証用に Layer 3 `ARROW` へ No. 1-23 の記号を順番配置
-- [x] Windows JIS 記号実機検証結果を `docs/windows-jis-symbol-validation.md` に入力
-- [x] Windows JIS 記号補正案の作成
-- [x] Layer 2 `NUM` と combo に Windows JIS 補正候補を反映
-- [x] `docs/windows-jis-symbol-validation.md` に補正後再検証用の入力表を追加
-- [x] `docs/windows-jis-symbol-validation.md` 冒頭に ZMK Studio 用逆引き表を追加
-- [x] Windows JIS 補正後の実機確認結果を `docs/windows-jis-symbol-validation.md` に入力
-- [x] 補正後再検証で外れた `*` を `&kp DOUBLE_QUOTES` に再補正
-- [x] combo 補正後再検証で `J` + `K` = `"`、`C` + `V` = `=` を確認
-- [x] `*` 再補正後の実機確認
+2026-05-04 時点:
+
+- `tools/roba-keymap-viewer/` で `npm test` 成功。
+- `tools/roba-keymap-viewer/` で `npm run build` 成功。
+- Dev server を `npm run dev -- --port 5173` で起動し、Microsoft Edge + Playwright による smoke check 成功。
+- Smoke check 内容:
+  - title rendered
+  - body non-empty
+  - Vite overlay なし
+  - `.keyCap` が43個
+  - layer buttons が7個
+  - tabs が7個
+  - console errors なし
+  - diagnostics counts OK
+- 検証後、dev server process と child process は停止済み。
+- build 検証で生成された `dist/` は削除済み。
 
 ## 次にやること
 
-1. Claude Design に `docs/zmk-studio-like-app-claude-design-request.md` を渡して、read-only MVP のモックアップを作る。
-2. モックアップ結果を見て、Vite + React の read-only 補助 Web アプリを実装するか判断する。
-3. 実装する場合は、`.keymap` read-only parser の検証基準を先に固める。
+優先順:
 
-## 参照すべきファイル
+1. read-only MVP と parser smoke tests を安定チェックポイントとして commit する。
+2. `http://localhost:5173` でユーザーが視覚確認する。
+3. 必要なら Windows JIS 表示ラベルを改善する。
+4. Phase 2 の source-range editing 設計とテストを追加する。
 
-- `AGENTS.md`
-- `docs/current-work-status.md`
-- `docs/keymap-multihost-scroll-plan.md`
-- `docs/keymap-flashing-guide.md`
-- `docs/windows-jis-symbol-validation.md`
+## 現在の注意点
+
+- `config/roBa.keymap` と `config/roBa.json` が正本。Claude Design の `uploads/` は snapshot 扱い。
+- `config/west.yml` の revision は変更しない。
+- `build.yaml` の `roBa_R` `snippet: studio-rpc-usb-uart` は維持する。
+- `roBa_R.conf` の `CONFIG_ZMK_STUDIO=y` / `CONFIG_ZMK_STUDIO_LOCKING=n` は維持する。
+- `CONFIG_EC11` と `CONFIG_ZMK_POINTING` が左右両方の `.conf` にあることだけを理由に削除しない。
+- 既存の numbered layer、特に `layer_6` は勝手にリネームしない。
+- keymap の見た目が変わる変更では、`keymap-drawer/roBa.yaml` と `keymap-drawer/roBa.svg` も更新する。
+- `zephyr/` と `.west/` は編集しない。
+
+## 関連ファイル
+
+roBa Keymap Viewer:
+
+- `tools/roba-keymap-viewer/`
+- `config/roBa.keymap`
+- `config/roBa.json`
+- `boards/shields/roBa/roBa.dtsi`
+
+詳細資料:
+
 - `docs/zmk-studio-like-app-plan.md`
-- `docs/zmk-studio-like-app-plan-review.md`
-- `docs/zmk-studio-like-app-plan-rereview.md`
 - `docs/zmk-studio-like-app-phase0-research.md`
-- `docs/zmk-studio-like-app-phase0-review-request.md`
 - `docs/zmk-studio-like-app-phase0-rereview.md`
 - `docs/zmk-studio-like-app-advanced-editing-ux-notes.md`
 - `docs/zmk-studio-like-app-keymap-editor-trial.md`
 - `docs/zmk-studio-like-app-claude-design-request.md`
-- `docs/zmk-studio-like-app-resume-prompt.md`
-- `config/roBa.keymap`
-- `keymap-drawer/roBa.yaml`
-- `keymap-drawer/roBa.svg`
+- `docs/zmk-studio-like-app-claude-design-review.md`
 
-## 作業方針メモ
+## 更新ルール
 
-- 第 1 段階では Windows JIS 記号補正には入らない。
-- 第 1 段階では Mac / モバイル補助レイヤーも追加しない。
-- `config/west.yml` は変更しない。
-- `build.yaml` も変更しない。
-- 既存の `layer_6` はリネームしない。
-- 表示に影響する keymap 変更では `keymap-drawer/roBa.yaml` と `keymap-drawer/roBa.svg` を更新する。
-- `keymap-drawer/roBa.yaml` を上書きする前後で、手動調整が壊れていないか差分を確認する。
-
-## 未決事項
-
-- `I` の `scroll_tap` 案は実機で `I` 連続入力になったため撤回。
-- `LEFT_ALT` 位置の専用 `&mo 5` (`SCROLL`) は、ユーザーが ZMK Studio でも変更できるため、いったん現状位置で採用する。
-- `SCROLL` レイヤーは作り込まず、スクロール中にも必要なキーが出た場合だけ最小限追加する。
-- Windows JIS 記号補正は、`docs/windows-jis-symbol-validation.md` の実機結果を埋めてから行う。
-
-## 事前調査結果
-
-- 2026-05-02 時点で `zmk@v0.3-branch` の `zmk,behavior-hold-tap.yaml` に `hold-while-undecided` が定義されていることを確認済み。
-- 2026-05-02 時点で `zmk@v0.3-branch` の `keys.h` に `INT1` / `INT_RO` / `INT3` / `INT_YEN` / `LANG1` / `LANG2` / `GLOBE` が定義されていることを確認済み。
-- 2026-05-02 時点の `kumamuk-git/zmk-pmw3610-driver` `main` は `5e04553ab803d24405bd45621a41310ea3050e59`。
-- 上記 driver では `get_input_mode_for_current_layer()` が `scroll-layers` を先に判定し、automouse は `input_mode == MOVE` の場合だけ起動するため、SCROLL レイヤーでは scroll 優先と判断。
-- `keymap` コマンドはこのローカル環境では未検出。今回の表示内容は `I` hold = `SCROLL` のままで変わらないため、`keymap-drawer/roBa.yaml` と `keymap-drawer/roBa.svg` は更新不要。
-
-## GitHub Actions 結果
-
-- 2026-05-02: workflow run `25248589390` (`.github/workflows/build.yml`) が成功。
-- 成功ジョブ: `roBa_L` / `roBa_R` (`studio-rpc-usb-uart`) / `settings_reset` / artifact merge。
-- 生成 artifact: `firmware`。
-
-## 実機検証メモ
-
-- 2026-05-02: `&st 5 I` を書き込んだが、`I` 長押しで `I` が連続入力され、トラックボールスクロールはできなかった。
-- Windows の UF2 コピー時に `0x800701B1` が出ることがあるが、コピー後に bootloader ドライブが消えてキーボードとして復帰するため、UF2 書き込み自体は成功している可能性が高い。
-- 2026-05-02: `I` は通常の `&kp I` に戻し、`LEFT_ALT` 位置を `&mo 5` に変更。専用キーで SCROLL レイヤーを確実に有効化する方針で再検証する。
-- 2026-05-02: 専用 `SCROLL` キーを押しながらトラックボールでスクロールできることを実機確認済み。
-- 2026-05-03: Windows JIS 記号検証結果を入力済み。`-` / `/` / `!` / `#` / `$` / `%` / `.` は表示どおり、`+` は `~`、`^` は `&`、`&` は `'`、`_` は `=`、`@` は `"`、`=` は `^`、`[` は `@`、`\` は `]`、`|` は `}` として出ることを確認。`~` / `)` / `*` / `double_quotation` は追試候補。
-- 2026-05-03: Layer 2 `NUM` に Windows JIS 補正候補を反映。`_` は `LS(INT_RO)`、`\` は `INT_YEN`、`|` は `LS(INT_YEN)` を採用候補にしたため、実機確認が必要。`double_quotation` combo は `J` + `K` (`<18 19>`) へ修正し、binding は Windows JIS で `"` が出る `AT_SIGN` に変更。`eq` combo は `UNDERSCORE` に変更。
-- 2026-05-03: 補正後再検証では `*` 以外の Layer 2 `NUM` 記号は期待出力どおり。`*` は `&kp AT_SIGN` で `"` が出たため、`&kp DOUBLE_QUOTES` に変更。combo は `J` + `K` = `"`、`C` + `V` = `=` を確認済み。
-- 2026-05-03: `&kp DOUBLE_QUOTES` に再補正した `*` も実機で表示どおり出ることを確認。Windows JIS 記号補正は現時点で全項目 OK。
-
-## 新しいチャットでの再開メモ
-
-新しいチャットでは、エージェントが `AGENTS.md` の作業再開ルールに従い、このファイルを読んで続きから再開する想定。
-ユーザーの最新指示がこのファイルと矛盾する場合は、ユーザーの最新指示を優先する。
-
-## 2026-05-04 update: Claude Design output placed
-
-- Claude Design output was placed under `docs/claude-design-roba-app/`.
-- Confirmed these snapshot files matched the canonical files at the time of check:
-  - `docs/claude-design-roba-app/uploads/roBa.json` == `config/roBa.json`
-  - `docs/claude-design-roba-app/uploads/roBa.keymap` == `config/roBa.keymap`
-- Treat `config/roBa.json` and `config/roBa.keymap` as canonical. Files under `uploads/` are Claude Design snapshots only.
-- Created the next-chat prompt at `docs/zmk-studio-like-app-next-chat-prompt.md`.
-- Next recommended action: review the Claude Design mockup, then decide whether to keep it as documentation or migrate it into a Vite + React read-only MVP under `tools/roba-keymap-viewer/`.
-
-## 2026-05-04 update: read-only MVP started
-
-- Reviewed the Claude Design mockup and documented the decision in `docs/zmk-studio-like-app-claude-design-review.md`.
-- Created a Vite + React read-only MVP at `tools/roba-keymap-viewer/`.
-- The MVP imports canonical files directly:
-  - `config/roBa.json`
-  - `config/roBa.keymap`
-  - `boards/shields/roBa/roBa.dtsi` for physical-layout count diagnostics
-- Implemented:
-  - 43-key visual layout from `config/roBa.json`
-  - 7-layer selector and key detail panel
-  - read-only `.keymap` parser for layer bindings, combos, macros, custom/reconfigured behaviors, and sensor-bindings
-  - Bindings / Combos / Macros / Behaviors / Sensors / Markdown / Diagnostics tabs
-  - Markdown preview generated from parsed canonical data
-  - Diagnostics for key count, DTS physical-layout count, layer count, binding count, combo count, macro count, and sensor-binding count
-- Added `.gitignore` for `node_modules/`, `dist/`, and `.vite/`.
-- Installed local npm dependencies under `tools/roba-keymap-viewer/`.
-- Verification:
-  - `npm run build` succeeded.
-  - Dev server was started with `npm run dev -- --port 5173`.
-  - `agent-browser` was unavailable in this environment, so Playwright with local Microsoft Edge was used instead.
-  - Browser smoke check succeeded: title rendered, body was non-empty, no Vite overlay, 43 `.keyCap` elements, 7 layer buttons, 7 tabs, and no console errors.
-  - Diagnostics tab showed all expected counts as OK.
-- Current dev server process was started from PowerShell as process id `24688` during this session. Stop it when no longer needed.
-
-Next recommended action:
-
-1. Open `http://localhost:5173` and inspect the MVP visually.
-2. If the layout is acceptable, refine labels and Windows JIS display mapping.
-3. Add a small automated parser test before expanding toward Phase 2 editing.
-
-## 2026-05-04 update: parser smoke tests added
-
-- Added Node built-in test coverage for the read-only MVP parser at `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js`.
-- Added `npm test` script to `tools/roba-keymap-viewer/package.json`.
-- Test coverage checks:
-  - canonical layer names and 7 layer count
-  - every layer has 43 bindings
-  - combo count is 5
-  - macro count is 1
-  - `lt_to_layer_0` custom behavior is detected
-  - sensor-binding count is 2
-  - important raw bindings such as position 36 `&mo 5` and `&lt_to_layer_0 6 INT_HENKAN` remain visible
-  - DTS physical-layout key count is 43
-  - Markdown output includes representative layer, combo, and sensor sections
-- Verification:
-  - `npm test` succeeded.
-  - `npm run build` succeeded.
-- Removed generated `dist/` after build verification.
-- Stopped the previously started dev server process and its child processes (`24688`, `20824`, `7552`).
-
-Next recommended action:
-
-1. Commit the read-only MVP and parser smoke tests as the current stable checkpoint.
-2. After that, refine Windows JIS display labels or add Phase 2 source-range editing design/tests.
+作業を進めたら、このファイルの「最新チェックポイント」「検証状況」「次にやること」を更新する。
+古い詳細はここに溜めず、必要なら個別の `docs/zmk-studio-like-app-*.md` に移す。

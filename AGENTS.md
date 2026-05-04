@@ -52,6 +52,26 @@ If it exists:
 
 If `docs/current-work-status.md` conflicts with the user's latest message, the user's latest message wins.
 
+### Minimal `@file` Resume Design
+
+For a new chat, the preferred minimal context is:
+
+1. `@AGENTS.md`
+2. `@docs/current-work-status.md`
+
+Only add more `@` files when the next task directly needs source, design, or verification details. Do not ask the user to attach every historical planning or review document by default.
+
+Historical design/review documents should be treated as reference material, not mandatory startup context. Read them lazily only when the current task needs the details.
+
+If a task needs a concrete handoff prompt, keep that prompt as a short section inside `docs/current-work-status.md` instead of creating a separate prompt-only file.
+
+Keep `docs/current-work-status.md` token-efficient:
+
+- Keep the current task, latest checkpoint, next actions, blockers, verification status, and relevant files.
+- Prefer replacing stale detail with a short summary plus links to detailed docs.
+- Do not paste long review histories, command logs, generated output, or duplicated instructions from `AGENTS.md`.
+- Keep the file short enough that an AI can read it at startup without wasting context.
+
 ## Workflow
 
 For keymap changes:
