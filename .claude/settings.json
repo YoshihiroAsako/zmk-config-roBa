@@ -5,7 +5,16 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(Remove-Item -Recurse -Force \"c:\\\\Users\\\\0000130350\\\\github\\\\zmk-config-roBa\\\\tools\\\\roba-keymap-viewer\\\\dist\")",
+      "Bash(git checkout *)",
+      "Bash(npx vite *)",
+      "Bash(Start-Sleep -Seconds 4)",
+      "Bash(Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173)",
+      "Bash(Select-Object -ExpandProperty StatusCode)",
+      "PowerShell(Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173)",
+      "PowerShell(cd \"c:\\\\Users\\\\0000130350\\\\github\\\\zmk-config-roBa\\\\tools\\\\roba-keymap-viewer\"; Start-Job -ScriptBlock { cd \"c:\\\\Users\\\\0000130350\\\\github\\\\zmk-config-roBa\\\\tools\\\\roba-keymap-viewer\"; npm run dev -- --port 5173 } | Out-Null; Start-Sleep -Seconds 6; Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173 | Select-Object -ExpandProperty StatusCode)",
+      "PowerShell(Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173/__roba/keymap-source)"
     ]
   }
 }
