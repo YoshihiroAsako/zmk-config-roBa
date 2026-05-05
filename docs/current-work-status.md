@@ -415,14 +415,15 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
   - dev server HTTP 200 確認。`/__roba/keymap-source` HTTP 200 確認。
   - `Save all` payload に `kind` を追加（バグ修正含む）。
-  - ユーザーによる手動 UI 確認は未実施。
+  - ユーザーが UI で `layers = <0>` / `timeout-ms = <100>` を `double_quotation` combo に挿入し、往復保存（追加 → Save all → 削除 → Save all）を確認。`git diff` は空。
+  - `ccdcbdf Integrate combo layers/timeout-ms into pending changes and Save all` で commit・push 済み。
 
 ## 次にやること
 
-優先順:
+combo `layers` / `timeout-ms` の保存統合が完了。次の作業候補:
 
-1. ユーザーによる手動 UI 確認: combo `layers` / `timeout-ms` の `Add combo draft` → `Save all` フロー。
-2. 確認後: macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
+1. Context Diff の insert kind 表示を修正する（`-};` / `+...` の誤表示 → 正しい挿入行 diff を表示）。
+2. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点
 
