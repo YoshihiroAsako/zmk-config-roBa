@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildDraftChange,
   buildComboDraftChanges,
+  buildLayerRenameDraftChange,
   buildPendingChangesState,
   removeDraftChange,
   upsertDraftChange,
@@ -281,5 +282,58 @@ describe("pending keymap changes", () => {
     assert.equal(layersChange.kind, "layers-replace");
     assert.equal(layersChange.currentRaw, "0");
     assert.equal(layersChange.nextRaw, "1 2");
+  });
+
+  it("applies a layer rename through pending changes state", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const target = parsed.layers[1];
+    const change = buildLayerRenameDraftChange({
+      layerIndex: 1,
+      currentName: target.name,
+      nextName: "FN",
+      nameRange: target.nameRange,
+    });
+
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+    const reparsed = parseKeymap(state.nextSource);
+    assert.equal(reparsed.layers[1].name, "FN");
+    assert.deepEqual(
+      reparsed.layers.map((layer) => layer.bindings.length),
+      parsed.layers.map((layer) => layer.bindings.length),
+    );
+  });
+
+  it("rejects layer renames that collide with another layer name", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const target = parsed.layers[1];
+    const change = buildLayerRenameDraftChange({
+      layerIndex: 1,
+      currentName: target.name,
+      nextName: parsed.layers[2].name,
+      nameRange: target.nameRange,
+    });
+
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.match(state.message, /unique/);
+  });
+
+  it("rejects layer renames with invalid identifier characters", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const target = parsed.layers[1];
+    const change = buildLayerRenameDraftChange({
+      layerIndex: 1,
+      currentName: target.name,
+      nextName: "1bad",
+      nameRange: target.nameRange,
+    });
+
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.match(state.message, /letter or underscore/);
   });
 });

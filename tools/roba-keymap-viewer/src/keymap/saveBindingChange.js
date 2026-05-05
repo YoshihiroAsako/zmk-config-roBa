@@ -152,12 +152,21 @@ export function buildSaveDiagnostics(beforeParsed, afterParsed) {
   const beforeSensorBindingCount = countSensorBindings(beforeParsed);
   const afterSensorBindingCount = countSensorBindings(afterParsed);
 
+  const beforeUniqueLayerNames = new Set(beforeParsed.layers.map((layer) => layer.name)).size;
+  const afterUniqueLayerNames = new Set(afterParsed.layers.map((layer) => layer.name)).size;
+
   return [
     {
       label: "Layer count",
       before: beforeParsed.layers.length,
       after: afterParsed.layers.length,
       ok: beforeParsed.layers.length === afterParsed.layers.length,
+    },
+    {
+      label: "Unique layer names",
+      before: beforeUniqueLayerNames,
+      after: afterUniqueLayerNames,
+      ok: afterUniqueLayerNames === afterParsed.layers.length,
     },
     {
       label: "Layer binding counts",
@@ -298,6 +307,11 @@ function validateSourceChange(source, change) {
     const propertyName = change.kind.replace("-insert", "");
     if (change.range.start !== change.range.end) throw new Error(`${change.kind} must be a zero-length range.`);
     validateMacroMsInsertionContent(change.nextRaw, propertyName);
+  } else if (change.kind === "layer-rename") {
+    validateLayerName(change.nextRaw);
+    if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(source.slice(change.range.start, change.range.end))) {
+      throw new Error("Layer rename source range does not contain a valid identifier.");
+    }
   } else {
     throw new Error("Unsupported pending change kind.");
   }
@@ -377,4 +391,13 @@ function validateMacroMsInsertionContent(nextRaw, propertyName) {
   const match = nextRaw.match(pattern);
   if (!match) throw new Error(`${propertyName}-insert content is invalid.`);
   validateMacroMsValue(match[1], propertyName);
+}
+
+function validateLayerName(name) {
+  if (typeof name !== "string" || !name.length) {
+    throw new Error("Layer name must be a non-empty string.");
+  }
+  if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) {
+    throw new Error("Layer name must start with a letter or underscore and contain only letters, digits, underscore, or hyphen.");
+  }
 }

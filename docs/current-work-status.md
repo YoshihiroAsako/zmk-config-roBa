@@ -445,64 +445,65 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
     - Binding 2 を `&kp A` に変更、wait-ms `10` / tap-ms `20` を入力。`Add macro draft` → `Save all` で `git diff -- config/roBa.keymap` は binding 1 行置換と wait-ms/tap-ms 2 行挿入のみであることを確認。
     - Binding 2 を `&kp MACRO_PLACEHOLDER` に戻し、wait-ms/tap-ms を空欄にして remove preview を表示。`Save all` 後、`git diff -- config/roBa.keymap` が空に戻ることを確認。
     - dev server 停止後、port 5173 listener なし。
-  - commit 待ち。
+  - `0a7bb51 Add macro preview editing to roBa viewer_20260505` で commit・push 済み。
+- Layer rename 編集を追加中:
+  - `parseKeymap.js` の `directChildBlocks` で各 child node の name token に `nameRange` を計算し、layer object に `nameRange` を露出。
+  - `pendingChanges.js` に `buildLayerRenameDraftChange` を追加。kind は `layer-rename`、id は `layer-${index}-rename`。
+  - `validatePendingChange` と `saveBindingChange.js` の `validateSourceChange` に `layer-rename` を追加。
+    - 新名は `[A-Za-z_][A-Za-z0-9_-]*` のみ許可。
+    - 保存範囲が既存 identifier 文字列であることも確認。
+  - `buildPendingChangesState` に layer 名 uniqueness 判定を追加し、衝突時は valid=false / 「unique」エラーメッセージ。
+  - `buildSaveDiagnostics` に `Unique layer names` 診断を追加。
+  - `App.jsx` に `LayerRenameRow` コンポーネントを追加し、visual pane header に「Layer name draft」入力欄、`Add rename draft` / `Remove rename draft` ボタン、note を表示。
+    - `&lt N` などの参照は index ベースなので rename しても影響しない旨を note に表示。
+  - 既存 layer は全て nameRange を持つことを parser test で確認。
+  - pending changes test 3 件追加（rename 適用 / 衝突拒否 / invalid identifier 拒否）。
+  - 既存 saveBindingChange test の diagnostics 期待値を更新（`Unique layer names` を含む）。
+- keymap-drawer 自動更新を追加中:
+  - `vite.config.js` に `POST /__roba/update-keymap-drawer` を追加。
+    - `keymap --version` で probe してから `keymap parse` / `keymap draw` を実行。
+    - 失敗時は `available: false` を返してエラーにしない（save 成否に影響させない）。
+    - shell: true で Windows / cp932 環境でも動作。
+  - `App.jsx` の `saveSelectedBinding` / `saveAllPendingChanges` 成功後に `update-keymap-drawer` を呼び、結果を `SaveStatusPanel` の `drawerMessage` 行に表示。
+  - `SaveStatusPanel` に `drawerMessage` 表示行を追加。styles.css に最小スタイル追加。
+- `npm test` 成功。64 tests / 6 suites（parser layer nameRange / pending layer-rename 3 件 / save diagnostic 更新を含む）。
+- `npm run build` 成功。生成された `dist/` は削除済み。
+- 検証時点では `keymap` CLI が PATH 未配置のため、`POST /__roba/update-keymap-drawer` は `{"ok":false,"available":false,"message":"keymap CLI not found on PATH..."}` を返すことを実 endpoint で確認済み。実 UI からの save 後動作（probe → 「keymap CLI not found...」 status 表示）は未確認。
+- commit 待ち。
 
 ## 次にやること
 
-以下の順で進める。
+### 1. layer rename と keymap-drawer 自動更新の実 UI 確認 + commit
 
-### 1. macro 編集の commit
+実装は完了済み。残作業:
 
-実装と実 UI 往復確認は完了済み（60 tests / 6 suites、dev server 往復保存で `git diff` が空に戻ることを確認）。残作業は commit のみ:
-
-- 関連変更を 1 commit にまとめる:
-  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.js`
-  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js`
-  - `tools/roba-keymap-viewer/src/keymap/macroPreview.js`（新規）
-  - `tools/roba-keymap-viewer/src/keymap/macroPreview.test.js`（新規）
-  - `tools/roba-keymap-viewer/src/keymap/pendingChanges.js`
-  - `tools/roba-keymap-viewer/src/keymap/saveBindingChange.js`
-  - `tools/roba-keymap-viewer/src/App.jsx`
+- ユーザーが dev server で実 UI 確認:
+  - 任意の layer を選択し、visual pane header の `Layer name draft` を変更 → `Add rename draft` → Preview タブで Context Diff を確認 → `Save all`。
+  - `git diff -- config/roBa.keymap` が layer 名 1 行だけになることを確認。
+  - 元名に戻して再保存 → `git diff` が空に戻ることを確認。
+  - keymap-drawer 自動更新は `keymap` CLI が PATH 未配置のため、status panel の `keymap-drawer` 行に「keymap CLI not found on PATH...」と表示されることだけ確認できれば OK（実生成は未検証）。
+- 確認 OK なら以下を 1 commit にまとめる:
+  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.js`（layer nameRange）
+  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js`（nameRange test）
+  - `tools/roba-keymap-viewer/src/keymap/pendingChanges.js`（layer-rename helper / validation / uniqueness 判定）
+  - `tools/roba-keymap-viewer/src/keymap/pendingChanges.test.js`（rename 3 tests）
+  - `tools/roba-keymap-viewer/src/keymap/saveBindingChange.js`（layer-rename validation / Unique layer names diagnostic）
+  - `tools/roba-keymap-viewer/src/keymap/saveBindingChange.test.js`（diagnostic 期待値更新）
+  - `tools/roba-keymap-viewer/src/App.jsx`（LayerRenameRow / drawer call / SaveStatusPanel drawerMessage）
+  - `tools/roba-keymap-viewer/src/styles.css`（rename row + drawer status styles）
+  - `tools/roba-keymap-viewer/vite.config.js`（update-keymap-drawer endpoint）
   - `docs/current-work-status.md`
 
-**注意:** canonical macro `to_layer_0` は 3 binding のうち `&kp MACRO_PLACEHOLDER` 1 件だけが Phase 2 editable。`&to 0` / `&macro_param_1to1` は read-only 表示。
+**注意:** layer rename はあくまで source の表示名変更。`&lt N` / `&mo N` 等の参照は index ベースなので影響しない（UI に注記済み）。`AGENTS.md` の「numbered layer を勝手にリネームしない」はユーザー明示操作には該当しない。
 
 ---
 
-### 2. layer rename
+### 2. (optional) keymap-drawer 自動更新の実生成確認
 
-UI から layer 名を変更できるようにする。
+`keymap` CLI を環境にインストールできるなら、save 後の `keymap-drawer/roBa.{yaml,svg}` 自動再生成を実機確認するとよい。`pip install keymap-drawer` で導入可能。実生成確認した場合:
 
-**現状:** `parseKeymap` は layer 名を `layers[].name` として返すが source range なし。numbered layer（`layer_6` など）はリネーム対象に含めてよいが、`&lt` / `&mo` などの参照は自動更新しない（表示名の変更のみ）。
-
-**作業ステップ:**
-
-1. `parseKeymap.js` の layer パースに `nameRange`（layer 名トークンの source range）を追加。
-2. `pendingChanges.js` に `buildLayerRenameDraftChange` を追加。kind は `layer-rename`。
-3. `validatePendingChange` / `validateSourceChange` に `layer-rename` を追加（有効な識別子文字のみ許可）。
-4. Layers タブ or detail panel に rename 入力欄を追加し、`Add draft` / `Save all` に接続。
-5. テストを追加。
-
-**注意:** `layer_6` など既存の数値付き layer 名は `AGENTS.md` に「勝手にリネームしない」とあるが、ユーザーが明示的に rename する操作なのでこの制約は該当しない。rename が `&lt N` などの数値参照に影響しないことを UI に注記する。
-
----
-
-### 3. keymap-drawer 自動更新
-
-Save all 成功後に `keymap-drawer/roBa.yaml` と `keymap-drawer/roBa.svg` を自動再生成する。
-
-**現状:** 保存は `config/roBa.keymap` のみ。keymap-drawer の更新は手動。
-
-**作業ステップ:**
-
-1. `vite.config.js` に `POST /__roba/update-keymap-drawer` を追加（dev-only）。
-   - `keymap parse -c 10 -z config/roBa.keymap > keymap-drawer/roBa.yaml` を実行。
-   - `keymap draw keymap-drawer/roBa.yaml > keymap-drawer/roBa.svg` を実行。
-   - `keymap` コマンドが PATH 上にない場合は `not available` を返す（エラーにしない）。
-2. `App.jsx` の `saveAllPendingChanges` 成功後に `update-keymap-drawer` を呼び、結果を SaveStatusPanel に追記表示。
-3. keymap-drawer が使えない環境では「keymap-drawer not found — update manually」と表示してスキップ。
-
-**注意:** keymap-drawer の自動更新は optional。失敗しても keymap 保存の成否には影響させない。`keymap-drawer/roBa.yaml` に手動調整が入っている場合は `keymap parse` で上書きされるため、事前に `git diff` で確認を促す UI コメントがあると親切。
+- `keymap-drawer/roBa.yaml` に手動調整が入っていないか事前 `git diff` 確認。
+- 確認後の状態を本ファイルの「検証状況」に追記。
 
 ## 現在の注意点
 

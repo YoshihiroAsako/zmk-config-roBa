@@ -83,6 +83,18 @@ export function buildComboDraftChanges({ source = null, combo, bindingRaw, posit
   return changes;
 }
 
+export function buildLayerRenameDraftChange({ layerIndex, currentName, nextName, nameRange }) {
+  return {
+    id: `layer-${layerIndex}-rename`,
+    kind: "layer-rename",
+    label: `${currentName} rename`,
+    layerIndex,
+    range: nameRange,
+    currentRaw: currentName,
+    nextRaw: nextName,
+  };
+}
+
 export function buildMacroDraftChanges({ source, macro, bindingDrafts, waitMsRaw, tapMsRaw }) {
   const changes = [];
   if (bindingDrafts) {
@@ -182,12 +194,16 @@ export function buildPendingChangesState(source, changes, layers) {
     const reparsed = parseKeymap(nextSource);
     const countsStable = layers.length === reparsed.layers.length &&
       layers.every((layer, index) => layer.bindings.length === reparsed.layers[index]?.bindings.length);
+    const layerNamesUnique = new Set(reparsed.layers.map((layer) => layer.name)).size === reparsed.layers.length;
+    const valid = countsStable && layerNamesUnique;
 
     return {
-      valid: countsStable,
-      message: countsStable
+      valid,
+      message: valid
         ? `${changes.length} pending change${changes.length === 1 ? "" : "s"} ready.`
-        : "Pending preview generated, but binding counts changed.",
+        : !layerNamesUnique
+          ? "Pending preview generated, but layer names are no longer unique."
+          : "Pending preview generated, but binding counts changed.",
       contextDiff: changes.map((change) => buildChangeContextDiff(source, change)).join("\n\n"),
       nextSource,
       items: changes.map((change) => ({
@@ -266,6 +282,8 @@ function validatePendingChange(change) {
     if (change.nextRaw !== "") throw new Error(`${change.label}: ${change.kind} must have empty nextRaw.`);
   } else if (change.kind === "wait-ms-insert" || change.kind === "tap-ms-insert") {
     validateMacroMsInsertionContent(change.nextRaw, change.kind.replace("-insert", ""));
+  } else if (change.kind === "layer-rename") {
+    validateLayerName(change.nextRaw);
   }
 }
 
@@ -336,6 +354,15 @@ function validateMacroMsInsertionContent(nextRaw, propertyName) {
   const match = nextRaw.match(pattern);
   if (!match) throw new Error(`${propertyName}-insert content is invalid.`);
   validateMacroMsValue(match[1], propertyName);
+}
+
+function validateLayerName(name) {
+  if (typeof name !== "string" || !name.length) {
+    throw new Error("Layer name must be a non-empty string.");
+  }
+  if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) {
+    throw new Error("Layer name must start with a letter or underscore and contain only letters, digits, underscore, or hyphen.");
+  }
 }
 
 function normalizeSpace(value) {

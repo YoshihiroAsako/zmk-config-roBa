@@ -138,6 +138,7 @@ describe("save binding change helper", () => {
       diagnostics.map((item) => [item.label, item.ok]),
       [
         ["Layer count", true],
+        ["Unique layer names", true],
         ["Layer binding counts", true],
         ["Combo count", true],
         ["Macro count", true],

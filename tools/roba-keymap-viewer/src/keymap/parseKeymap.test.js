@@ -144,6 +144,24 @@ describe("roBa keymap parser", () => {
     assert.equal(macro.tapMs, null);
   });
 
+  it("tracks source ranges for layer name tokens", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+
+    for (const layer of parsed.layers) {
+      assert.ok(layer.nameRange, `${layer.name} should have nameRange`);
+      assert.equal(source.slice(layer.nameRange.start, layer.nameRange.end), layer.name);
+    }
+
+    const renamed = `${source.slice(0, parsed.layers[1].nameRange.start)}FN${source.slice(parsed.layers[1].nameRange.end)}`;
+    const reparsed = parseKeymap(renamed);
+    assert.equal(reparsed.layers[1].name, "FN");
+    assert.deepEqual(
+      reparsed.layers.map((layer) => layer.bindings.length),
+      parsed.layers.map((layer) => layer.bindings.length),
+    );
+  });
+
   it("captures wait-ms and tap-ms ranges when macros define them", () => {
     const source = `/
 {

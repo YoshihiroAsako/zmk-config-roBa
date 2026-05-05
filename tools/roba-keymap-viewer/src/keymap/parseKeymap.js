@@ -41,6 +41,12 @@ function directChildBlocks(body, baseOffset = 0) {
 
     if (name) {
       const rawStart = boundary + 1;
+      let nameEnd = open;
+      while (nameEnd > rawStart && /\s/.test(body[nameEnd - 1])) nameEnd -= 1;
+      const nameStart = nameEnd - name.length;
+      const nameRange = nameStart >= rawStart && body.slice(nameStart, nameEnd) === name
+        ? { start: baseOffset + nameStart, end: baseOffset + nameEnd }
+        : undefined;
       children.push({
         name,
         rawHead: head,
@@ -50,6 +56,7 @@ function directChildBlocks(body, baseOffset = 0) {
         raw: body.slice(boundary + 1, close + 1).trim(),
         rawStart: baseOffset + rawStart,
         rawEnd: baseOffset + close + 1,
+        nameRange,
       });
     }
     cursor = close + 1;
@@ -287,6 +294,7 @@ export function parseKeymap(source) {
     return {
       id: index,
       name: layer.name,
+      nameRange: layer.nameRange,
       bindings: bindingEntries.map((entry) => entry.raw),
       bindingEntries,
       sensorBindings: splitBindingExpressions(getAngleProperty(layer.body, "sensor-bindings")),

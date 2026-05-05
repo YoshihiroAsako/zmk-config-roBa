@@ -1,11 +1,16 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { saveBindingChange, saveBindingChanges } from "./src/keymap/saveBindingChange.js";
 
+const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(__dirname, "../..");
 const keymapPath = path.join(repoRoot, "config", "roBa.keymap");
+const drawerYamlPath = path.join(repoRoot, "keymap-drawer", "roBa.yaml");
+const drawerSvgPath = path.join(repoRoot, "keymap-drawer", "roBa.svg");
 
 export default defineConfig({
   plugins: [
@@ -59,6 +64,17 @@ export default defineConfig({
             sendJson(response, 400, { ok: false, message: error.message });
           }
         });
+
+        server.middlewares.use("/__roba/update-keymap-drawer", async (request, response, next) => {
+          if (request.method !== "POST") return next();
+
+          try {
+            const result = await updateKeymapDrawer();
+            sendJson(response, 200, result);
+          } catch (error) {
+            sendJson(response, 500, { ok: false, available: true, message: error.message });
+          }
+        });
       },
     },
   ],
@@ -73,6 +89,55 @@ function sendJson(response, statusCode, payload) {
   response.statusCode = statusCode;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.end(JSON.stringify(payload));
+}
+
+async function isKeymapAvailable() {
+  try {
+    await execFileAsync("keymap", ["--version"], { shell: true, timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function updateKeymapDrawer() {
+  if (!(await isKeymapAvailable())) {
+    return {
+      ok: false,
+      available: false,
+      message: "keymap CLI not found on PATH. Update keymap-drawer manually.",
+    };
+  }
+
+  try {
+    const { stdout: yaml } = await execFileAsync(
+      "keymap",
+      ["parse", "-c", "10", "-z", keymapPath],
+      { shell: true, maxBuffer: 16 * 1024 * 1024 },
+    );
+    await writeFile(drawerYamlPath, yaml, "utf8");
+
+    const { stdout: svg } = await execFileAsync(
+      "keymap",
+      ["draw", drawerYamlPath],
+      { shell: true, maxBuffer: 16 * 1024 * 1024 },
+    );
+    await writeFile(drawerSvgPath, svg, "utf8");
+
+    return {
+      ok: true,
+      available: true,
+      message: "Updated keymap-drawer/roBa.yaml and roBa.svg.",
+      yamlPath: path.relative(repoRoot, drawerYamlPath).replace(/\\/g, "/"),
+      svgPath: path.relative(repoRoot, drawerSvgPath).replace(/\\/g, "/"),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      available: true,
+      message: `keymap-drawer update failed: ${error.message}`,
+    };
+  }
 }
 
 function readJsonBody(request) {

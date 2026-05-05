@@ -11,6 +11,7 @@ import { countDtsPhysicalKeys, parseKeymap } from "./keymap/parseKeymap.js";
 import {
   buildDraftChange,
   buildComboDraftChanges,
+  buildLayerRenameDraftChange,
   buildMacroDraftChanges,
   buildPendingChangesState,
   getDraftId,
@@ -24,7 +25,7 @@ const UNIT = 48;
 const TRACKBALL = { x: 10, y: 3.8, r: 0.62 };
 
 const TABS = ["Bindings", "Combos", "Macros", "Behaviors", "Sensors", "Preview", "Markdown", "Diagnostics"];
-const EMPTY_SAVE_STATUS = { tone: "idle", title: "", message: "", backupPath: "" };
+const EMPTY_SAVE_STATUS = { tone: "idle", title: "", message: "", backupPath: "", drawerMessage: "" };
 
 function App() {
   const [keymapSource, setKeymapSource] = useState(initialKeymapSource);
@@ -65,6 +66,7 @@ function App() {
     waitMsRaw: "",
     tapMsRaw: "",
   });
+  const [layerRenameDraft, setLayerRenameDraft] = useState("");
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -144,6 +146,12 @@ function App() {
       tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
     });
   }, [selectedMacro]);
+
+  const layerRenameDraftId = `layer-${activeLayer}-rename`;
+  const layerRenamePending = pendingChanges.find((change) => change.id === layerRenameDraftId);
+  useEffect(() => {
+    setLayerRenameDraft(layerRenamePending?.nextRaw ?? currentLayer.name);
+  }, [activeLayer, currentLayer.name, layerRenamePending?.nextRaw]);
 
   const reloadKeymapSource = async () => {
     if (!saveEndpointAvailable) {
@@ -230,15 +238,35 @@ function App() {
         title: "Saved .keymap",
         message: "Backup created before writing config/roBa.keymap.",
         backupPath: payload.backupPath,
+        drawerMessage: "Updating keymap-drawer...",
       });
       setActiveTab("Preview");
+      const drawerMessage = await updateKeymapDrawerAfterSave();
+      setSaveStatus((current) => ({ ...current, drawerMessage }));
     } catch (error) {
       setSaveStatus({
         tone: "error",
         title: "Save failed",
         message: error.message,
         backupPath: "",
+        drawerMessage: "",
       });
+    }
+  };
+
+  const updateKeymapDrawerAfterSave = async () => {
+    try {
+      const response = await fetch("/__roba/update-keymap-drawer", { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (payload.ok) {
+        return `keymap-drawer regenerated (${payload.yamlPath}, ${payload.svgPath}).`;
+      }
+      if (payload.available === false) {
+        return "keymap CLI not found on PATH. Update keymap-drawer manually.";
+      }
+      return payload.message || "keymap-drawer update failed.";
+    } catch (error) {
+      return `keymap-drawer update failed: ${error.message}`;
     }
   };
 
@@ -287,14 +315,18 @@ function App() {
         title: "Saved pending changes",
         message: payload.message || "Backup created before writing config/roBa.keymap.",
         backupPath: payload.backupPath,
+        drawerMessage: "Updating keymap-drawer...",
       });
       setActiveTab("Preview");
+      const drawerMessage = await updateKeymapDrawerAfterSave();
+      setSaveStatus((current) => ({ ...current, drawerMessage }));
     } catch (error) {
       setSaveStatus({
         tone: "error",
         title: "Save all failed",
         message: error.message,
         backupPath: "",
+        drawerMessage: "",
       });
     }
   };
@@ -335,6 +367,26 @@ function App() {
   const clearPendingChanges = () => {
     setPendingChanges([]);
     setDraftBinding(selectedEntry?.raw || selectedBinding);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  const addLayerRenameDraft = () => {
+    const trimmed = layerRenameDraft.trim();
+    if (!currentLayer.nameRange || !trimmed || trimmed === currentLayer.name) return;
+    const change = buildLayerRenameDraftChange({
+      layerIndex: activeLayer,
+      currentName: currentLayer.name,
+      nextName: trimmed,
+      nameRange: currentLayer.nameRange,
+    });
+    setPendingChanges((current) => upsertDraftChange(current, change));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const removeLayerRenameDraft = () => {
+    setPendingChanges((changes) => removeDraftChange(changes, layerRenameDraftId));
+    setLayerRenameDraft(currentLayer.name);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -451,6 +503,18 @@ function App() {
             <div>
               <span className="eyebrow">Layer {currentLayer.id}</span>
               <h2>{currentLayer.name}</h2>
+              <LayerRenameRow
+                currentName={currentLayer.name}
+                draft={layerRenameDraft}
+                pending={Boolean(layerRenamePending)}
+                disabled={!currentLayer.nameRange}
+                onChange={(value) => {
+                  setLayerRenameDraft(value);
+                  setSaveStatus(EMPTY_SAVE_STATUS);
+                }}
+                onAdd={addLayerRenameDraft}
+                onRemove={removeLayerRenameDraft}
+              />
             </div>
             <div className="legend">
               <span><i className="editDirect" /> Studio direct</span>
@@ -715,6 +779,39 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
       </div>
       <pre className="rawNodePreview">{combo.raw}</pre>
     </section>
+  );
+}
+
+function LayerRenameRow({ currentName, draft, pending, disabled, onChange, onAdd, onRemove }) {
+  const trimmed = (draft || "").trim();
+  const validIdentifier = /^[A-Za-z_][A-Za-z0-9_-]*$/.test(trimmed);
+  const changed = trimmed !== currentName;
+  const canAdd = !disabled && validIdentifier && changed;
+  const note = !disabled && trimmed && !validIdentifier
+    ? "Invalid identifier."
+    : "Layer references like &lt N use indices, not names.";
+
+  return (
+    <div className="layerRenameRow">
+      <label>
+        <span>Layer name draft</span>
+        <input
+          aria-label="Layer name draft"
+          disabled={disabled}
+          value={draft}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+      <div className="layerRenameActions">
+        <button type="button" disabled={!canAdd} onClick={onAdd}>
+          {pending ? "Update rename draft" : "Add rename draft"}
+        </button>
+        <button type="button" disabled={!pending} onClick={onRemove}>
+          Remove rename draft
+        </button>
+      </div>
+      <small className="layerRenameNote">{note}</small>
+    </div>
   );
 }
 
@@ -1197,6 +1294,12 @@ function SaveStatusPanel({ status, compact = false }) {
         <div className="backupPathBlock">
           <span className="backupPathLabel">Backup path</span>
           <code className="backupPathValue">{status.backupPath}</code>
+        </div>
+      )}
+      {status.drawerMessage && (
+        <div className="drawerStatusLine">
+          <span className="drawerStatusLabel">keymap-drawer</span>
+          <span>{status.drawerMessage}</span>
         </div>
       )}
     </div>
