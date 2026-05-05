@@ -503,18 +503,6 @@ function App() {
             <div>
               <span className="eyebrow">Layer {currentLayer.id}</span>
               <h2>{currentLayer.name}</h2>
-              <LayerRenameRow
-                currentName={currentLayer.name}
-                draft={layerRenameDraft}
-                pending={Boolean(layerRenamePending)}
-                disabled={!currentLayer.nameRange}
-                onChange={(value) => {
-                  setLayerRenameDraft(value);
-                  setSaveStatus(EMPTY_SAVE_STATUS);
-                }}
-                onAdd={addLayerRenameDraft}
-                onRemove={removeLayerRenameDraft}
-              />
             </div>
             <div className="legend">
               <span><i className="editDirect" /> Studio direct</span>
@@ -533,6 +521,21 @@ function App() {
         </section>
 
         <aside className="detailPane">
+          <div className="layerRenameSection">
+            <span className="eyebrow">Layer {currentLayer.id} · {currentLayer.name}</span>
+            <LayerRenameRow
+              currentName={currentLayer.name}
+              draft={layerRenameDraft}
+              pending={Boolean(layerRenamePending)}
+              disabled={!currentLayer.nameRange}
+              onChange={(value) => {
+                setLayerRenameDraft(value);
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
+              onAdd={addLayerRenameDraft}
+              onRemove={removeLayerRenameDraft}
+            />
+          </div>
           <div className="paneHeader compact">
             <div>
               <span className="eyebrow">Selected key</span>
@@ -789,25 +792,23 @@ function LayerRenameRow({ currentName, draft, pending, disabled, onChange, onAdd
   const canAdd = !disabled && validIdentifier && changed;
   const note = !disabled && trimmed && !validIdentifier
     ? "Invalid identifier."
-    : "Layer references like &lt N use indices, not names.";
+    : "&lt N uses index, not name.";
 
   return (
     <div className="layerRenameRow">
-      <label>
-        <span>Layer name draft</span>
-        <input
-          aria-label="Layer name draft"
-          disabled={disabled}
-          value={draft}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      </label>
+      <input
+        aria-label="Layer name draft"
+        disabled={disabled}
+        value={draft}
+        placeholder="Layer name draft"
+        onChange={(event) => onChange(event.target.value)}
+      />
       <div className="layerRenameActions">
         <button type="button" disabled={!canAdd} onClick={onAdd}>
-          {pending ? "Update rename draft" : "Add rename draft"}
+          {pending ? "Update" : "Add"}
         </button>
         <button type="button" disabled={!pending} onClick={onRemove}>
-          Remove rename draft
+          Remove
         </button>
       </div>
       <small className="layerRenameNote">{note}</small>

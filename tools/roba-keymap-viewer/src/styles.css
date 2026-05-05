@@ -952,33 +952,38 @@ td code {
   border-left: 4px solid #c64f5f;
 }
 
-.layerRenameRow {
-  display: grid;
-  grid-template-columns: minmax(200px, 1fr) auto;
-  gap: 8px;
-  align-items: end;
-  margin-top: 8px;
-  padding: 8px 10px;
-  border: 1px solid #d6dee9;
-  border-radius: 6px;
-  background: #fbfcfd;
+.layerRenameSection {
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid #dfe6f0;
 }
 
-.layerRenameRow label {
+.layerRenameSection .eyebrow {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.layerRenameRow {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: #65758b;
-  font-weight: 600;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .layerRenameRow input {
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 13px;
-  padding: 4px 6px;
+  width: 180px;
+  height: 28px;
+  padding: 0 6px;
   border: 1px solid #cfd8e3;
   border-radius: 4px;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  color: #18202f;
+  background: #ffffff;
+}
+
+.layerRenameRow input:disabled {
+  background: #eef2f7;
+  color: #7d8da3;
 }
 
 .layerRenameActions {
@@ -986,10 +991,28 @@ td code {
   gap: 6px;
 }
 
+.layerRenameActions button {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #c8d4e4;
+  border-radius: 5px;
+  background: #eef2f7;
+  color: #7d8da3;
+  font-size: 12px;
+  cursor: default;
+}
+
+.layerRenameActions button:not(:disabled) {
+  border-color: #087f8c;
+  background: #087f8c;
+  color: #ffffff;
+  cursor: pointer;
+}
+
 .layerRenameNote {
-  grid-column: 1 / -1;
   font-size: 11px;
   color: #65758b;
+  flex-basis: 100%;
 }
 
 .drawerStatusLine {

@@ -9,7 +9,15 @@
       "PowerShell($path1 = \"c:\\\\Users\\\\0000130350\\\\github\\\\zmk-config-roBa\\\\AGENTS.md\"; $path2 = \"c:\\\\Users\\\\0000130350\\\\github\\\\zmk-config-roBa\\\\docs\\\\current-work-status.md\"; foreach \\($p in @\\($path1, $path2\\)\\) { $b = [System.IO.File]::ReadAllBytes\\($p\\); $crlf = 0; $lfOnly = 0; for \\($i = 0; $i -lt $b.Length; $i++\\) { if \\($b[$i] -eq 0x0A\\) { if \\($i -gt 0 -and $b[$i-1] -eq 0x0D\\) { $crlf++ } else { $lfOnly++ } } }; \"{0,-60} CRLF={1} LF-only={2} bytes={3}\" -f \\(Split-Path -Leaf $p\\), $crlf, $lfOnly, $b.Length })",
       "PowerShell($path = \"c:\\\\Users\\\\0000130350\\\\github\\\\zmk-config-roBa\\\\docs\\\\current-work-status.md\"; $content = [System.IO.File]::ReadAllText\\($path, [System.Text.UTF8Encoding]::new\\($false\\)\\); [System.IO.File]::WriteAllText\\($path, $content, [System.Text.UTF8Encoding]::new\\($true\\)\\); $b = [System.IO.File]::ReadAllBytes\\($path\\); \"First 3 bytes: {0:X2} {1:X2} {2:X2}\" -f $b[0], $b[1], $b[2]; \"Total bytes: $\\($b.Length\\)\")",
       "PowerShell(Invoke-WebRequest -UseBasicParsing http://[::1]:5173/__roba/keymap-source)",
-      "PowerShell(Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq \"\" } | Stop-Process -Force; Write-Host \"Stopped node processes\")"
+      "PowerShell(Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq \"\" } | Stop-Process -Force; Write-Host \"Stopped node processes\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://127.0.0.1:5173/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://127.0.0.1:5173/__roba/keymap-source)",
+      "Bash(powershell -NoProfile -Command 'Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '\\\\''*roba-keymap-viewer*'\\\\'' } | Stop-Process -Force')",
+      "Bash(netstat -ano)",
+      "Bash(findstr :5173)",
+      "Bash(command -v keymap)",
+      "Bash(powershell -NoProfile -Command \"Get-Command keymap -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(curl -s -X POST http://127.0.0.1:5173/__roba/update-keymap-drawer)"
     ]
   }
 }
