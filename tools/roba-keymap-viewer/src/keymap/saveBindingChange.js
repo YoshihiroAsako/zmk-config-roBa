@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { parseKeymap, replaceBinding } from "./parseKeymap.js";
+import { parseKeymap, replaceBinding, replaceBindings } from "./parseKeymap.js";
 
 const CANONICAL_SOURCE_PATH = "config/roBa.keymap";
 
@@ -55,6 +55,70 @@ export async function saveBindingChange({
   return {
     ok: true,
     message: "Saved config/roBa.keymap with a backup.",
+    backupPath: toRepoRelativePath(root, backupPath),
+    diagnostics,
+  };
+}
+
+export async function saveBindingChanges({
+  repoRoot,
+  sourcePath = CANONICAL_SOURCE_PATH,
+  changes,
+  now = new Date(),
+}) {
+  const root = path.resolve(repoRoot);
+  const normalizedSourcePath = normalizeSourcePath(sourcePath);
+
+  if (normalizedSourcePath !== CANONICAL_SOURCE_PATH) {
+    throw new Error("Only config/roBa.keymap can be saved.");
+  }
+
+  if (!Array.isArray(changes) || changes.length === 0) {
+    throw new Error("At least one pending change is required.");
+  }
+
+  const sourceFile = path.resolve(root, ...CANONICAL_SOURCE_PATH.split("/"));
+  assertInsideRepo(root, sourceFile);
+
+  const source = await readFile(sourceFile, "utf8");
+  for (const change of changes) {
+    const currentSourceRaw = source.slice(change.range?.start, change.range?.end).trim();
+    if (currentSourceRaw !== change.currentRaw) {
+      throw new Error("One or more bindings no longer match the source file. Reload before saving.");
+    }
+  }
+
+  const beforeParsed = parseKeymap(source);
+  const replacements = changes.map((change) => ({
+    range: change.range,
+    nextRaw: change.nextRaw,
+  }));
+  const nextSource = replaceBindings(source, replacements);
+  const afterParsed = parseKeymap(nextSource);
+  const diagnostics = buildSaveDiagnostics(beforeParsed, afterParsed);
+  const failedDiagnostic = diagnostics.find((item) => !item.ok);
+  if (failedDiagnostic) {
+    throw new Error(`Save rejected because ${failedDiagnostic.label} changed.`);
+  }
+
+  const backupPath = await writeBackup(root, source, now);
+  const tempPath = `${sourceFile}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    await writeFile(tempPath, nextSource, "utf8");
+    await rename(tempPath, sourceFile);
+  } catch (error) {
+    await removeTempFile(tempPath);
+    throw error;
+  }
+
+  const savedSource = await readFile(sourceFile, "utf8");
+  if (savedSource !== nextSource) {
+    throw new Error("Saved source verification failed.");
+  }
+
+  return {
+    ok: true,
+    message: `Saved ${changes.length} pending change${changes.length === 1 ? "" : "s"} with a backup.`,
     backupPath: toRepoRelativePath(root, backupPath),
     diagnostics,
   };

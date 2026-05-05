@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parseKeymap } from "./parseKeymap.js";
-import { buildSaveDiagnostics, saveBindingChange } from "./saveBindingChange.js";
+import { buildSaveDiagnostics, saveBindingChange, saveBindingChanges } from "./saveBindingChange.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");
@@ -143,5 +143,146 @@ describe("save binding change helper", () => {
         ["Sensor binding count", true],
       ],
     );
+  });
+
+  it("backs up once and saves multiple editable binding changes", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const firstEntry = parsed.layers[0].bindingEntries[0];
+    const secondEntry = parsed.layers[0].bindingEntries[38];
+
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({
+        repoRoot: tempRoot,
+        sourcePath: "config/roBa.keymap",
+        changes: [
+          {
+            range: firstEntry.sourceRange,
+            currentRaw: firstEntry.raw,
+            nextRaw: "&kp B",
+          },
+          {
+            range: secondEntry.sourceRange,
+            currentRaw: secondEntry.raw,
+            nextRaw: "&lt 1 TAB",
+          },
+        ],
+        now: new Date(2026, 4, 4, 13, 10, 11),
+      });
+      const savedSource = await readTempKeymap(tempRoot);
+      const backupSource = await readFile(path.join(tempRoot, result.backupPath), "utf8");
+      const savedParsed = parseKeymap(savedSource);
+
+      assert.equal(result.ok, true);
+      assert.equal(result.message, "Saved 2 pending changes with a backup.");
+      assert.equal(result.backupPath, "config/.roBa.keymap.bak/20260504-131011.roBa.keymap");
+      assert.equal(backupSource, source);
+      assert.equal(savedParsed.layers[0].bindings[0], "&kp B");
+      assert.equal(savedParsed.layers[0].bindings[38], "&lt 1 TAB");
+      assert.equal(savedParsed.layers[0].bindings.length, parsed.layers[0].bindings.length);
+      assert.equal(result.diagnostics.every((item) => item.ok), true);
+    });
+  });
+
+  it("rejects one stale currentRaw in a multi-change save without changing the source", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const firstEntry = parsed.layers[0].bindingEntries[0];
+    const secondEntry = parsed.layers[0].bindingEntries[38];
+
+    await withTempRepo(source, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({
+          repoRoot: tempRoot,
+          changes: [
+            {
+              range: firstEntry.sourceRange,
+              currentRaw: firstEntry.raw,
+              nextRaw: "&kp B",
+            },
+            {
+              range: secondEntry.sourceRange,
+              currentRaw: "&lt 9 STALE",
+              nextRaw: "&lt 1 TAB",
+            },
+          ],
+        }),
+        /no longer match/,
+      );
+
+      assert.equal(await readTempKeymap(tempRoot), source);
+    });
+  });
+
+  it("rejects overlapping multi-change ranges without changing the source", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const selectedEntry = parseKeymap(source).layers[0].bindingEntries[0];
+
+    await withTempRepo(source, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({
+          repoRoot: tempRoot,
+          changes: [
+            {
+              range: selectedEntry.sourceRange,
+              currentRaw: selectedEntry.raw,
+              nextRaw: "&kp B",
+            },
+            {
+              range: selectedEntry.sourceRange,
+              currentRaw: selectedEntry.raw,
+              nextRaw: "&kp C",
+            },
+          ],
+        }),
+        /overlap/,
+      );
+
+      assert.equal(await readTempKeymap(tempRoot), source);
+    });
+  });
+
+  it("rejects empty, unsupported, and non-canonical multi-change saves", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const selectedEntry = parseKeymap(source).layers[0].bindingEntries[0];
+
+    await withTempRepo(source, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({
+          repoRoot: tempRoot,
+          changes: [],
+        }),
+        /At least one/,
+      );
+      await assert.rejects(
+        () => saveBindingChanges({
+          repoRoot: tempRoot,
+          changes: [
+            {
+              range: selectedEntry.sourceRange,
+              currentRaw: selectedEntry.raw,
+              nextRaw: "&bt BT_SEL 0",
+            },
+          ],
+        }),
+        /not supported/,
+      );
+      await assert.rejects(
+        () => saveBindingChanges({
+          repoRoot: tempRoot,
+          sourcePath: "config/other.keymap",
+          changes: [
+            {
+              range: selectedEntry.sourceRange,
+              currentRaw: selectedEntry.raw,
+              nextRaw: "&kp B",
+            },
+          ],
+        }),
+        /Only config\/roBa\.keymap/,
+      );
+
+      assert.equal(await readTempKeymap(tempRoot), source);
+    });
   });
 });

@@ -114,3 +114,103 @@ server helper テスト:
 4. UI の Save button を endpoint につなぐ。
 5. 保存成功後の再取得・再 parse・diagnostics 表示を入れる。
 6. 手動確認後に `docs/current-work-status.md` を更新する。
+
+## 複数キー変更への拡張メモ
+
+1 binding 保存が実機 UI で往復確認できた後の拡張案。
+ここでも保存対象は Phase 2 editable binding に限定し、combo / macro / sensor-bindings / layer rename / keymap-drawer 自動更新は別作業に分ける。
+
+### 目的
+
+- 複数の通常キー binding を一度 draft として保持し、まとめて preview できるようにする。
+- 実ファイル保存は `Save all` の 1 回だけにし、backup も 1 回だけ作る。
+- 既存の source range 置換方式を維持し、`.keymap` 全体の再生成はしない。
+
+### draft model
+
+UI 側に pending changes list を持つ。
+各 item は最低限この形にする。
+
+- `id`: layer index と key position から作る安定 ID。例: `layer-2-pos-38`
+- `layerIndex`
+- `position`
+- `range`: 選択時の `bindingEntries[].sourceRange`
+- `currentRaw`: 選択時点の binding
+- `nextRaw`: draft binding
+
+同じ `id` の draft を再編集した場合は上書きする。
+`nextRaw === currentRaw` に戻った draft は pending list から消す。
+
+### preview
+
+複数 preview は `replaceBindings(source, replacements)` を使う。
+UI では `source` に対して pending changes 全件を適用した `nextSource` を作り、再 parse して diagnostics を表示する。
+
+preview 時に拒否する条件:
+
+- pending list が空。
+- いずれかの `nextRaw` が Phase 2 editable binding ではない。
+- いずれかの `range` が 1 binding expression 全体を指していない。
+- `range` が重複している。
+- 再 parse 後に layer count / layer binding counts / combo count / macro count / sensor binding count が変わる。
+
+Context Diff はまず変更ごとの小さな diff list でよい。
+`.keymap` 全文 preview は残してもよいが、複数変更時は表示が長くなるため、主 UI は pending changes と per-change Context Diff を優先する。
+
+### save all endpoint
+
+1 binding endpoint とは別に、dev-only の `POST /__roba/save-bindings` を追加する。
+
+request body:
+
+- `sourcePath`: 固定で `config/roBa.keymap` のみ許可
+- `changes`: pending changes list
+  - `range`
+  - `currentRaw`
+  - `nextRaw`
+
+server 側の保存手順:
+
+1. 現在の `config/roBa.keymap` を UTF-8 text として読む。
+2. 各 change の `source.slice(range.start, range.end).trim()` が `currentRaw` と一致することを確認する。
+3. `replaceBindings(source, changes)` で next source を作る。
+4. before / after を parse し、1 binding 保存と同じ diagnostics が維持されることを確認する。
+5. backup を 1 件だけ作る。
+6. temp file 経由で `config/roBa.keymap` を更新する。
+7. 保存後 source を返し、UI は pending changes を clear して再 parse する。
+
+部分成功は作らない。
+1 件でも検証に失敗したら実ファイルを書かず、ユーザーに `Reload source` を促す。
+
+### 最小 UI
+
+- detail panel の保存ボタンは、まず `Add draft` / `Update draft` に変える。
+- top bar か Preview tab に pending count を表示する。
+- Preview tab に `Pending changes` list を表示する。
+- 各 pending item に `Remove` を置く。
+- list 全体に `Clear all` と `Save all` を置く。
+- `Save all` は dev mode かつ pending preview が valid の時だけ有効にする。
+
+最初の実装ではドラッグ編集、複数選択、一括キーコード入力は入れない。
+既存の「1キーを選んで raw binding を編集する」流れを draft に積むだけにする。
+
+### テスト計画
+
+純粋関数テスト:
+
+- `replaceBindings` が複数 range を後ろから置換し、offset ずれを起こさない。
+- 重複 range を拒否する。
+- unsupported binding を含む場合に拒否する。
+- 複数置換後も parse と diagnostics が維持される。
+
+server helper テスト:
+
+- 複数 change を 1 backup で保存できる。
+- 1 件の `currentRaw` 不一致で全体を拒否し、元ファイルを変更しない。
+- 重複 range で全体を拒否し、元ファイルを変更しない。
+
+手動確認:
+
+- 2 つ以上のキーを draft に積み、Preview tab で全変更が見えること。
+- `Save all` 後に `config/roBa.keymap` の差分が対象 binding だけに収まること。
+- `Reload source` 後に pending changes が安全に扱われること。

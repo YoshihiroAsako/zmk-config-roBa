@@ -527,6 +527,12 @@ pre {
   cursor: pointer;
 }
 
+.editorActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .bottomPanel {
   display: grid;
   grid-template-rows: 42px minmax(0, 1fr);
@@ -671,12 +677,39 @@ td code {
 
 .diffGrid > div {
   display: grid;
-  grid-template-rows: 28px minmax(0, 1fr);
+  grid-template-rows: auto minmax(42px, auto) auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   border: 1px solid #d7e0ec;
   border-radius: 7px;
   background: #ffffff;
+}
+
+.diffGrid > div:last-child {
+  grid-template-rows: 28px minmax(0, 1fr);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 8px;
+}
+
+.previewHeader button,
+.pendingRemove {
+  height: 26px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+  background: #f8fbff;
+  color: #52647b;
+  cursor: pointer;
+}
+
+.previewHeader button:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .diffGrid h3 {
@@ -700,6 +733,57 @@ td code {
 
 .diffPreview {
   color: #315b9b;
+}
+
+.pendingEmpty {
+  margin: 0 10px 8px;
+  padding: 9px 10px;
+  border: 1px dashed #c8d4e4;
+  border-radius: 7px;
+  color: #65758b;
+  background: #f8fbff;
+}
+
+.pendingList {
+  display: grid;
+  gap: 6px;
+  max-height: 88px;
+  margin: 0 10px 8px;
+  overflow: auto;
+}
+
+.pendingItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  gap: 6px;
+}
+
+.pendingMain {
+  display: grid;
+  grid-template-columns: minmax(82px, 0.6fr) 52px minmax(0, 1.4fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #d7e0ec;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #263247;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pendingMain strong,
+.pendingMain code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pendingMain span {
+  color: #65758b;
+  font-size: 11px;
+  font-weight: 750;
 }
 
 .markdownPreview {

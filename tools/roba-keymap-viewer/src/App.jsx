@@ -6,6 +6,13 @@ import { buildMarkdown } from "./export/markdown.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
 import { buildEditorState } from "./keymap/editorPreview.js";
 import { countDtsPhysicalKeys, parseKeymap } from "./keymap/parseKeymap.js";
+import {
+  buildDraftChange,
+  buildPendingChangesState,
+  getDraftId,
+  removeDraftChange,
+  upsertDraftChange,
+} from "./keymap/pendingChanges.js";
 
 const KEY_SIZE = 44;
 const UNIT = 48;
@@ -39,24 +46,31 @@ function App() {
   const [activeTab, setActiveTab] = useState("Bindings");
   const [search, setSearch] = useState("");
   const [draftBinding, setDraftBinding] = useState(null);
+  const [pendingChanges, setPendingChanges] = useState([]);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
   const selectedBinding = currentLayer.bindings[selectedPosition] || "&trans";
   const selectedEntry = currentLayer.bindingEntries?.[selectedPosition];
+  const selectedDraftId = getDraftId(activeLayer, selectedPosition);
+  const selectedPendingChange = pendingChanges.find((change) => change.id === selectedDraftId);
   const selectedParsed = describeBinding(selectedBinding, layerNames);
   const selectedRange = selectedEntry?.sourceRange;
-  const effectiveDraftBinding = draftBinding ?? selectedEntry?.raw ?? selectedBinding;
+  const effectiveDraftBinding = draftBinding ?? selectedPendingChange?.nextRaw ?? selectedEntry?.raw ?? selectedBinding;
   const editorState = useMemo(
     () => buildEditorState(keymapSource, selectedEntry, effectiveDraftBinding, document.layers),
     [selectedEntry, effectiveDraftBinding, document],
+  );
+  const pendingState = useMemo(
+    () => buildPendingChangesState(keymapSource, pendingChanges, document.layers),
+    [keymapSource, pendingChanges, document.layers],
   );
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
 
   useEffect(() => {
-    setDraftBinding(selectedEntry?.raw || selectedBinding);
-  }, [selectedEntry, selectedBinding]);
+    setDraftBinding(selectedPendingChange?.nextRaw || selectedEntry?.raw || selectedBinding);
+  }, [selectedEntry, selectedBinding, selectedPendingChange]);
 
   const reloadKeymapSource = async () => {
     if (!saveEndpointAvailable) {
@@ -84,6 +98,7 @@ function App() {
 
       setKeymapSource(payload.source);
       setDraftBinding(null);
+      setPendingChanges([]);
       setSaveStatus({
         tone: "ok",
         title: "Reloaded source",
@@ -136,6 +151,7 @@ function App() {
 
       setKeymapSource(payload.source);
       setDraftBinding(effectiveDraftBinding);
+      setPendingChanges([]);
       setSaveStatus({
         tone: "ok",
         title: "Saved .keymap",
@@ -159,6 +175,32 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const addSelectedDraft = () => {
+    if (!editorState.canEdit || !selectedEntry?.sourceRange) return;
+    const change = buildDraftChange({
+      layerIndex: activeLayer,
+      layerName: currentLayer.name,
+      position: selectedPosition,
+      entry: selectedEntry,
+      nextRaw: effectiveDraftBinding,
+    });
+    setPendingChanges((changes) => upsertDraftChange(changes, change));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const removeSelectedDraft = () => {
+    setPendingChanges((changes) => removeDraftChange(changes, selectedDraftId));
+    setDraftBinding(selectedEntry?.raw || selectedBinding);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  const clearPendingChanges = () => {
+    setPendingChanges([]);
+    setDraftBinding(selectedEntry?.raw || selectedBinding);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
   return (
     <div className="appShell">
       <header className="topBar">
@@ -179,7 +221,7 @@ function App() {
       <section className="statusStrip" aria-label="status">
         <StatusPill label="Source" value="config/roBa.keymap" tone="ok" />
         <StatusPill label="Layout" value={`${document.physicalLayout.length} keys`} tone="ok" />
-        <StatusPill label="Mode" value="read-only" tone="info" />
+        <StatusPill label="Pending" value={`${pendingChanges.length} draft${pendingChanges.length === 1 ? "" : "s"}`} tone={pendingChanges.length ? "warn" : "info"} />
         <StatusPill label="Studio" value="official app only" tone="warn" />
         <StatusPill label="Action" value={saveStatus.title || "ready"} tone={getStatusTone(saveStatus)} />
       </section>
@@ -283,6 +325,22 @@ function App() {
             </label>
             <div className="editorStatus">{editorState.message}</div>
             <SaveStatusPanel status={saveStatus} compact />
+            <div className="editorActions">
+              <button
+                type="button"
+                disabled={!editorState.canEdit || !editorState.changed}
+                onClick={addSelectedDraft}
+              >
+                {selectedPendingChange ? "Update draft" : "Add draft"}
+              </button>
+              <button
+                type="button"
+                disabled={!selectedPendingChange}
+                onClick={removeSelectedDraft}
+              >
+                Remove draft
+              </button>
+            </div>
             <button
               type="button"
               disabled={!saveEndpointAvailable || !editorState.canEdit || !editorState.changed || saveStatus.tone === "saving"}
@@ -319,9 +377,13 @@ function App() {
           markdown={markdown}
           diagnostics={diagnostics}
           editorState={editorState}
+          pendingChanges={pendingChanges}
+          pendingState={pendingState}
           saveStatus={saveStatus}
           selectedPosition={selectedPosition}
           onSelectBinding={selectBinding}
+          onRemovePendingChange={(id) => setPendingChanges((changes) => removeDraftChange(changes, id))}
+          onClearPendingChanges={clearPendingChanges}
         />
       </section>
     </div>
@@ -386,7 +448,23 @@ function KeyCap({ keyDef, parsed, selected, onSelect }) {
   );
 }
 
-function PanelContent({ tab, document, activeLayer, layerNames, search, markdown, diagnostics, editorState, saveStatus, selectedPosition, onSelectBinding }) {
+function PanelContent({
+  tab,
+  document,
+  activeLayer,
+  layerNames,
+  search,
+  markdown,
+  diagnostics,
+  editorState,
+  pendingChanges,
+  pendingState,
+  saveStatus,
+  selectedPosition,
+  onSelectBinding,
+  onRemovePendingChange,
+  onClearPendingChanges,
+}) {
   if (tab === "Bindings") {
     return (
       <BindingsTable
@@ -488,7 +566,17 @@ function PanelContent({ tab, document, activeLayer, layerNames, search, markdown
   }
 
   if (tab === "Preview") {
-    return <PreviewPanel editorState={editorState} saveStatus={saveStatus} />;
+    return (
+      <PreviewPanel
+        editorState={editorState}
+        pendingChanges={pendingChanges}
+        pendingState={pendingState}
+        saveStatus={saveStatus}
+        onSelectBinding={onSelectBinding}
+        onRemovePendingChange={onRemovePendingChange}
+        onClearPendingChanges={onClearPendingChanges}
+      />
+    );
   }
 
   return (
@@ -556,20 +644,64 @@ function BindingsTable({ document, activeLayer, layerNames, search, selectedPosi
   );
 }
 
-function PreviewPanel({ editorState, saveStatus }) {
+function PreviewPanel({
+  editorState,
+  pendingChanges,
+  pendingState,
+  saveStatus,
+  onSelectBinding,
+  onRemovePendingChange,
+  onClearPendingChanges,
+}) {
+  const previewSource = pendingChanges.length ? pendingState.nextSource : editorState.nextSource;
+  const contextDiff = pendingChanges.length
+    ? pendingState.contextDiff || pendingState.message
+    : editorState.contextDiff || editorState.diff || "No change.";
+
   return (
     <div className={saveStatus.message ? "previewPanel hasStatus" : "previewPanel"}>
       <SaveStatusPanel status={saveStatus} />
       <div className="diffGrid">
         <div>
+          <div className="previewHeader">
+            <h3>Pending Changes</h3>
+            <button type="button" disabled={!pendingChanges.length} onClick={onClearPendingChanges}>Clear all</button>
+          </div>
+          <PendingChangesList
+            changes={pendingChanges}
+            message={pendingState.message}
+            onSelect={onSelectBinding}
+            onRemove={onRemovePendingChange}
+          />
           <h3>Context Diff</h3>
-          <pre className="diffPreview">{editorState.contextDiff || editorState.diff || "No change."}</pre>
+          <pre className="diffPreview">{contextDiff}</pre>
         </div>
         <div>
           <h3>.keymap Preview</h3>
-          <pre className="sourcePreview">{editorState.nextSource}</pre>
+          <pre className="sourcePreview">{previewSource}</pre>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PendingChangesList({ changes, message, onSelect, onRemove }) {
+  if (!changes.length) {
+    return <div className="pendingEmpty">{message}</div>;
+  }
+
+  return (
+    <div className="pendingList">
+      {changes.map((change) => (
+        <div className="pendingItem" key={change.id}>
+          <button type="button" className="pendingMain" onClick={() => onSelect(change.layerIndex, change.position)}>
+            <strong>{change.layerName}</strong>
+            <span>POS{change.position}</span>
+            <code>{change.currentRaw} {"->"} {change.nextRaw}</code>
+          </button>
+          <button type="button" className="pendingRemove" onClick={() => onRemove(change.id)}>Remove</button>
+        </div>
+      ))}
     </div>
   );
 }
