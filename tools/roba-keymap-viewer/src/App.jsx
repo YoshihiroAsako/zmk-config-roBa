@@ -169,6 +169,62 @@ function App() {
     }
   };
 
+  const saveAllPendingChanges = async () => {
+    if (!pendingChanges.length || !pendingState.valid) return;
+    if (!saveEndpointAvailable) {
+      setSaveStatus({
+        tone: "error",
+        title: "Save unavailable",
+        message: "Save all is available only on the local dev server.",
+        backupPath: "",
+      });
+      return;
+    }
+
+    setSaveStatus({
+      tone: "saving",
+      title: "Saving pending changes",
+      message: "Validating all draft changes and creating one backup.",
+      backupPath: "",
+    });
+    try {
+      const response = await fetch("/__roba/save-bindings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourcePath: "config/roBa.keymap",
+          changes: pendingChanges.map((change) => ({
+            range: change.range,
+            currentRaw: change.currentRaw,
+            nextRaw: change.nextRaw,
+          })),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || "Save all failed.");
+      }
+
+      setKeymapSource(payload.source);
+      setDraftBinding(null);
+      setPendingChanges([]);
+      setSaveStatus({
+        tone: "ok",
+        title: "Saved pending changes",
+        message: payload.message || "Backup created before writing config/roBa.keymap.",
+        backupPath: payload.backupPath,
+      });
+      setActiveTab("Preview");
+    } catch (error) {
+      setSaveStatus({
+        tone: "error",
+        title: "Save all failed",
+        message: error.message,
+        backupPath: "",
+      });
+    }
+  };
+
   const selectBinding = (layerId, position) => {
     setActiveLayer(layerId);
     setSelectedPosition(position);
@@ -384,6 +440,8 @@ function App() {
           onSelectBinding={selectBinding}
           onRemovePendingChange={(id) => setPendingChanges((changes) => removeDraftChange(changes, id))}
           onClearPendingChanges={clearPendingChanges}
+          onSavePendingChanges={saveAllPendingChanges}
+          saveEndpointAvailable={saveEndpointAvailable}
         />
       </section>
     </div>
@@ -464,6 +522,8 @@ function PanelContent({
   onSelectBinding,
   onRemovePendingChange,
   onClearPendingChanges,
+  onSavePendingChanges,
+  saveEndpointAvailable,
 }) {
   if (tab === "Bindings") {
     return (
@@ -575,6 +635,8 @@ function PanelContent({
         onSelectBinding={onSelectBinding}
         onRemovePendingChange={onRemovePendingChange}
         onClearPendingChanges={onClearPendingChanges}
+        onSavePendingChanges={onSavePendingChanges}
+        saveEndpointAvailable={saveEndpointAvailable}
       />
     );
   }
@@ -652,6 +714,8 @@ function PreviewPanel({
   onSelectBinding,
   onRemovePendingChange,
   onClearPendingChanges,
+  onSavePendingChanges,
+  saveEndpointAvailable,
 }) {
   const previewSource = pendingChanges.length ? pendingState.nextSource : editorState.nextSource;
   const contextDiff = pendingChanges.length
@@ -665,7 +729,16 @@ function PreviewPanel({
         <div>
           <div className="previewHeader">
             <h3>Pending Changes</h3>
-            <button type="button" disabled={!pendingChanges.length} onClick={onClearPendingChanges}>Clear all</button>
+            <div className="previewActions">
+              <button
+                type="button"
+                disabled={!saveEndpointAvailable || !pendingChanges.length || !pendingState.valid || saveStatus.tone === "saving"}
+                onClick={onSavePendingChanges}
+              >
+                {saveStatus.tone === "saving" ? "Saving..." : "Save all"}
+              </button>
+              <button type="button" disabled={!pendingChanges.length} onClick={onClearPendingChanges}>Clear all</button>
+            </div>
           </div>
           <PendingChangesList
             changes={pendingChanges}

@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { saveBindingChange } from "./src/keymap/saveBindingChange.js";
+import { saveBindingChange, saveBindingChanges } from "./src/keymap/saveBindingChange.js";
 
 const repoRoot = path.resolve(__dirname, "../..");
 const keymapPath = path.join(repoRoot, "config", "roBa.keymap");
@@ -35,6 +35,23 @@ export default defineConfig({
               range: body.range,
               currentRaw: body.currentRaw,
               nextRaw: body.nextRaw,
+            });
+            const source = await readFile(keymapPath, "utf8");
+            sendJson(response, 200, { ...result, source });
+          } catch (error) {
+            sendJson(response, 400, { ok: false, message: error.message });
+          }
+        });
+
+        server.middlewares.use("/__roba/save-bindings", async (request, response, next) => {
+          if (request.method !== "POST") return next();
+
+          try {
+            const body = await readJsonBody(request);
+            const result = await saveBindingChanges({
+              repoRoot,
+              sourcePath: body.sourcePath,
+              changes: body.changes,
             });
             const source = await readFile(keymapPath, "utf8");
             sendJson(response, 200, { ...result, source });

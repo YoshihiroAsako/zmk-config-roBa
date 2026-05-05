@@ -697,6 +697,11 @@ td code {
   padding-right: 8px;
 }
 
+.previewActions {
+  display: flex;
+  gap: 6px;
+}
+
 .previewHeader button,
 .pendingRemove {
   height: 26px;

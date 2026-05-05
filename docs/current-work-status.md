@@ -145,6 +145,17 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 保存前に `currentRaw` 一致、空 changes 拒否、canonical path 制限、Phase 2 editable binding、重複 range 拒否、再 parse diagnostics 維持を確認。
   - 部分成功は作らず、1 件でも検証に失敗したら元ファイルを変更しない。
   - `tools/roba-keymap-viewer/src/keymap/saveBindingChange.test.js` に temp repo tests を追加。
+- 複数キー変更の dev-only endpoint / UI 接続を追加済み:
+  - `tools/roba-keymap-viewer/vite.config.js` に `POST /__roba/save-bindings` を追加。
+  - endpoint は `saveBindingChanges` を呼び、保存後の source を返す。
+  - Preview tab に `Save all` button を追加。
+  - `Save all` は pending changes があり、pending preview が valid で、dev server 上の時だけ有効。
+  - 保存成功後は返却 source で再 parse し、pending changes を clear する。
+- 複数キー変更保存の往復確認済み:
+  - dev server の `POST /__roba/save-bindings` に POS0/POS1 の2変更を送信し、1 backup で保存できることを確認。
+  - 一時変更後の `git diff -- config/roBa.keymap` は default layer の POS0/POS1 だけに収まることを確認。
+  - 同じ endpoint で POS0/POS1 を元の `&kp Q` / `&kp W` に戻し、`git diff -- config/roBa.keymap` が空になることを確認。
+  - 実装差分を確認し、今回の複数保存 endpoint / UI 接続は commit-ready。
 
 ## 検証状況
 
@@ -285,15 +296,31 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `tools/roba-keymap-viewer/` で `npm test` 成功。31 tests / 4 suites。
   - `tools/roba-keymap-viewer/` で `npm run build` 成功。
   - UI / endpoint 接続は未実装のため、ブラウザ手動確認は未実施。
+- 複数キー変更 dev-only endpoint / UI 接続後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。31 tests / 4 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - dev server を `http://127.0.0.1:5173` で起動し、トップページ HTTP 200 を確認。
+  - `GET /__roba/keymap-source` は HTTP 200 を確認。
+  - `POST /__roba/save-bindings` は空 changes に HTTP 400 を返すことを確認。
+  - `agent-browser` CLI は PATH 上になく、代わりに headless Edge `--dump-dom` で主要 DOM 表示を確認。
+  - headless DOM で title、43 key UI、7 layer buttons、`Pending` status pill、`Add draft` button を確認。
+  - 実ファイルを変更する複数保存の手動 UI 確認は未実施。
+- 複数キー変更往復保存確認後:
+  - `POST /__roba/save-bindings` で POS0/POS1 を `&kp F1` / `&kp F2` に一時変更し、HTTP 200 と `Saved 2 pending changes with a backup.` を確認。
+  - 一時変更後の `git diff -- config/roBa.keymap` は `&kp Q` / `&kp W` から `&kp F1` / `&kp F2` への1行差分だけ。
+  - `POST /__roba/save-bindings` で POS0/POS1 を `&kp Q` / `&kp W` に戻し、HTTP 200 と `Saved 2 pending changes with a backup.` を確認。
+  - 往復後の `git diff -- config/roBa.keymap` は空。
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。31 tests / 4 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - 差分レビュー済み。変更ファイルは `docs/current-work-status.md`、`tools/roba-keymap-viewer/src/App.jsx`、`tools/roba-keymap-viewer/src/styles.css`、`tools/roba-keymap-viewer/vite.config.js`。
 
 ## 次にやること
 
 優先順:
 
-1. 次に dev-only `POST /__roba/save-bindings` endpoint を `vite.config.js` に追加する。
-2. その後、Preview tab の `Save all` UI を endpoint に接続し、保存成功後に pending changes を clear して返却 source で再 parse する。
-3. 複数 draft の手動 UI 確認では、2つ以上のキーを draft に積み、`Save all` 後の `git diff -- config/roBa.keymap` が対象 binding だけに収まることを見る。
-4. combo / macro / sensor-bindings / layer rename / keymap-drawer 自動更新は、複数キー保存とは別作業に分ける。
+1. 今回の複数保存 endpoint / UI 接続差分をコミットする。候補メッセージ: `Add multi-binding save action to roBa viewer`
+2. 必要ならユーザーがブラウザ UI で `Save all` ボタン表示と操作感を目視確認する。endpoint 経由の往復保存は確認済み。
+3. combo / macro / sensor-bindings / layer rename / keymap-drawer 自動更新は、複数キー保存とは別作業に分ける。
 
 ## 現在の注意点
 
