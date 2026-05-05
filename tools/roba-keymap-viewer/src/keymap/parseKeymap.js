@@ -151,10 +151,17 @@ function parseCombos(source) {
   const block = findBlock(source, "combos");
   if (!block) return [];
 
-  return directChildBlocks(block.body)
+  return directChildBlocks(block.body, block.start + 1)
     .filter((child) => child.name !== "compatible")
     .map((child) => {
-      const positions = getAngleProperty(child.body, "key-positions")
+      const positionsProperty = getAnglePropertyInfo(child.body, "key-positions", child.bodyStart);
+      const bindingsProperty = getAnglePropertyInfo(child.body, "bindings", child.bodyStart);
+      const layersProperty = getAnglePropertyInfo(child.body, "layers", child.bodyStart);
+      const bindingEntries = bindingsProperty
+        ? splitBindingEntries(bindingsProperty.value, bindingsProperty.sourceRange.start)
+        : [];
+
+      const positions = (positionsProperty?.value || "")
         .trim()
         .split(/\s+/)
         .filter(Boolean)
@@ -162,13 +169,21 @@ function parseCombos(source) {
       return {
         name: child.name,
         positions,
-        binding: splitBindingExpressions(getAngleProperty(child.body, "bindings"))[0] || "",
+        binding: bindingEntries[0]?.raw || "",
+        bindingEntry: bindingEntries[0],
+        keyPositionsRange: positionsProperty?.sourceRange,
         timeoutMs: getNumberProperty(child.body, "timeout-ms") ?? 50,
-        layers: getAngleProperty(child.body, "layers")
+        layers: (layersProperty?.value || "")
           .trim()
           .split(/\s+/)
           .filter(Boolean)
           .map(Number),
+        layersRange: layersProperty?.sourceRange,
+        sourceRange: {
+          start: child.rawStart,
+          end: child.rawEnd,
+        },
+        raw: child.raw,
       };
     });
 }

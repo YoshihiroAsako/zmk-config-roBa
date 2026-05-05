@@ -162,6 +162,13 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 選択した combo の key positions をキーボード上でハイライトする。
   - layer 指定がある combo では、その先頭 layer へ切り替え、combo の先頭 position を選択する。
   - これは combo 編集そのものではなく、既存 combo 編集に進む前の選択・確認 UI。
+- Combo read-only 可視化は `7b9fcbc Highlight selected combos in roBa viewer` で commit 済み。ユーザーが push 済み。
+- 既存 combo 編集に進む前の parser metadata 土台を追加中:
+  - `parseCombos` が combo node 全体の `sourceRange` / `raw` を持つようにした。
+  - `key-positions` の `keyPositionsRange` を持つようにした。
+  - combo `bindings` の先頭 binding を `bindingEntry` として source range 付きで持つようにした。
+  - `layers` がある combo では `layersRange` を持てる形にした。
+  - 既存の `name` / `positions` / `binding` / `layers` / `timeoutMs` は維持。
 
 ## 検証状況
 
@@ -324,14 +331,19 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
   - 起動中の dev server `http://127.0.0.1:5173` で headless Edge `--dump-dom` を実行し、title、`comboHighlighted` CSS、`clickableRow` CSS が配信されることを確認。
   - `git diff -- config/roBa.keymap` は空。
+- Combo parser metadata 追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。32 tests / 4 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js` に combo source range test を追加。
+  - `git diff -- config/roBa.keymap` は空。
 
 ## 次にやること
 
 優先順:
 
-1. Combo read-only 可視化の差分を commit-ready review し、問題なければコミットする。候補メッセージ: `Highlight selected combos in roBa viewer`
-2. 必要ならユーザーがブラウザ UI で Combos タブを開き、combo row 選択時に対象キーがハイライトされることを目視確認する。
-3. 既存 combo 編集、macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
+1. Combo parser metadata 追加差分を commit-ready review し、問題なければコミットする。候補メッセージ: `Track combo source ranges in roBa viewer`
+2. 次に既存 combo の read-only detail panel を整えるか、combo binding / positions の preview-only 編集設計に進む。
+3. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点
 

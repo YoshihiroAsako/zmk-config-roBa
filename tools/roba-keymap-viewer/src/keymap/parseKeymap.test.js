@@ -103,6 +103,21 @@ describe("roBa keymap parser", () => {
     assert.equal(defaultLayer.bindingEntries[37].raw, "&lt_to_layer_0 6 INT_HENKAN");
   });
 
+  it("tracks source ranges for combo nodes and combo binding expressions", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos.find((item) => item.name === "double_quotation");
+
+    assert.ok(combo);
+    assert.deepEqual(combo.positions, [18, 19]);
+    assert.equal(combo.binding, "&kp AT_SIGN");
+    assert.equal(source.slice(combo.sourceRange.start, combo.sourceRange.end).trim(), combo.raw);
+    assert.equal(source.slice(combo.keyPositionsRange.start, combo.keyPositionsRange.end).trim(), "18 19");
+    assert.equal(source.slice(combo.bindingEntry.sourceRange.start, combo.bindingEntry.sourceRange.end), "&kp AT_SIGN");
+    assert.deepEqual(combo.layers, []);
+    assert.equal(combo.layersRange, undefined);
+  });
+
   it("replaces one key binding while preserving every other byte of the keymap source", async () => {
     const source = await readRepoFile("config/roBa.keymap");
     const parsed = parseKeymap(source);
