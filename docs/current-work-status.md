@@ -420,10 +420,38 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 次にやること
 
-combo `layers` / `timeout-ms` の保存統合が完了。次の作業候補:
+**推奨: Context Diff の insert kind 表示修正（小規模・すぐ完了）**
 
-1. Context Diff の insert kind 表示を修正する（`-};` / `+...` の誤表示 → 正しい挿入行 diff を表示）。
-2. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
+### 問題
+`layers-insert` / `timeout-ms-insert` などの zero-length range 挿入を pending changes に追加すると、
+Preview タブの Context Diff が `- };` / `+...` と誤表示される。
+実際の保存は正しく動くが、表示が誤解を招く。
+
+### 修正方針
+`tools/roba-keymap-viewer/src/keymap/pendingChanges.js` の `buildChangeContextDiff` を修正する。
+
+```js
+function buildChangeContextDiff(source, change) {
+  const label = `# ${change.label || ...}`;
+  // insert kind には buildLineInsertionDiff 相当の表示を使う
+  if (change.kind?.endsWith("-insert")) {
+    return [label, buildInsertDiff(source, change.range.start, change.nextRaw)].join("\n");
+  }
+  // remove kind には buildLineRemovalDiff 相当の表示を使う
+  if (change.kind?.endsWith("-remove")) {
+    return [label, buildRemovalDiff(source, change.range)].join("\n");
+  }
+  return [label, buildContextDiff(source, change.range, change.nextRaw)].join("\n");
+}
+```
+
+`comboPreview.js` の `buildLineInsertionDiff` / `buildLineRemovalDiff` を export するか、
+同等の関数を `editorPreview.js` に移して共有する。
+
+### その後の候補
+- macro 編集
+- layer rename
+- keymap-drawer 自動更新
 
 ## 現在の注意点
 
