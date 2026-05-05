@@ -4,6 +4,7 @@ import dtsiSource from "../../../boards/shields/roBa/roBa.dtsi?raw";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarkdown } from "./export/markdown.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
+import { buildComboPreviewState } from "./keymap/comboPreview.js";
 import { buildEditorState } from "./keymap/editorPreview.js";
 import { countDtsPhysicalKeys, parseKeymap } from "./keymap/parseKeymap.js";
 import {
@@ -48,6 +49,7 @@ function App() {
   const [draftBinding, setDraftBinding] = useState(null);
   const [pendingChanges, setPendingChanges] = useState([]);
   const [selectedComboName, setSelectedComboName] = useState("");
+  const [comboDraft, setComboDraft] = useState({ bindingRaw: "", positionsRaw: "" });
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -70,12 +72,23 @@ function App() {
     () => buildPendingChangesState(keymapSource, pendingChanges, document.layers),
     [keymapSource, pendingChanges, document.layers],
   );
+  const comboPreviewState = useMemo(
+    () => buildComboPreviewState(keymapSource, selectedCombo, comboDraft, document.physicalLayout.length),
+    [keymapSource, selectedCombo, comboDraft, document.physicalLayout.length],
+  );
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
 
   useEffect(() => {
     setDraftBinding(selectedPendingChange?.nextRaw || selectedEntry?.raw || selectedBinding);
   }, [selectedEntry, selectedBinding, selectedPendingChange]);
+
+  useEffect(() => {
+    setComboDraft({
+      bindingRaw: selectedCombo?.binding || "",
+      positionsRaw: selectedCombo?.positions.join(" ") || "",
+    });
+  }, [selectedCombo]);
 
   const reloadKeymapSource = async () => {
     if (!saveEndpointAvailable) {
@@ -375,7 +388,15 @@ function App() {
             </div>
           </dl>
           {activeTab === "Combos" && selectedCombo && (
-            <ComboDetailPanel combo={selectedCombo} />
+            <ComboDetailPanel
+              combo={selectedCombo}
+              draft={comboDraft}
+              previewState={comboPreviewState}
+              onDraftChange={(nextDraft) => {
+                setComboDraft(nextDraft);
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
+            />
           )}
           <div className={editorState.canEdit ? "editorBox" : "editorBox disabled"}>
             <div className="editorHeader">
@@ -449,6 +470,7 @@ function App() {
           markdown={markdown}
           diagnostics={diagnostics}
           editorState={editorState}
+          comboPreviewState={comboPreviewState}
           pendingChanges={pendingChanges}
           pendingState={pendingState}
           saveStatus={saveStatus}
@@ -466,7 +488,7 @@ function App() {
   );
 }
 
-function ComboDetailPanel({ combo }) {
+function ComboDetailPanel({ combo, draft, previewState, onDraftChange }) {
   return (
     <section className="comboDetailPanel" aria-label="selected combo details">
       <div className="editorHeader">
@@ -503,6 +525,26 @@ function ComboDetailPanel({ combo }) {
           <dd>{formatRange(combo.bindingEntry?.sourceRange)}</dd>
         </div>
       </dl>
+      <div className={previewState.changed ? "comboPreviewBox active" : "comboPreviewBox"}>
+        <label>
+          <span>Binding draft</span>
+          <input
+            aria-label="Combo binding draft"
+            disabled={!previewState.canEditBinding}
+            value={draft.bindingRaw}
+            onChange={(event) => onDraftChange({ ...draft, bindingRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Positions draft</span>
+          <input
+            aria-label="Combo positions draft"
+            value={draft.positionsRaw}
+            onChange={(event) => onDraftChange({ ...draft, positionsRaw: event.target.value })}
+          />
+        </label>
+        <div className="editorStatus">{previewState.message}</div>
+      </div>
       <pre className="rawNodePreview">{combo.raw}</pre>
     </section>
   );
@@ -576,6 +618,7 @@ function PanelContent({
   markdown,
   diagnostics,
   editorState,
+  comboPreviewState,
   pendingChanges,
   pendingState,
   saveStatus,
@@ -684,6 +727,7 @@ function PanelContent({
     return (
       <PreviewPanel
         editorState={editorState}
+        comboPreviewState={comboPreviewState}
         pendingChanges={pendingChanges}
         pendingState={pendingState}
         saveStatus={saveStatus}
@@ -785,6 +829,7 @@ function BindingsTable({ document, activeLayer, layerNames, search, selectedPosi
 
 function PreviewPanel({
   editorState,
+  comboPreviewState,
   pendingChanges,
   pendingState,
   saveStatus,
@@ -794,10 +839,11 @@ function PreviewPanel({
   onSavePendingChanges,
   saveEndpointAvailable,
 }) {
-  const previewSource = pendingChanges.length ? pendingState.nextSource : editorState.nextSource;
+  const activeSinglePreview = comboPreviewState?.changed ? comboPreviewState : editorState;
+  const previewSource = pendingChanges.length ? pendingState.nextSource : activeSinglePreview.nextSource;
   const contextDiff = pendingChanges.length
     ? pendingState.contextDiff || pendingState.message
-    : editorState.contextDiff || editorState.diff || "No change.";
+    : activeSinglePreview.contextDiff || activeSinglePreview.diff || activeSinglePreview.message || "No change.";
 
   return (
     <div className={saveStatus.message ? "previewPanel hasStatus" : "previewPanel"}>

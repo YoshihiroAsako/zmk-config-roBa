@@ -175,6 +175,15 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - combo node range、positions range、binding range を表示。
   - combo node の raw source preview を表示。
   - 保存や編集処理は未追加。既存 combo 編集に進む前の確認 UI。
+- Combo read-only detail panel は `daab44a Show selected combo source details in roBa viewer` で commit 済み。
+- Combo binding / positions の preview-only 編集土台を追加中:
+  - `tools/roba-keymap-viewer/src/keymap/comboPreview.js` に combo preview helper を追加。
+  - combo binding は Phase 2 editable binding set の範囲だけ preview 可能。
+  - combo positions は 2キー以上、重複なし、物理キー範囲内の整数リストとして validation する。
+  - Combos タブの右 detail panel に binding / positions draft 入力欄を追加。
+  - Preview タブで combo の Context Diff と `.keymap` preview を表示できる。
+  - 保存処理は未追加。既存 key binding の pending changes / Save all とはまだ統合しない。
+- Combo preview-only 編集土台は `Add combo preview editing state to roBa viewer` で commit 済み。
 
 ## 検証状況
 
@@ -346,14 +355,22 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `tools/roba-keymap-viewer/` で `npm test` 成功。32 tests / 4 suites。
   - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
   - `git diff -- config/roBa.keymap` は空。
+- 2026-05-05 再開時確認:
+  - 直近コミットは `daab44a Show selected combo source details in roBa viewer`。
+  - `git status --short` は clean。
+- Combo preview-only 編集土台追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。35 tests / 5 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - dev server を `http://127.0.0.1:5173` で起動し、トップページ HTTP 200 を確認。
+  - headless Edge `--dump-dom` で title、43 key UI、既存の主要 DOM 表示を確認。
+  - `agent-browser` CLI は PATH 上になく、ブラウザ操作による手動 smoke check は未実施。
 
 ## 次にやること
 
 優先順:
 
-1. Combo read-only detail panel の差分を commit-ready review し、問題なければコミットする。候補メッセージ: `Show selected combo source details in roBa viewer`
-2. 次に combo binding / positions の preview-only 編集設計に進む。
-3. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
+1. Combo preview を pending changes / 保存 helper へ統合する設計に進む。
+2. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点
 
