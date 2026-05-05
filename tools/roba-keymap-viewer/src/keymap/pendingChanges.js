@@ -1,6 +1,6 @@
 import { isEditableBindingExpression, parseKeymap, replaceBindings } from "./parseKeymap.js";
 import { buildContextDiff } from "./editorPreview.js";
-import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
+import { buildLayersChange, buildLineInsertionDiff, buildLineRemovalDiff, buildTimeoutMsChange } from "./comboPreview.js";
 
 export function getDraftId(layerIndex, position) {
   return `layer-${layerIndex}-pos-${position}`;
@@ -147,10 +147,14 @@ export function buildPendingChangesState(source, changes, layers) {
 }
 
 function buildChangeContextDiff(source, change) {
-  return [
-    `# ${change.label || `${change.layerName || `Layer ${change.layerIndex}`} POS${change.position}`}`,
-    buildContextDiff(source, change.range, change.nextRaw),
-  ].join("\n");
+  const label = `# ${change.label || `${change.layerName || `Layer ${change.layerIndex}`} POS${change.position}`}`;
+  if (change.kind?.endsWith("-insert")) {
+    return [label, buildLineInsertionDiff(source, change.range.start, change.nextRaw)].join("\n");
+  }
+  if (change.kind?.endsWith("-remove")) {
+    return [label, buildLineRemovalDiff(source, change.range)].join("\n");
+  }
+  return [label, buildContextDiff(source, change.range, change.nextRaw)].join("\n");
 }
 
 function applyPendingChanges(source, changes) {

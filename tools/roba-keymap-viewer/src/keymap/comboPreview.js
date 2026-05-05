@@ -228,7 +228,7 @@ function buildComboContextDiff(source, replacements) {
     .join("\n\n");
 }
 
-function buildLineInsertionDiff(source, position, insertion) {
+export function buildLineInsertionDiff(source, position, insertion) {
   const insertedText = stripTrailingNewline(insertion);
   const previousLine = getLineEndingBefore(source, position);
   const nextLine = getLineStartingAt(source, position);
@@ -239,7 +239,7 @@ function buildLineInsertionDiff(source, position, insertion) {
   ].filter(Boolean).join("\n");
 }
 
-function buildLineRemovalDiff(source, range) {
+export function buildLineRemovalDiff(source, range) {
   const removedText = stripTrailingNewline(source.slice(range.start, range.end));
   const previousLine = getLineEndingBefore(source, range.start);
   const nextLine = getLineStartingAt(source, range.end);

@@ -210,6 +210,55 @@ describe("pending keymap changes", () => {
     assert.notEqual(nextCombo.timeoutMsRange, null);
   });
 
+  it("shows insertion diff for layers-insert and timeout-ms-insert changes", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos.find((item) => item.name === "double_quotation");
+
+    const changes = upsertDraftChanges([], buildComboDraftChanges({
+      source,
+      combo,
+      bindingRaw: combo.binding,
+      positionsRaw: combo.positions.join(" "),
+      layersRaw: "0",
+      timeoutMsRaw: "100",
+    }));
+
+    const state = buildPendingChangesState(source, changes, parsed.layers);
+    const layersItem = state.items.find((c) => c.id.endsWith("-layers"));
+    const timeoutItem = state.items.find((c) => c.id.endsWith("-timeout-ms"));
+
+    assert.match(layersItem.contextDiff, /^\+\s*layers\s*=\s*<0>;/m);
+    assert.doesNotMatch(layersItem.contextDiff, /^-.*};/m);
+    assert.match(timeoutItem.contextDiff, /^\+\s*timeout-ms\s*=\s*<100>;/m);
+    assert.doesNotMatch(timeoutItem.contextDiff, /^-.*};/m);
+  });
+
+  it("shows removal diff for layers-remove and timeout-ms-remove changes", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos.find((item) => item.name === "double_quotation");
+
+    const layersEdit = buildLayersChange(source, combo, "0", 7);
+    const sourceWithLayers = `${source.slice(0, layersEdit.range.start)}${layersEdit.after}${source.slice(layersEdit.range.end)}`;
+    const parsedWithLayers = parseKeymap(sourceWithLayers);
+    const comboWithLayers = parsedWithLayers.combos.find((item) => item.name === "double_quotation");
+
+    const changes = upsertDraftChanges([], buildComboDraftChanges({
+      source: sourceWithLayers,
+      combo: comboWithLayers,
+      bindingRaw: comboWithLayers.binding,
+      positionsRaw: comboWithLayers.positions.join(" "),
+      layersRaw: "",
+    }));
+
+    const state = buildPendingChangesState(sourceWithLayers, changes, parsedWithLayers.layers);
+    const layersItem = state.items.find((c) => c.id.endsWith("-layers"));
+
+    assert.match(layersItem.contextDiff, /^-\s*layers\s*=\s*<0>;/m);
+    assert.doesNotMatch(layersItem.contextDiff, /^\+/m);
+  });
+
   it("builds combo draft changes for layers-replace when layers already exist", async () => {
     const source = await readRepoFile("config/roBa.keymap");
     const parsed = parseKeymap(source);

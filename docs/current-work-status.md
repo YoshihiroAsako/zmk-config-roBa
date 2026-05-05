@@ -417,41 +417,78 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `Save all` payload に `kind` を追加（バグ修正含む）。
   - ユーザーが UI で `layers = <0>` / `timeout-ms = <100>` を `double_quotation` combo に挿入し、往復保存（追加 → Save all → 削除 → Save all）を確認。`git diff` は空。
   - `ccdcbdf Integrate combo layers/timeout-ms into pending changes and Save all` で commit・push 済み。
+- Context Diff の insert/remove kind 表示修正後:
+  - `comboPreview.js` の `buildLineInsertionDiff` / `buildLineRemovalDiff` を export。
+  - `pendingChanges.js` の `buildChangeContextDiff` を `-insert` / `-remove` kind に対応。
+  - `pendingChanges.test.js` に insert/remove diff 表示の 2 テストを追加。
+  - `npm test` 成功。52 tests / 5 suites。`npm run build` 成功。生成された `dist/` は削除済み。
+  - `config/roBa.keymap` 差分なし。commit-ready。
 
 ## 次にやること
 
-**推奨: Context Diff の insert kind 表示修正（小規模・すぐ完了）**
+以下の順で進める。
 
-### 問題
-`layers-insert` / `timeout-ms-insert` などの zero-length range 挿入を pending changes に追加すると、
-Preview タブの Context Diff が `- };` / `+...` と誤表示される。
-実際の保存は正しく動くが、表示が誤解を招く。
+### 1. macro 編集
 
-### 修正方針
-`tools/roba-keymap-viewer/src/keymap/pendingChanges.js` の `buildChangeContextDiff` を修正する。
+combo 編集と同じ流れで、macro の binding を preview / pending changes / Save all できるようにする。
 
-```js
-function buildChangeContextDiff(source, change) {
-  const label = `# ${change.label || ...}`;
-  // insert kind には buildLineInsertionDiff 相当の表示を使う
-  if (change.kind?.endsWith("-insert")) {
-    return [label, buildInsertDiff(source, change.range.start, change.nextRaw)].join("\n");
-  }
-  // remove kind には buildLineRemovalDiff 相当の表示を使う
-  if (change.kind?.endsWith("-remove")) {
-    return [label, buildRemovalDiff(source, change.range)].join("\n");
-  }
-  return [label, buildContextDiff(source, change.range, change.nextRaw)].join("\n");
-}
-```
+**現状:** Macros タブは read-only。`parseMacros` は `name` / `bindings` / `waitMs` / `tapMs` を返すが source range なし。
 
-`comboPreview.js` の `buildLineInsertionDiff` / `buildLineRemovalDiff` を export するか、
-同等の関数を `editorPreview.js` に移して共有する。
+**作業ステップ:**
 
-### その後の候補
-- macro 編集
-- layer rename
-- keymap-drawer 自動更新
+1. `parseKeymap.js` の `parseMacros` を拡張し、combo と同様に次の source range を追加する。
+   - macro node 全体の `sourceRange` / `bodyRange`
+   - `bindings` 内の各 binding の `bindingEntry` (source range 付き)
+   - `wait-ms` / `tap-ms` 値の `waitMsRange` / `tapMsRange`
+2. `tools/roba-keymap-viewer/src/keymap/macroPreview.js` を新規作成。
+   - `buildMacroPreviewState` — binding / wait-ms / tap-ms の draft を受けて preview を返す。
+   - combo と同様に `buildPropertyInsertion` / `linePropertyRange` 相当のロジックで insert/replace/remove を扱う。
+   - `buildMacroChange` / `buildWaitMsChange` / `buildTapMsChange` を export。
+3. `pendingChanges.js` の `buildComboDraftChanges` に倣って `buildMacroDraftChanges` を追加。
+   - kind は `macro-binding` / `wait-ms-insert` / `wait-ms-replace` / `wait-ms-remove` / `tap-ms-insert` / `tap-ms-replace` / `tap-ms-remove`。
+4. `saveBindingChange.js` / `pendingChanges.js` の `validatePendingChange` / `validateSourceChange` に新 kind を追加。
+5. Macros タブの右 detail panel に draft 入力欄を追加し、`Add macro draft` / `Save all` に接続。
+6. `parseKeymap.test.js` に macro source range の smoke test を追加。
+7. `macroPreview.test.js` を新規作成し、insert/replace/remove の主要ケースをカバー。
+
+**注意:** macro には複数 binding があるため、combo の `bindingEntry`（先頭1件）と異なり、binding ごとに source range が必要。まず `tap-action` / `hold-action` / `release-action` を持たない単純な `bindings = <...>` 形式の macro だけを Phase 2 対象にすると小さく進められる。
+
+---
+
+### 2. layer rename
+
+UI から layer 名を変更できるようにする。
+
+**現状:** `parseKeymap` は layer 名を `layers[].name` として返すが source range なし。numbered layer（`layer_6` など）はリネーム対象に含めてよいが、`&lt` / `&mo` などの参照は自動更新しない（表示名の変更のみ）。
+
+**作業ステップ:**
+
+1. `parseKeymap.js` の layer パースに `nameRange`（layer 名トークンの source range）を追加。
+2. `pendingChanges.js` に `buildLayerRenameDraftChange` を追加。kind は `layer-rename`。
+3. `validatePendingChange` / `validateSourceChange` に `layer-rename` を追加（有効な識別子文字のみ許可）。
+4. Layers タブ or detail panel に rename 入力欄を追加し、`Add draft` / `Save all` に接続。
+5. テストを追加。
+
+**注意:** `layer_6` など既存の数値付き layer 名は `AGENTS.md` に「勝手にリネームしない」とあるが、ユーザーが明示的に rename する操作なのでこの制約は該当しない。rename が `&lt N` などの数値参照に影響しないことを UI に注記する。
+
+---
+
+### 3. keymap-drawer 自動更新
+
+Save all 成功後に `keymap-drawer/roBa.yaml` と `keymap-drawer/roBa.svg` を自動再生成する。
+
+**現状:** 保存は `config/roBa.keymap` のみ。keymap-drawer の更新は手動。
+
+**作業ステップ:**
+
+1. `vite.config.js` に `POST /__roba/update-keymap-drawer` を追加（dev-only）。
+   - `keymap parse -c 10 -z config/roBa.keymap > keymap-drawer/roBa.yaml` を実行。
+   - `keymap draw keymap-drawer/roBa.yaml > keymap-drawer/roBa.svg` を実行。
+   - `keymap` コマンドが PATH 上にない場合は `not available` を返す（エラーにしない）。
+2. `App.jsx` の `saveAllPendingChanges` 成功後に `update-keymap-drawer` を呼び、結果を SaveStatusPanel に追記表示。
+3. keymap-drawer が使えない環境では「keymap-drawer not found — update manually」と表示してスキップ。
+
+**注意:** keymap-drawer の自動更新は optional。失敗しても keymap 保存の成否には影響させない。`keymap-drawer/roBa.yaml` に手動調整が入っている場合は `keymap parse` で上書きされるため、事前に `git diff` で確認を促す UI コメントがあると親切。
 
 ## 現在の注意点
 
