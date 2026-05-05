@@ -1,5 +1,6 @@
 import { isEditableBindingExpression, parseKeymap, replaceBindings } from "./parseKeymap.js";
 import { buildContextDiff } from "./editorPreview.js";
+import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
 
 export function getDraftId(layerIndex, position) {
   return `layer-${layerIndex}-pos-${position}`;
@@ -19,7 +20,7 @@ export function buildDraftChange({ layerIndex, layerName, position, entry, nextR
   };
 }
 
-export function buildComboDraftChanges({ combo, bindingRaw, positionsRaw }) {
+export function buildComboDraftChanges({ source = null, combo, bindingRaw, positionsRaw, layersRaw, timeoutMsRaw, layerCount = 7 }) {
   const changes = [];
   const normalizedPositions = normalizeSpace(positionsRaw);
   if (bindingRaw !== combo.binding) {
@@ -44,11 +45,45 @@ export function buildComboDraftChanges({ combo, bindingRaw, positionsRaw }) {
       nextRaw: normalizedPositions,
     });
   }
+  if (source != null && layersRaw !== undefined) {
+    const layersCurrent = combo.layers.join(" ");
+    if (normalizeSpace(layersRaw) !== layersCurrent) {
+      const layerEdit = buildLayersChange(source, combo, layersRaw, layerCount);
+      if (layerEdit) {
+        changes.push({
+          id: `combo-${combo.name}-layers`,
+          kind: layerEdit.kind,
+          label: `${combo.name} layers`,
+          comboName: combo.name,
+          range: layerEdit.range,
+          currentRaw: source.slice(layerEdit.range.start, layerEdit.range.end).trim(),
+          nextRaw: layerEdit.after,
+        });
+      }
+    }
+  }
+  if (source != null && timeoutMsRaw !== undefined) {
+    const timeoutCurrent = combo.timeoutMsRange ? String(combo.timeoutMs) : "";
+    if ((timeoutMsRaw ?? "").trim() !== timeoutCurrent) {
+      const timeoutEdit = buildTimeoutMsChange(source, combo, timeoutMsRaw ?? "");
+      if (timeoutEdit) {
+        changes.push({
+          id: `combo-${combo.name}-timeout-ms`,
+          kind: timeoutEdit.kind,
+          label: `${combo.name} timeout-ms`,
+          comboName: combo.name,
+          range: timeoutEdit.range,
+          currentRaw: source.slice(timeoutEdit.range.start, timeoutEdit.range.end).trim(),
+          nextRaw: timeoutEdit.after,
+        });
+      }
+    }
+  }
   return changes;
 }
 
 export function upsertDraftChange(changes, change) {
-  const nextRaw = change.nextRaw.trim();
+  const nextRaw = change.kind?.endsWith("-insert") ? change.nextRaw : change.nextRaw.trim();
   const normalized = { ...change, nextRaw };
   const withoutExisting = changes.filter((item) => item.id !== normalized.id);
   if (nextRaw === normalized.currentRaw) return withoutExisting;
@@ -147,9 +182,20 @@ function validatePendingChange(change) {
     if (!isEditableBindingExpression(change.nextRaw)) {
       throw new Error(`${change.label} replacement is not supported in Phase 2.`);
     }
-  }
-  if (change.kind === "combo-positions") {
+  } else if (change.kind === "combo-positions") {
     validateComboPositions(change.nextRaw);
+  } else if (change.kind === "layers-replace") {
+    validateLayerValues(change.nextRaw);
+  } else if (change.kind === "layers-remove") {
+    if (change.nextRaw !== "") throw new Error(`${change.label}: layers-remove must have empty nextRaw.`);
+  } else if (change.kind === "layers-insert") {
+    validateLayerInsertionContent(change.nextRaw);
+  } else if (change.kind === "timeout-ms-replace") {
+    validateTimeoutMsValue(change.nextRaw);
+  } else if (change.kind === "timeout-ms-remove") {
+    if (change.nextRaw !== "") throw new Error(`${change.label}: timeout-ms-remove must have empty nextRaw.`);
+  } else if (change.kind === "timeout-ms-insert") {
+    validateTimeoutMsInsertionContent(change.nextRaw);
   }
 }
 
@@ -173,6 +219,39 @@ function validateComboPositions(raw, keyCount = 43) {
   if (positions.some((position) => position < 0 || position >= keyCount)) {
     throw new Error(`Combo positions must be between 0 and ${keyCount - 1}.`);
   }
+}
+
+function validateLayerValues(raw, layerCount = 7) {
+  const text = String(raw || "").trim();
+  if (!text) throw new Error("Combo layers must not be empty.");
+  if (text !== normalizeSpace(text)) throw new Error("Combo layers must be a single-space-separated list.");
+  const layers = text.split(" ").map((value) => {
+    if (!/^\d+$/.test(value)) throw new Error("Combo layers must be integer layer indices.");
+    return Number(value);
+  });
+  if (new Set(layers).size !== layers.length) throw new Error("Combo layers must be unique.");
+  if (layers.some((layer) => layer < 0 || layer >= layerCount)) {
+    throw new Error(`Combo layers must be between 0 and ${layerCount - 1}.`);
+  }
+}
+
+function validateLayerInsertionContent(nextRaw) {
+  const match = nextRaw.match(/layers\s*=\s*<([\d\s]+)>;\r?\n$/);
+  if (!match) throw new Error("layers-insert content is invalid.");
+  validateLayerValues(match[1].trim());
+}
+
+function validateTimeoutMsValue(raw) {
+  const text = String(raw || "").trim();
+  if (!/^\d+$/.test(text)) throw new Error("Combo timeout-ms must be a non-negative integer.");
+  const value = Number(text);
+  if (value < 1 || value > 10000) throw new Error("Combo timeout-ms must be between 1 and 10000.");
+}
+
+function validateTimeoutMsInsertionContent(nextRaw) {
+  const match = nextRaw.match(/timeout-ms\s*=\s*<(\d+)>;\r?\n$/);
+  if (!match) throw new Error("timeout-ms-insert content is invalid.");
+  validateTimeoutMsValue(match[1]);
 }
 
 function normalizeSpace(value) {

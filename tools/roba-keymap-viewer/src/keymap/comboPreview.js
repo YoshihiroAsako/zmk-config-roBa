@@ -106,7 +106,7 @@ function emptyComboState(source, message, canEditBinding = false) {
   };
 }
 
-function buildLayersChange(source, combo, raw, layerCount) {
+export function buildLayersChange(source, combo, raw, layerCount) {
   const trimmed = raw.trim();
   const existingRange = combo.layersRange;
   if (!trimmed) {
@@ -133,7 +133,7 @@ function buildLayersChange(source, combo, raw, layerCount) {
   return buildPropertyInsertion(source, combo, "layers-insert", "Layers (insert)", "layers", normalized);
 }
 
-function buildTimeoutMsChange(source, combo, raw) {
+export function buildTimeoutMsChange(source, combo, raw) {
   const trimmed = raw.trim();
   const existingRange = combo.timeoutMsRange;
   if (!trimmed) {

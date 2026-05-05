@@ -69,7 +69,12 @@ function App() {
   const selectedDraftId = getDraftId(activeLayer, selectedPosition);
   const selectedPendingChange = pendingChanges.find((change) => change.id === selectedDraftId);
   const selectedComboDraftIds = selectedCombo
-    ? [`combo-${selectedCombo.name}-binding`, `combo-${selectedCombo.name}-positions`]
+    ? [
+        `combo-${selectedCombo.name}-binding`,
+        `combo-${selectedCombo.name}-positions`,
+        `combo-${selectedCombo.name}-layers`,
+        `combo-${selectedCombo.name}-timeout-ms`,
+      ]
     : [];
   const selectedComboPendingCount = pendingChanges.filter((change) => selectedComboDraftIds.includes(change.id)).length;
   const selectedParsed = describeBinding(selectedBinding, layerNames);
@@ -231,6 +236,7 @@ function App() {
         body: JSON.stringify({
           sourcePath: "config/roBa.keymap",
           changes: pendingChanges.map((change) => ({
+            kind: change.kind,
             range: change.range,
             currentRaw: change.currentRaw,
             nextRaw: change.nextRaw,
@@ -304,9 +310,13 @@ function App() {
   const addSelectedComboDraft = () => {
     if (!selectedCombo || !comboPreviewState.changed || !comboPreviewState.valid) return;
     const changes = buildComboDraftChanges({
+      source: keymapSource,
       combo: selectedCombo,
       bindingRaw: comboDraft.bindingRaw,
       positionsRaw: comboDraft.positionsRaw,
+      layersRaw: comboDraft.layersRaw,
+      timeoutMsRaw: comboDraft.timeoutMsRaw,
+      layerCount: document.layers.length,
     });
     setPendingChanges((current) => upsertDraftChanges(current, changes));
     setSaveStatus(EMPTY_SAVE_STATUS);
@@ -607,7 +617,6 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
           />
         </label>
         <div className="editorStatus">{previewState.message}</div>
-        <div className="editorNote">Layers / timeout-ms drafts are preview-only. Add draft / Save all currently covers binding and positions only.</div>
         <div className="editorActions">
           <button
             type="button"

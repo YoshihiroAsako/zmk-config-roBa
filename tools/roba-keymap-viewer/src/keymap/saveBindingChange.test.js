@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parseKeymap } from "./parseKeymap.js";
+import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
 import { buildSaveDiagnostics, replaceKeymapChanges, saveBindingChange, saveBindingChanges } from "./saveBindingChange.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -328,6 +329,77 @@ describe("save binding change helper", () => {
       assert.deepEqual(savedCombo.positions, [17, 18]);
       assert.equal(result.diagnostics.every((item) => item.ok), true);
     });
+  });
+
+  it("backs up once and saves combo layers-insert and timeout-ms-insert changes", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos.find((item) => item.name === "double_quotation");
+
+    const layerEdit = buildLayersChange(source, combo, "0", 7);
+    const timeoutEdit = buildTimeoutMsChange(source, combo, "100");
+
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({
+        repoRoot: tempRoot,
+        changes: [
+          {
+            kind: layerEdit.kind,
+            range: layerEdit.range,
+            currentRaw: source.slice(layerEdit.range.start, layerEdit.range.end).trim(),
+            nextRaw: layerEdit.after,
+          },
+          {
+            kind: timeoutEdit.kind,
+            range: timeoutEdit.range,
+            currentRaw: source.slice(timeoutEdit.range.start, timeoutEdit.range.end).trim(),
+            nextRaw: timeoutEdit.after,
+          },
+        ],
+        now: new Date(2026, 4, 5, 11, 0, 0),
+      });
+      const savedSource = await readTempKeymap(tempRoot);
+      const savedParsed = parseKeymap(savedSource);
+      const savedCombo = savedParsed.combos.find((item) => item.name === "double_quotation");
+
+      assert.equal(result.ok, true);
+      assert.equal(result.backupPath, "config/.roBa.keymap.bak/20260505-110000.roBa.keymap");
+      assert.deepEqual(savedCombo.layers, [0]);
+      assert.equal(savedCombo.timeoutMs, 100);
+      assert.notEqual(savedCombo.timeoutMsRange, null);
+      assert.equal(result.diagnostics.every((item) => item.ok), true);
+    });
+  });
+
+  it("rejects invalid layers and timeout-ms source changes", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos.find((item) => item.name === "double_quotation");
+    const layerEdit = buildLayersChange(source, combo, "0", 7);
+
+    assert.throws(
+      () => replaceKeymapChanges(source, [
+        {
+          kind: "layers-insert",
+          range: layerEdit.range,
+          currentRaw: "",
+          nextRaw: "  layers = <99>;",
+        },
+      ]),
+      /invalid/,
+    );
+
+    assert.throws(
+      () => replaceKeymapChanges(source, [
+        {
+          kind: "timeout-ms-insert",
+          range: layerEdit.range,
+          currentRaw: "",
+          nextRaw: "  timeout-ms = <0>;\n",
+        },
+      ]),
+      /between 1 and 10000/,
+    );
   });
 
   it("rejects invalid combo source changes without changing the source", async () => {

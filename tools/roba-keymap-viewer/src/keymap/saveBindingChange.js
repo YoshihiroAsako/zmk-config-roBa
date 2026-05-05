@@ -256,6 +256,32 @@ function validateSourceChange(source, change) {
     if (!/^[\d\s]+$/.test(source.slice(change.range.start, change.range.end))) {
       throw new Error("Combo positions source range is invalid.");
     }
+  } else if (change.kind === "layers-replace") {
+    validateLayerValues(change.nextRaw);
+    if (!/^[\d\s]+$/.test(source.slice(change.range.start, change.range.end))) {
+      throw new Error("Layers source range is invalid.");
+    }
+  } else if (change.kind === "layers-remove") {
+    if (change.nextRaw !== "") throw new Error("layers-remove must have empty nextRaw.");
+    if (!/layers\s*=/.test(source.slice(change.range.start, change.range.end))) {
+      throw new Error("Layers remove range does not contain a layers property.");
+    }
+  } else if (change.kind === "layers-insert") {
+    if (change.range.start !== change.range.end) throw new Error("layers-insert must be a zero-length range.");
+    validateLayerInsertionContent(change.nextRaw);
+  } else if (change.kind === "timeout-ms-replace") {
+    validateTimeoutMsValue(change.nextRaw);
+    if (!/^\d+$/.test(source.slice(change.range.start, change.range.end).trim())) {
+      throw new Error("Timeout-ms source range is invalid.");
+    }
+  } else if (change.kind === "timeout-ms-remove") {
+    if (change.nextRaw !== "") throw new Error("timeout-ms-remove must have empty nextRaw.");
+    if (!/timeout-ms\s*=/.test(source.slice(change.range.start, change.range.end))) {
+      throw new Error("Timeout-ms remove range does not contain a timeout-ms property.");
+    }
+  } else if (change.kind === "timeout-ms-insert") {
+    if (change.range.start !== change.range.end) throw new Error("timeout-ms-insert must be a zero-length range.");
+    validateTimeoutMsInsertionContent(change.nextRaw);
   } else {
     throw new Error("Unsupported pending change kind.");
   }
@@ -288,4 +314,37 @@ function validateComboPositions(raw, keyCount = 43) {
   if (positions.some((position) => position < 0 || position >= keyCount)) {
     throw new Error(`Combo positions must be between 0 and ${keyCount - 1}.`);
   }
+}
+
+function validateLayerValues(raw, layerCount = 7) {
+  const text = String(raw || "").trim();
+  if (!text) throw new Error("Combo layers must not be empty.");
+  if (text !== text.replace(/\s+/g, " ")) throw new Error("Combo layers must be a single-space-separated list.");
+  const layers = text.split(" ").map((value) => {
+    if (!/^\d+$/.test(value)) throw new Error("Combo layers must be integer layer indices.");
+    return Number(value);
+  });
+  if (new Set(layers).size !== layers.length) throw new Error("Combo layers must be unique.");
+  if (layers.some((layer) => layer < 0 || layer >= layerCount)) {
+    throw new Error(`Combo layers must be between 0 and ${layerCount - 1}.`);
+  }
+}
+
+function validateLayerInsertionContent(nextRaw) {
+  const match = nextRaw.match(/layers\s*=\s*<([\d\s]+)>;\r?\n$/);
+  if (!match) throw new Error("layers-insert content is invalid.");
+  validateLayerValues(match[1].trim());
+}
+
+function validateTimeoutMsValue(raw) {
+  const text = String(raw || "").trim();
+  if (!/^\d+$/.test(text)) throw new Error("Combo timeout-ms must be a non-negative integer.");
+  const value = Number(text);
+  if (value < 1 || value > 10000) throw new Error("Combo timeout-ms must be between 1 and 10000.");
+}
+
+function validateTimeoutMsInsertionContent(nextRaw) {
+  const match = nextRaw.match(/timeout-ms\s*=\s*<(\d+)>;\r?\n$/);
+  if (!match) throw new Error("timeout-ms-insert content is invalid.");
+  validateTimeoutMsValue(match[1]);
 }

@@ -203,6 +203,18 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - Combos タブの右 detail panel に `Layers draft` / `Timeout draft (ms)` 入力欄を追加。
   - layers / timeout-ms draft は preview-only であり、`Add draft` / `Save all` の対象には現状含まないことを UI 上に注記表示。
   - parser metadata と combo preview に新規テストを追加。
+- Combo `layers` / `timeout-ms` を pending changes / `Save all` に統合済み:
+  - `comboPreview.js` の `buildLayersChange` / `buildTimeoutMsChange` を export。
+  - `pendingChanges.js` の `buildComboDraftChanges` に `source` / `layersRaw` / `timeoutMsRaw` / `layerCount` を追加。
+    - `layers-insert` / `layers-replace` / `layers-remove` / `timeout-ms-insert` / `timeout-ms-replace` / `timeout-ms-remove` を生成。
+  - `upsertDraftChange` は `-insert` kind の `nextRaw` を trim しないよう修正。
+  - `pendingChanges.js` の `validatePendingChange` に 6 種の新 kind を追加。
+  - `saveBindingChange.js` の `validateSourceChange` に 6 種の新 kind を追加。
+  - `App.jsx` の `addSelectedComboDraft` に全パラメータを渡すよう更新。
+  - `App.jsx` の `selectedComboDraftIds` に layers / timeout-ms の ID を追加。
+  - `App.jsx` の `saveAllPendingChanges` payload に `kind` を追加（combo-positions が正しく識別されるバグ修正を含む）。
+  - Combos タブの "preview-only" 注記を削除。
+  - `npm test` 50 tests / 5 suites 成功。`npm run build` 成功。dev server HTTP 200 確認。
 
 ## 検証状況
 
@@ -398,18 +410,19 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 追加したテスト: parser に既存 `timeout-ms` / `layers` 値 range を追える `captures timeout-ms and layers ranges when combos define them`、combo preview に insert / replace / remove / validation の 5 ケース。
   - ユーザーがブラウザで Layers / Timeout draft の挿入・validation 動作を確認済み。
   - `a87763a Add combo layers/timeout-ms preview editing to roBa viewer` で commit・push 済み。
+- Combo `layers` / `timeout-ms` pending/save 統合後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。50 tests / 5 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - dev server HTTP 200 確認。`/__roba/keymap-source` HTTP 200 確認。
+  - `Save all` payload に `kind` を追加（バグ修正含む）。
+  - ユーザーによる手動 UI 確認は未実施。
 
 ## 次にやること
 
 優先順:
 
-1. combo `layers` / `timeout-ms` を pending changes / `Save all` に統合する（推奨・合意済み）。
-   - `buildComboDraftChanges` に `layersRaw` / `timeoutMsRaw` を追加。
-   - `saveBindingChanges` の `validateSourceChange` / `replaceKeymapChanges` に新 kind を追加。
-   - `buildPendingChangesState` の `validatePendingChange` にも対応 kind を追加。
-   - 挿入 kind（zero-length range）は `replaceBindings`（binding expression チェックあり）を通さず、raw string replace として処理する。
-   - 保存統合テストと手動確認を行う。
-2. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
+1. ユーザーによる手動 UI 確認: combo `layers` / `timeout-ms` の `Add combo draft` → `Save all` フロー。
+2. 確認後: macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点
 
