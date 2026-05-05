@@ -11,6 +11,7 @@ const repoRoot = path.resolve(__dirname, "../..");
 const keymapPath = path.join(repoRoot, "config", "roBa.keymap");
 const drawerYamlPath = path.join(repoRoot, "keymap-drawer", "roBa.yaml");
 const drawerSvgPath = path.join(repoRoot, "keymap-drawer", "roBa.svg");
+const dtsiPath = path.join(repoRoot, "boards", "shields", "roBa", "roBa.dtsi");
 
 export default defineConfig({
   plugins: [
@@ -109,18 +110,20 @@ async function updateKeymapDrawer() {
     };
   }
 
+  const keymapEnv = { ...process.env, PYTHONUTF8: "1" };
+
   try {
     const { stdout: yaml } = await execFileAsync(
       "keymap",
       ["parse", "-c", "10", "-z", keymapPath],
-      { shell: true, maxBuffer: 16 * 1024 * 1024 },
+      { shell: true, maxBuffer: 16 * 1024 * 1024, env: keymapEnv },
     );
     await writeFile(drawerYamlPath, yaml, "utf8");
 
     const { stdout: svg } = await execFileAsync(
       "keymap",
-      ["draw", drawerYamlPath],
-      { shell: true, maxBuffer: 16 * 1024 * 1024 },
+      ["draw", "-d", dtsiPath, drawerYamlPath],
+      { shell: true, maxBuffer: 16 * 1024 * 1024, env: keymapEnv },
     );
     await writeFile(drawerSvgPath, svg, "utf8");
 

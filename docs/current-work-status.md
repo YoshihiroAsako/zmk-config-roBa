@@ -38,29 +38,20 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
-### 2026-05-06: Layer rename + keymap-drawer 自動更新 完了
+### 2026-05-06: Layer rename + keymap-drawer 自動更新 完了・実生成確認済み
 
 実装・確認済み機能:
 
-- **Layer rename**:
-  - `parseKeymap.js` が各 layer の name token に `nameRange` を付与。
-  - `pendingChanges.js` に `buildLayerRenameDraftChange` を追加。kind = `layer-rename`。
-  - `validatePendingChange` / `validateSourceChange` に `layer-rename` を追加（identifier 検証 / 保存範囲確認）。
-  - `buildPendingChangesState` で layer 名 uniqueness 判定。衝突時は valid=false。
-  - `buildSaveDiagnostics` に `Unique layer names` 診断を追加。
-  - `LayerRenameRow` コンポーネントを right detail pane の最上部（layer 名表示 + rename 入力欄）に配置。
-    - Visual pane ヘッダや SVG 下には配置しない（SVG の `overflow: visible` によるキーとの重なりを避けるため）。
-    - `&lt N` / `&mo N` は index ベースなのでリネームしても影響しない旨を note に表示。
-  - commit `b3c426d Add layer rename and keymap-drawer auto-update to roBa viewer_20260505` に含まれる。
-  - Layout 修正（`LayerRenameRow` を detail pane 上部に移動）は commit 未反映 → **ユーザーが commit 予定**。
+- **Layer rename**: commit `b3c426d` に含まれる（詳細は git ログ参照）。
 
-- **keymap-drawer 自動更新**:
-  - `vite.config.js` に `POST /__roba/update-keymap-drawer` を追加。
-  - `keymap --version` で probe してから `keymap parse` / `keymap draw` を実行。
-  - `keymap` CLI が PATH 未配置の場合は `available: false` を返し、save の成否に影響させない。
-  - save 成功後に `drawerMessage` として `SaveStatusPanel` に表示。
-  - 動作確認: `keymap` CLI が PATH にないため「keymap CLI not found on PATH. Update keymap-drawer manually.」が表示されることをユーザーが確認。
-  - commit `b3c426d` に含まれる。
+- **keymap-drawer 自動更新（実生成確認済み）**:
+  - `POST /__roba/update-keymap-drawer` が `ok: true` を返すことを実機確認。
+  - `vite.config.js` に以下の修正を追加（未コミット）:
+    - `dtsiPath` = `boards/shields/roBa/roBa.dtsi` を定義。
+    - `keymap draw` に `-d dtsiPath` を追加（roBa はカスタム KBD のため ZMK DB にない）。
+    - `PYTHONUTF8: "1"` を env に渡す（日本語 Windows の cp932 問題を回避）。
+  - `keymap-drawer/roBa.yaml` と `roBa.svg` が keymap-drawer 0.23.0 フォーマットで再生成済み（未コミット）。
+  - Python 3.13.13 / keymap-drawer 0.23.0 を winget / pip でインストール済み。
 
 - **テスト状況**: `npm test` 64 tests / 6 suites 成功（layout 修正は純粋な JSX/CSS 変更のため影響なし）。
 
@@ -78,12 +69,12 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 次にやること
 
-### (optional) keymap-drawer 自動更新の実生成確認
+### 未コミットの変更をコミットする
 
-`keymap` CLI を環境にインストールできるなら、save 後の `keymap-drawer/roBa.{yaml,svg}` 自動再生成を実機確認するとよい。`pip install keymap-drawer` で導入可能。実生成確認した場合:
-
-- `keymap-drawer/roBa.yaml` に手動調整が入っていないか事前 `git diff` 確認。
-- 確認後の状態を本ファイルの検証状況メモに追記。
+以下3ファイルをコミットする（ユーザーが判断して実行）:
+- `tools/roba-keymap-viewer/vite.config.js` — `-d dtsiPath` + `PYTHONUTF8` 修正
+- `keymap-drawer/roBa.yaml` — keymap-drawer 0.23.0 で再生成
+- `keymap-drawer/roBa.svg` — 同上
 
 ### [Post-Phase 2] Key Capture 入力
 
