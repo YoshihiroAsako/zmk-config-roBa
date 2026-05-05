@@ -84,8 +84,12 @@ Example keymap-drawer commands:
 
 ```bash
 keymap parse -c 10 -z config/roBa.keymap > keymap-drawer/roBa.yaml
-keymap draw keymap-drawer/roBa.yaml > keymap-drawer/roBa.svg
+keymap draw -d boards/shields/roBa/roBa.dtsi keymap-drawer/roBa.yaml > keymap-drawer/roBa.svg
 ```
+
+`roBa` is a custom keyboard not in keymap-drawer's built-in database, so `keymap draw` requires `-d boards/shields/roBa/roBa.dtsi` to supply the physical layout.
+
+On Windows with PowerShell, `>` redirects as UTF-16 LE. Use `Out-File -Encoding utf8` or run via `python -c` with explicit UTF-8 file writes to avoid encoding errors.
 
 Before overwriting `keymap-drawer/roBa.yaml`, check whether it contains manual adjustments and review the diff afterward.
 

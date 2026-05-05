@@ -46,11 +46,11 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - **keymap-drawer 自動更新（実生成確認済み）**:
   - `POST /__roba/update-keymap-drawer` が `ok: true` を返すことを実機確認。
-  - `vite.config.js` に以下の修正を追加（未コミット）:
+  - `vite.config.js` に以下の修正を追加（commit `c5f2007`）:
     - `dtsiPath` = `boards/shields/roBa/roBa.dtsi` を定義。
     - `keymap draw` に `-d dtsiPath` を追加（roBa はカスタム KBD のため ZMK DB にない）。
     - `PYTHONUTF8: "1"` を env に渡す（日本語 Windows の cp932 問題を回避）。
-  - `keymap-drawer/roBa.yaml` と `roBa.svg` が keymap-drawer 0.23.0 フォーマットで再生成済み（未コミット）。
+  - `keymap-drawer/roBa.yaml` と `roBa.svg` が keymap-drawer 0.23.0 フォーマットで再生成済み（commit `c5f2007`）。
   - Python 3.13.13 / keymap-drawer 0.23.0 を winget / pip でインストール済み。
 
 - **テスト状況**: `npm test` 64 tests / 6 suites 成功（layout 修正は純粋な JSX/CSS 変更のため影響なし）。
@@ -68,13 +68,6 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - keymap-drawer 自動更新（probe-first pattern、CLI 未配置時の graceful fallback）
 
 ## 次にやること
-
-### 未コミットの変更をコミットする
-
-以下3ファイルをコミットする（ユーザーが判断して実行）:
-- `tools/roba-keymap-viewer/vite.config.js` — `-d dtsiPath` + `PYTHONUTF8` 修正
-- `keymap-drawer/roBa.yaml` — keymap-drawer 0.23.0 で再生成
-- `keymap-drawer/roBa.svg` — 同上
 
 ### [Post-Phase 2] Key Capture 入力
 
