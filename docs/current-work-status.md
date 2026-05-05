@@ -396,16 +396,20 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `tools/roba-keymap-viewer/` で `npm test` 成功。44 tests / 5 suites。
   - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
   - 追加したテスト: parser に既存 `timeout-ms` / `layers` 値 range を追える `captures timeout-ms and layers ranges when combos define them`、combo preview に insert / replace / remove / validation の 5 ケース。
-  - 実ファイル `config/roBa.keymap` は変更していない。`git diff -- config/roBa.keymap` は空。
-  - dev server / 手動ブラウザ smoke check はまだ未実施。
+  - ユーザーがブラウザで Layers / Timeout draft の挿入・validation 動作を確認済み。
+  - `a87763a Add combo layers/timeout-ms preview editing to roBa viewer` で commit・push 済み。
 
 ## 次にやること
 
 優先順:
 
-1. dev server で combo の Layers / Timeout draft preview を手動確認する。Context Diff と `.keymap` Preview に挿入・置換・削除が正しく出ることを確認する。
-2. combo `layers` / `timeout-ms` を pending changes / `Save all` に統合するか、macro 編集に進むかを決める。
-3. sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
+1. combo `layers` / `timeout-ms` を pending changes / `Save all` に統合する（推奨・合意済み）。
+   - `buildComboDraftChanges` に `layersRaw` / `timeoutMsRaw` を追加。
+   - `saveBindingChanges` の `validateSourceChange` / `replaceKeymapChanges` に新 kind を追加。
+   - `buildPendingChangesState` の `validatePendingChange` にも対応 kind を追加。
+   - 挿入 kind（zero-length range）は `replaceBindings`（binding expression チェックあり）を通さず、raw string replace として処理する。
+   - 保存統合テストと手動確認を行う。
+2. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点
 
