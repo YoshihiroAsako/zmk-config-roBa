@@ -463,6 +463,21 @@ pre {
   color: #7d8da3;
 }
 
+.comboPreviewBox button {
+  height: 30px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+  background: #eef2f7;
+  color: #7d8da3;
+}
+
+.comboPreviewBox button:not(:disabled) {
+  border-color: #d18b21;
+  background: #d18b21;
+  color: #ffffff;
+  cursor: pointer;
+}
+
 .disabledBox,
 .editorBox {
   display: grid;

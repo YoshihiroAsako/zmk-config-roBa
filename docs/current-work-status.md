@@ -184,6 +184,14 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - Preview タブで combo の Context Diff と `.keymap` preview を表示できる。
   - 保存処理は未追加。既存 key binding の pending changes / Save all とはまだ統合しない。
 - Combo preview-only 編集土台は `Add combo preview editing state to roBa viewer` で commit 済み。
+- Combo preview を pending changes / 保存 helper に統合中:
+  - combo binding / positions draft を `Add combo draft` / `Update combo draft` で Pending Changes に積めるようにした。
+  - `Save all` で通常 key binding draft と combo draft をまとめて保存できるようにした。
+  - `saveBindingChanges` は `binding` / `combo-binding` / `combo-positions` の混在 changes を扱う。
+  - combo binding は Phase 2 editable binding set の範囲だけ保存可能。
+  - combo positions は 2キー以上、重複なし、物理キー範囲内の整数リストとして保存前にも validation する。
+  - dev server endpoint `POST /__roba/save-bindings` で combo binding / positions の往復保存を確認済み。
+- Combo pending/save 統合は `Save combo drafts from roBa viewer pending changes` で commit 済み。
 
 ## 検証状況
 
@@ -364,13 +372,22 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - dev server を `http://127.0.0.1:5173` で起動し、トップページ HTTP 200 を確認。
   - headless Edge `--dump-dom` で title、43 key UI、既存の主要 DOM 表示を確認。
   - `agent-browser` CLI は PATH 上になく、ブラウザ操作による手動 smoke check は未実施。
+- Combo pending/save 統合後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。38 tests / 5 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。
+  - dev server を `http://127.0.0.1:5173` で起動し、トップページ HTTP 200 を確認。
+  - `POST /__roba/save-bindings` で `double_quotation` combo を `&kp DQT` / `17 18` に一時変更し、HTTP 200 相当の `Saved 2 pending changes with a backup.` を確認。
+  - 一時変更後の `git diff -- config/roBa.keymap` は `double_quotation` の `bindings` / `key-positions` 2行だけ。
+  - 同 endpoint で `&kp AT_SIGN` / `18 19` に戻し、往復後の `git diff -- config/roBa.keymap` は空。
+  - headless Edge `--dump-dom` で title、43 key UI、主要 DOM 表示を確認。
+  - `agent-browser` CLI は PATH 上になく、ブラウザ操作による手動 smoke check は未実施。
 
 ## 次にやること
 
 優先順:
 
-1. Combo preview を pending changes / 保存 helper へ統合する設計に進む。
-2. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
+1. 次に combo `layers` / `timeout-ms` の preview-only 編集設計に進むか、macro 編集に進むかを決める。
+2. sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点
 

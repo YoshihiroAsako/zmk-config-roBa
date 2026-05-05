@@ -9,10 +9,12 @@ import { buildEditorState } from "./keymap/editorPreview.js";
 import { countDtsPhysicalKeys, parseKeymap } from "./keymap/parseKeymap.js";
 import {
   buildDraftChange,
+  buildComboDraftChanges,
   buildPendingChangesState,
   getDraftId,
   removeDraftChange,
   upsertDraftChange,
+  upsertDraftChanges,
 } from "./keymap/pendingChanges.js";
 
 const KEY_SIZE = 44;
@@ -61,6 +63,10 @@ function App() {
   const selectedEntry = currentLayer.bindingEntries?.[selectedPosition];
   const selectedDraftId = getDraftId(activeLayer, selectedPosition);
   const selectedPendingChange = pendingChanges.find((change) => change.id === selectedDraftId);
+  const selectedComboDraftIds = selectedCombo
+    ? [`combo-${selectedCombo.name}-binding`, `combo-${selectedCombo.name}-positions`]
+    : [];
+  const selectedComboPendingCount = pendingChanges.filter((change) => selectedComboDraftIds.includes(change.id)).length;
   const selectedParsed = describeBinding(selectedBinding, layerNames);
   const selectedRange = selectedEntry?.sourceRange;
   const effectiveDraftBinding = draftBinding ?? selectedPendingChange?.nextRaw ?? selectedEntry?.raw ?? selectedBinding;
@@ -282,6 +288,27 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const addSelectedComboDraft = () => {
+    if (!selectedCombo || !comboPreviewState.changed || !comboPreviewState.valid) return;
+    const changes = buildComboDraftChanges({
+      combo: selectedCombo,
+      bindingRaw: comboDraft.bindingRaw,
+      positionsRaw: comboDraft.positionsRaw,
+    });
+    setPendingChanges((current) => upsertDraftChanges(current, changes));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const removeSelectedComboDraft = () => {
+    setPendingChanges((changes) => changes.filter((change) => !selectedComboDraftIds.includes(change.id)));
+    setComboDraft({
+      bindingRaw: selectedCombo?.binding || "",
+      positionsRaw: selectedCombo?.positions.join(" ") || "",
+    });
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
   return (
     <div className="appShell">
       <header className="topBar">
@@ -392,6 +419,9 @@ function App() {
               combo={selectedCombo}
               draft={comboDraft}
               previewState={comboPreviewState}
+              pendingCount={selectedComboPendingCount}
+              onAddDraft={addSelectedComboDraft}
+              onRemoveDraft={removeSelectedComboDraft}
               onDraftChange={(nextDraft) => {
                 setComboDraft(nextDraft);
                 setSaveStatus(EMPTY_SAVE_STATUS);
@@ -488,7 +518,7 @@ function App() {
   );
 }
 
-function ComboDetailPanel({ combo, draft, previewState, onDraftChange }) {
+function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange }) {
   return (
     <section className="comboDetailPanel" aria-label="selected combo details">
       <div className="editorHeader">
@@ -544,6 +574,22 @@ function ComboDetailPanel({ combo, draft, previewState, onDraftChange }) {
           />
         </label>
         <div className="editorStatus">{previewState.message}</div>
+        <div className="editorActions">
+          <button
+            type="button"
+            disabled={!previewState.changed || !previewState.valid}
+            onClick={onAddDraft}
+          >
+            {pendingCount ? "Update combo draft" : "Add combo draft"}
+          </button>
+          <button
+            type="button"
+            disabled={!pendingCount}
+            onClick={onRemoveDraft}
+          >
+            Remove combo draft
+          </button>
+        </div>
       </div>
       <pre className="rawNodePreview">{combo.raw}</pre>
     </section>
@@ -890,9 +936,15 @@ function PendingChangesList({ changes, message, onSelect, onRemove }) {
     <div className="pendingList">
       {changes.map((change) => (
         <div className="pendingItem" key={change.id}>
-          <button type="button" className="pendingMain" onClick={() => onSelect(change.layerIndex, change.position)}>
-            <strong>{change.layerName}</strong>
-            <span>POS{change.position}</span>
+          <button
+            type="button"
+            className="pendingMain"
+            onClick={() => {
+              if (change.kind === "binding" || !change.kind) onSelect(change.layerIndex, change.position);
+            }}
+          >
+            <strong>{change.layerName || change.comboName || "Keymap"}</strong>
+            <span>{change.position === undefined ? change.kind : `POS${change.position}`}</span>
             <code>{change.currentRaw} {"->"} {change.nextRaw}</code>
           </button>
           <button type="button" className="pendingRemove" onClick={() => onRemove(change.id)}>Remove</button>

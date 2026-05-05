@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { parseKeymap, replaceBinding, replaceBindings } from "./parseKeymap.js";
+import { isEditableBindingExpression, parseKeymap, replaceBinding, replaceBindings } from "./parseKeymap.js";
 
 const CANONICAL_SOURCE_PATH = "config/roBa.keymap";
 
@@ -84,16 +84,12 @@ export async function saveBindingChanges({
   for (const change of changes) {
     const currentSourceRaw = source.slice(change.range?.start, change.range?.end).trim();
     if (currentSourceRaw !== change.currentRaw) {
-      throw new Error("One or more bindings no longer match the source file. Reload before saving.");
+      throw new Error("One or more pending changes no longer match the source file. Reload before saving.");
     }
   }
 
   const beforeParsed = parseKeymap(source);
-  const replacements = changes.map((change) => ({
-    range: change.range,
-    nextRaw: change.nextRaw,
-  }));
-  const nextSource = replaceBindings(source, replacements);
+  const nextSource = replaceKeymapChanges(source, changes);
   const afterParsed = parseKeymap(nextSource);
   const diagnostics = buildSaveDiagnostics(beforeParsed, afterParsed);
   const failedDiagnostic = diagnostics.find((item) => !item.ok);
@@ -122,6 +118,32 @@ export async function saveBindingChanges({
     backupPath: toRepoRelativePath(root, backupPath),
     diagnostics,
   };
+}
+
+export function replaceKeymapChanges(source, changes) {
+  const bindingChanges = changes.filter((change) => change.kind === "binding" || !change.kind);
+  const sourceChanges = changes.filter((change) => change.kind && change.kind !== "binding");
+  if (bindingChanges.length) {
+    replaceBindings(source, bindingChanges.map((change) => ({
+      range: change.range,
+      nextRaw: change.nextRaw,
+    })));
+  }
+  for (const change of sourceChanges) {
+    validateSourceChange(source, change);
+  }
+
+  const ordered = [...changes].sort((a, b) => b.range.start - a.range.start);
+  for (let index = 0; index < ordered.length; index += 1) {
+    const next = ordered[index + 1];
+    if (next && next.range.end > ordered[index].range.start) {
+      throw new Error("Replacement ranges must not overlap.");
+    }
+  }
+
+  return ordered.reduce((updated, change) => (
+    `${updated.slice(0, change.range.start)}${change.nextRaw}${updated.slice(change.range.end)}`
+  ), source);
 }
 
 export function buildSaveDiagnostics(beforeParsed, afterParsed) {
@@ -221,4 +243,49 @@ function countSensorBindings(parsed) {
 
 function toRepoRelativePath(root, target) {
   return path.relative(root, target).replace(/\\/g, "/");
+}
+
+function validateSourceChange(source, change) {
+  validateRange(source, change.range);
+  if (change.kind === "combo-binding") {
+    if (!isEditableBindingExpression(change.currentRaw) || !isEditableBindingExpression(change.nextRaw)) {
+      throw new Error("Combo binding replacement is not supported in Phase 2.");
+    }
+  } else if (change.kind === "combo-positions") {
+    validateComboPositions(change.nextRaw);
+    if (!/^[\d\s]+$/.test(source.slice(change.range.start, change.range.end))) {
+      throw new Error("Combo positions source range is invalid.");
+    }
+  } else {
+    throw new Error("Unsupported pending change kind.");
+  }
+}
+
+function validateRange(source, range) {
+  if (
+    !range ||
+    !Number.isInteger(range.start) ||
+    !Number.isInteger(range.end) ||
+    range.start < 0 ||
+    range.end < range.start ||
+    range.end > source.length
+  ) {
+    throw new Error("Invalid source range.");
+  }
+}
+
+function validateComboPositions(raw, keyCount = 43) {
+  const text = String(raw || "");
+  if (!text || text !== text.trim() || text !== text.replace(/\s+/g, " ")) {
+    throw new Error("Combo positions must be a single-space-separated list.");
+  }
+  const positions = text.split(" ").map((value) => {
+    if (!/^\d+$/.test(value)) throw new Error("Combo positions must be integer key positions.");
+    return Number(value);
+  });
+  if (positions.length < 2) throw new Error("Combo positions must include at least two keys.");
+  if (new Set(positions).size !== positions.length) throw new Error("Combo positions must be unique.");
+  if (positions.some((position) => position < 0 || position >= keyCount)) {
+    throw new Error(`Combo positions must be between 0 and ${keyCount - 1}.`);
+  }
 }

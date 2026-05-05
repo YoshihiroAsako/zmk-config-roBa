@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parseKeymap } from "./parseKeymap.js";
-import { buildSaveDiagnostics, saveBindingChange, saveBindingChanges } from "./saveBindingChange.js";
+import { buildSaveDiagnostics, replaceKeymapChanges, saveBindingChange, saveBindingChanges } from "./saveBindingChange.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");
@@ -280,6 +280,86 @@ describe("save binding change helper", () => {
           ],
         }),
         /Only config\/roBa\.keymap/,
+      );
+
+      assert.equal(await readTempKeymap(tempRoot), source);
+    });
+  });
+
+  it("backs up once and saves key binding and combo changes together", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const firstEntry = parsed.layers[0].bindingEntries[0];
+    const combo = parsed.combos.find((item) => item.name === "double_quotation");
+
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({
+        repoRoot: tempRoot,
+        changes: [
+          {
+            kind: "binding",
+            range: firstEntry.sourceRange,
+            currentRaw: firstEntry.raw,
+            nextRaw: "&kp B",
+          },
+          {
+            kind: "combo-binding",
+            range: combo.bindingEntry.sourceRange,
+            currentRaw: combo.binding,
+            nextRaw: "&kp DQT",
+          },
+          {
+            kind: "combo-positions",
+            range: combo.keyPositionsRange,
+            currentRaw: combo.positions.join(" "),
+            nextRaw: "17 18",
+          },
+        ],
+        now: new Date(2026, 4, 5, 10, 20, 30),
+      });
+      const savedSource = await readTempKeymap(tempRoot);
+      const savedParsed = parseKeymap(savedSource);
+      const savedCombo = savedParsed.combos.find((item) => item.name === "double_quotation");
+
+      assert.equal(result.ok, true);
+      assert.equal(result.backupPath, "config/.roBa.keymap.bak/20260505-102030.roBa.keymap");
+      assert.equal(savedParsed.layers[0].bindings[0], "&kp B");
+      assert.equal(savedCombo.binding, "&kp DQT");
+      assert.deepEqual(savedCombo.positions, [17, 18]);
+      assert.equal(result.diagnostics.every((item) => item.ok), true);
+    });
+  });
+
+  it("rejects invalid combo source changes without changing the source", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const combo = parseKeymap(source).combos.find((item) => item.name === "double_quotation");
+
+    assert.throws(
+      () => replaceKeymapChanges(source, [
+        {
+          kind: "combo-positions",
+          range: combo.keyPositionsRange,
+          currentRaw: combo.positions.join(" "),
+          nextRaw: "18 18",
+        },
+      ]),
+      /unique/,
+    );
+
+    await withTempRepo(source, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({
+          repoRoot: tempRoot,
+          changes: [
+            {
+              kind: "combo-binding",
+              range: combo.bindingEntry.sourceRange,
+              currentRaw: combo.binding,
+              nextRaw: "&bt BT_SEL 0",
+            },
+          ],
+        }),
+        /not supported/,
       );
 
       assert.equal(await readTempKeymap(tempRoot), source);

@@ -5,9 +5,11 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   buildDraftChange,
+  buildComboDraftChanges,
   buildPendingChangesState,
   removeDraftChange,
   upsertDraftChange,
+  upsertDraftChanges,
 } from "./pendingChanges.js";
 import { parseKeymap } from "./parseKeymap.js";
 
@@ -105,5 +107,36 @@ describe("pending keymap changes", () => {
     assert.equal(state.valid, false);
     assert.match(state.message, /changed on disk/);
     assert.equal(state.nextSource, source);
+  });
+
+  it("builds a combined preview for key bindings and combo drafts", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos.find((item) => item.name === "double_quotation");
+    const keyChange = buildDraftChange({
+      layerIndex: 0,
+      layerName: parsed.layers[0].name,
+      position: 0,
+      entry: parsed.layers[0].bindingEntries[0],
+      nextRaw: "&kp B",
+    });
+    const comboChanges = buildComboDraftChanges({
+      combo,
+      bindingRaw: "&kp DQT",
+      positionsRaw: "17 18",
+    });
+
+    const changes = upsertDraftChanges([keyChange], comboChanges);
+    const state = buildPendingChangesState(source, changes, parsed.layers);
+    const nextParsed = parseKeymap(state.nextSource);
+    const nextCombo = nextParsed.combos.find((item) => item.name === "double_quotation");
+
+    assert.equal(state.valid, true);
+    assert.match(state.contextDiff, /default_layer POS0/);
+    assert.match(state.contextDiff, /double_quotation binding/);
+    assert.match(state.contextDiff, /double_quotation positions/);
+    assert.equal(nextParsed.layers[0].bindings[0], "&kp B");
+    assert.equal(nextCombo.binding, "&kp DQT");
+    assert.deepEqual(nextCombo.positions, [17, 18]);
   });
 });
