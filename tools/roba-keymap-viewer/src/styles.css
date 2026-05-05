@@ -390,6 +390,35 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.compactList {
+  gap: 8px;
+  padding: 10px 0 0;
+}
+
+.comboDetailPanel {
+  display: grid;
+  gap: 8px;
+  margin: 0 16px 12px;
+  padding: 12px;
+  border: 1px solid #ead39a;
+  border-radius: 7px;
+  background: #fffaf0;
+}
+
+.rawNodePreview {
+  max-height: 120px;
+  min-height: 0;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid #ead39a;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #6b4b12;
+  font-size: 11px;
+  white-space: pre;
+}
+
 .disabledBox,
 .editorBox {
   display: grid;

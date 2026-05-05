@@ -169,6 +169,12 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - combo `bindings` の先頭 binding を `bindingEntry` として source range 付きで持つようにした。
   - `layers` がある combo では `layersRange` を持てる形にした。
   - 既存の `name` / `positions` / `binding` / `layers` / `timeoutMs` は維持。
+- Combo parser metadata は `4b0093a Track combo source ranges in roBa viewer` で commit 済み。ユーザーが push 済み。
+- 既存 combo の read-only detail panel を追加中:
+  - Combos タブで選択中の combo について、右 detail panel に positions / binding / layers / timeout を表示。
+  - combo node range、positions range、binding range を表示。
+  - combo node の raw source preview を表示。
+  - 保存や編集処理は未追加。既存 combo 編集に進む前の確認 UI。
 
 ## 検証状況
 
@@ -336,13 +342,17 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
   - `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js` に combo source range test を追加。
   - `git diff -- config/roBa.keymap` は空。
+- Combo read-only detail panel 追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。32 tests / 4 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - `git diff -- config/roBa.keymap` は空。
 
 ## 次にやること
 
 優先順:
 
-1. Combo parser metadata 追加差分を commit-ready review し、問題なければコミットする。候補メッセージ: `Track combo source ranges in roBa viewer`
-2. 次に既存 combo の read-only detail panel を整えるか、combo binding / positions の preview-only 編集設計に進む。
+1. Combo read-only detail panel の差分を commit-ready review し、問題なければコミットする。候補メッセージ: `Show selected combo source details in roBa viewer`
+2. 次に combo binding / positions の preview-only 編集設計に進む。
 3. macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点

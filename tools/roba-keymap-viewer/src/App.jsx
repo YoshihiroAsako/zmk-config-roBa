@@ -374,6 +374,9 @@ function App() {
               <dd>{selectedParsed.note || "No special note."}</dd>
             </div>
           </dl>
+          {activeTab === "Combos" && selectedCombo && (
+            <ComboDetailPanel combo={selectedCombo} />
+          )}
           <div className={editorState.canEdit ? "editorBox" : "editorBox disabled"}>
             <div className="editorHeader">
               <strong>Phase 2 Preview</strong>
@@ -460,6 +463,48 @@ function App() {
         />
       </section>
     </div>
+  );
+}
+
+function ComboDetailPanel({ combo }) {
+  return (
+    <section className="comboDetailPanel" aria-label="selected combo details">
+      <div className="editorHeader">
+        <strong>Combo</strong>
+        <span>{combo.name}</span>
+      </div>
+      <dl className="detailList compactList">
+        <div>
+          <dt>Positions</dt>
+          <dd>{combo.positions.join(" + ")}</dd>
+        </div>
+        <div>
+          <dt>Binding</dt>
+          <dd><code>{combo.binding}</code></dd>
+        </div>
+        <div>
+          <dt>Layers</dt>
+          <dd>{combo.layers.join(", ") || "all"}</dd>
+        </div>
+        <div>
+          <dt>Timeout</dt>
+          <dd>{combo.timeoutMs}ms</dd>
+        </div>
+        <div>
+          <dt>Node range</dt>
+          <dd>{formatRange(combo.sourceRange)}</dd>
+        </div>
+        <div>
+          <dt>Positions range</dt>
+          <dd>{formatRange(combo.keyPositionsRange)}</dd>
+        </div>
+        <div>
+          <dt>Binding range</dt>
+          <dd>{formatRange(combo.bindingEntry?.sourceRange)}</dd>
+        </div>
+      </dl>
+      <pre className="rawNodePreview">{combo.raw}</pre>
+    </section>
   );
 }
 
@@ -875,6 +920,10 @@ function getDiagnostics(document) {
 function shorten(value, max) {
   const text = String(value ?? "");
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function formatRange(range) {
+  return range ? `${range.start}..${range.end}` : "Unavailable";
 }
 
 export default App;
