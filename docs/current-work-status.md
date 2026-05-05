@@ -156,6 +156,12 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 一時変更後の `git diff -- config/roBa.keymap` は default layer の POS0/POS1 だけに収まることを確認。
   - 同じ endpoint で POS0/POS1 を元の `&kp Q` / `&kp W` に戻し、`git diff -- config/roBa.keymap` が空になることを確認。
   - 実装差分を確認し、今回の複数保存 endpoint / UI 接続は commit-ready。
+- 複数保存 endpoint / UI 接続は `f14e4b7 Add multi-binding save action to roBa viewer` で commit 済み。ユーザーが push 済み。
+- Combo 編集前の read-only 可視化を追加中:
+  - Combos タブで combo row を選択できるようにした。
+  - 選択した combo の key positions をキーボード上でハイライトする。
+  - layer 指定がある combo では、その先頭 layer へ切り替え、combo の先頭 position を選択する。
+  - これは combo 編集そのものではなく、既存 combo 編集に進む前の選択・確認 UI。
 
 ## 検証状況
 
@@ -313,14 +319,19 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `tools/roba-keymap-viewer/` で `npm test` 成功。31 tests / 4 suites。
   - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
   - 差分レビュー済み。変更ファイルは `docs/current-work-status.md`、`tools/roba-keymap-viewer/src/App.jsx`、`tools/roba-keymap-viewer/src/styles.css`、`tools/roba-keymap-viewer/vite.config.js`。
+- Combo read-only 可視化追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。31 tests / 4 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - 起動中の dev server `http://127.0.0.1:5173` で headless Edge `--dump-dom` を実行し、title、`comboHighlighted` CSS、`clickableRow` CSS が配信されることを確認。
+  - `git diff -- config/roBa.keymap` は空。
 
 ## 次にやること
 
 優先順:
 
-1. 今回の複数保存 endpoint / UI 接続差分をコミットする。候補メッセージ: `Add multi-binding save action to roBa viewer`
-2. 必要ならユーザーがブラウザ UI で `Save all` ボタン表示と操作感を目視確認する。endpoint 経由の往復保存は確認済み。
-3. combo / macro / sensor-bindings / layer rename / keymap-drawer 自動更新は、複数キー保存とは別作業に分ける。
+1. Combo read-only 可視化の差分を commit-ready review し、問題なければコミットする。候補メッセージ: `Highlight selected combos in roBa viewer`
+2. 必要ならユーザーがブラウザ UI で Combos タブを開き、combo row 選択時に対象キーがハイライトされることを目視確認する。
+3. 既存 combo 編集、macro 編集、sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点
 

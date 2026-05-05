@@ -47,9 +47,14 @@ function App() {
   const [search, setSearch] = useState("");
   const [draftBinding, setDraftBinding] = useState(null);
   const [pendingChanges, setPendingChanges] = useState([]);
+  const [selectedComboName, setSelectedComboName] = useState("");
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
+  const selectedCombo = document.combos.find((combo) => combo.name === selectedComboName);
+  const comboHighlightPositions = activeTab === "Combos" && selectedCombo
+    ? new Set(selectedCombo.positions)
+    : new Set();
   const selectedBinding = currentLayer.bindings[selectedPosition] || "&trans";
   const selectedEntry = currentLayer.bindingEntries?.[selectedPosition];
   const selectedDraftId = getDraftId(activeLayer, selectedPosition);
@@ -231,6 +236,13 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const selectCombo = (combo) => {
+    setSelectedComboName(combo.name);
+    if (combo.layers.length) setActiveLayer(combo.layers[0]);
+    if (combo.positions.length) setSelectedPosition(combo.positions[0]);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
   const addSelectedDraft = () => {
     if (!editorState.canEdit || !selectedEntry?.sourceRange) return;
     const change = buildDraftChange({
@@ -324,6 +336,7 @@ function App() {
             bindings={currentLayer.bindings}
             layerNames={layerNames}
             selectedPosition={selectedPosition}
+            highlightedPositions={comboHighlightPositions}
             onSelect={(position) => selectBinding(activeLayer, position)}
           />
         </section>
@@ -437,7 +450,9 @@ function App() {
           pendingState={pendingState}
           saveStatus={saveStatus}
           selectedPosition={selectedPosition}
+          selectedComboName={selectedComboName}
           onSelectBinding={selectBinding}
+          onSelectCombo={selectCombo}
           onRemovePendingChange={(id) => setPendingChanges((changes) => removeDraftChange(changes, id))}
           onClearPendingChanges={clearPendingChanges}
           onSavePendingChanges={saveAllPendingChanges}
@@ -448,7 +463,7 @@ function App() {
   );
 }
 
-function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, onSelect }) {
+function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlightedPositions, onSelect }) {
   const bounds = keys.reduce(
     (acc, key) => ({
       minX: Math.min(acc.minX, key.x),
@@ -482,6 +497,7 @@ function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, onSelect })
             keyDef={key}
             parsed={parsed}
             selected={selectedPosition === key.position}
+            highlighted={highlightedPositions.has(key.position)}
             onSelect={onSelect}
           />
         );
@@ -490,11 +506,11 @@ function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, onSelect })
   );
 }
 
-function KeyCap({ keyDef, parsed, selected, onSelect }) {
+function KeyCap({ keyDef, parsed, selected, highlighted, onSelect }) {
   const x = keyDef.x * UNIT;
   const y = keyDef.y * UNIT;
   const rotate = keyDef.r ? ` rotate(${keyDef.r}, ${(keyDef.rx - keyDef.x) * UNIT}, ${(keyDef.ry - keyDef.y) * UNIT})` : "";
-  const className = ["keyCap", selected ? "selected" : "", keyDef.thumb ? "thumb" : "", parsed.kind].filter(Boolean).join(" ");
+  const className = ["keyCap", highlighted ? "comboHighlighted" : "", selected ? "selected" : "", keyDef.thumb ? "thumb" : "", parsed.kind].filter(Boolean).join(" ");
 
   return (
     <g className={className} transform={`translate(${x}, ${y})${rotate}`} onClick={() => onSelect(keyDef.position)}>
@@ -519,7 +535,9 @@ function PanelContent({
   pendingState,
   saveStatus,
   selectedPosition,
+  selectedComboName,
   onSelectBinding,
+  onSelectCombo,
   onRemovePendingChange,
   onClearPendingChanges,
   onSavePendingChanges,
@@ -540,18 +558,10 @@ function PanelContent({
 
   if (tab === "Combos") {
     return (
-      <Table
-        columns={["Name", "Positions", "Binding", "Layers", "Timeout"]}
-        rows={document.combos}
-        renderRow={(combo) => (
-          <tr key={combo.name}>
-            <td>{combo.name}</td>
-            <td>{combo.positions.join(" + ")}</td>
-            <td><code>{combo.binding}</code></td>
-            <td>{combo.layers.join(", ") || "all"}</td>
-            <td>{combo.timeoutMs}ms</td>
-          </tr>
-        )}
+      <CombosTable
+        combos={document.combos}
+        selectedComboName={selectedComboName}
+        onSelectCombo={onSelectCombo}
       />
     );
   }
@@ -651,6 +661,28 @@ function PanelContent({
         </div>
       ))}
     </div>
+  );
+}
+
+function CombosTable({ combos, selectedComboName, onSelectCombo }) {
+  return (
+    <Table
+      columns={["Name", "Positions", "Binding", "Layers", "Timeout"]}
+      rows={combos}
+      renderRow={(combo) => (
+        <tr
+          className={combo.name === selectedComboName ? "selectedRow clickableRow" : "clickableRow"}
+          key={combo.name}
+          onClick={() => onSelectCombo(combo)}
+        >
+          <td>{combo.name}</td>
+          <td>{combo.positions.join(" + ")}</td>
+          <td><code>{combo.binding}</code></td>
+          <td>{combo.layers.join(", ") || "all"}</td>
+          <td>{combo.timeoutMs}ms</td>
+        </tr>
+      )}
+    />
   );
 }
 

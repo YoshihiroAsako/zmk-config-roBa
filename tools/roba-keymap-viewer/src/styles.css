@@ -322,10 +322,21 @@ pre {
   stroke: #e0e7f0;
 }
 
+.keyCap.comboHighlighted rect {
+  fill: #fff1c7;
+  stroke: #d18b21;
+  stroke-width: 2px;
+}
+
 .keyCap.selected rect {
   fill: #dff5f3;
   stroke: #087f8c;
   stroke-width: 2px;
+}
+
+.keyCap.comboHighlighted.selected rect {
+  fill: #ffe7a3;
+  stroke: #087f8c;
 }
 
 .keyDisplay {
@@ -616,6 +627,10 @@ tbody tr.selectedRow {
 
 tbody tr.selectedRow:hover {
   background: #d4f0ee;
+}
+
+tbody tr.clickableRow {
+  cursor: pointer;
 }
 
 td code {
