@@ -199,14 +199,41 @@ function parseMacros(source) {
   const block = findBlock(source, "macros");
   if (!block) return [];
 
-  return directChildBlocks(block.body).map((child) => ({
-    name: child.name,
-    compatible: getStringProperty(child.body, "compatible"),
-    bindingCells: getNumberProperty(child.body, "#binding-cells"),
-    bindings: splitBindingExpressions(getAngleProperty(child.body, "bindings")),
-    label: getStringProperty(child.body, "label"),
-    raw: child.raw,
-  }));
+  return directChildBlocks(block.body, block.start + 1)
+    .filter((child) => child.name !== "compatible")
+    .map((child) => {
+      const bindingsProperty = getAnglePropertyInfo(child.body, "bindings", child.bodyStart);
+      const waitMsProperty = getAnglePropertyInfo(child.body, "wait-ms", child.bodyStart);
+      const tapMsProperty = getAnglePropertyInfo(child.body, "tap-ms", child.bodyStart);
+      const bindingEntries = bindingsProperty
+        ? splitBindingEntries(bindingsProperty.value, bindingsProperty.sourceRange.start)
+        : [];
+      const waitMsParsed = Number((waitMsProperty?.value || "").trim());
+      const tapMsParsed = Number((tapMsProperty?.value || "").trim());
+
+      return {
+        name: child.name,
+        compatible: getStringProperty(child.body, "compatible"),
+        bindingCells: getNumberProperty(child.body, "#binding-cells"),
+        bindings: bindingEntries.map((entry) => entry.raw),
+        bindingEntries,
+        bindingsRange: bindingsProperty?.sourceRange,
+        waitMs: Number.isFinite(waitMsParsed) && waitMsProperty ? waitMsParsed : null,
+        waitMsRange: waitMsProperty?.sourceRange,
+        tapMs: Number.isFinite(tapMsParsed) && tapMsProperty ? tapMsParsed : null,
+        tapMsRange: tapMsProperty?.sourceRange,
+        label: getStringProperty(child.body, "label"),
+        sourceRange: {
+          start: child.rawStart,
+          end: child.rawEnd,
+        },
+        bodyRange: {
+          start: child.bodyStart,
+          end: child.bodyEnd,
+        },
+        raw: child.raw,
+      };
+    });
 }
 
 function parseBehaviors(source) {

@@ -247,9 +247,9 @@ function toRepoRelativePath(root, target) {
 
 function validateSourceChange(source, change) {
   validateRange(source, change.range);
-  if (change.kind === "combo-binding") {
+  if (change.kind === "combo-binding" || change.kind === "macro-binding") {
     if (!isEditableBindingExpression(change.currentRaw) || !isEditableBindingExpression(change.nextRaw)) {
-      throw new Error("Combo binding replacement is not supported in Phase 2.");
+      throw new Error(`${change.kind} replacement is not supported in Phase 2.`);
     }
   } else if (change.kind === "combo-positions") {
     validateComboPositions(change.nextRaw);
@@ -282,6 +282,22 @@ function validateSourceChange(source, change) {
   } else if (change.kind === "timeout-ms-insert") {
     if (change.range.start !== change.range.end) throw new Error("timeout-ms-insert must be a zero-length range.");
     validateTimeoutMsInsertionContent(change.nextRaw);
+  } else if (change.kind === "wait-ms-replace" || change.kind === "tap-ms-replace") {
+    const propertyName = change.kind.replace("-replace", "");
+    validateMacroMsValue(change.nextRaw, propertyName);
+    if (!/^\d+$/.test(source.slice(change.range.start, change.range.end).trim())) {
+      throw new Error(`${propertyName} source range is invalid.`);
+    }
+  } else if (change.kind === "wait-ms-remove" || change.kind === "tap-ms-remove") {
+    const propertyName = change.kind.replace("-remove", "");
+    if (change.nextRaw !== "") throw new Error(`${change.kind} must have empty nextRaw.`);
+    if (!new RegExp(`${propertyName}\\s*=`).test(source.slice(change.range.start, change.range.end))) {
+      throw new Error(`${propertyName} remove range does not contain a ${propertyName} property.`);
+    }
+  } else if (change.kind === "wait-ms-insert" || change.kind === "tap-ms-insert") {
+    const propertyName = change.kind.replace("-insert", "");
+    if (change.range.start !== change.range.end) throw new Error(`${change.kind} must be a zero-length range.`);
+    validateMacroMsInsertionContent(change.nextRaw, propertyName);
   } else {
     throw new Error("Unsupported pending change kind.");
   }
@@ -347,4 +363,18 @@ function validateTimeoutMsInsertionContent(nextRaw) {
   const match = nextRaw.match(/timeout-ms\s*=\s*<(\d+)>;\r?\n$/);
   if (!match) throw new Error("timeout-ms-insert content is invalid.");
   validateTimeoutMsValue(match[1]);
+}
+
+function validateMacroMsValue(raw, propertyName) {
+  const text = String(raw || "").trim();
+  if (!/^\d+$/.test(text)) throw new Error(`${propertyName} must be a non-negative integer.`);
+  const value = Number(text);
+  if (value < 0 || value > 10000) throw new Error(`${propertyName} must be between 0 and 10000.`);
+}
+
+function validateMacroMsInsertionContent(nextRaw, propertyName) {
+  const pattern = new RegExp(`${propertyName}\\s*=\\s*<(\\d+)>;\\r?\\n$`);
+  const match = nextRaw.match(pattern);
+  if (!match) throw new Error(`${propertyName}-insert content is invalid.`);
+  validateMacroMsValue(match[1], propertyName);
 }

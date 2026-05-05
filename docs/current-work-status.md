@@ -422,36 +422,50 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `pendingChanges.js` の `buildChangeContextDiff` を `-insert` / `-remove` kind に対応。
   - `pendingChanges.test.js` に insert/remove diff 表示の 2 テストを追加。
   - `npm test` 成功。52 tests / 5 suites。`npm run build` 成功。生成された `dist/` は削除済み。
-  - `config/roBa.keymap` 差分なし。commit-ready。
+  - `config/roBa.keymap` 差分なし。`5de680f Fix insert kind display in Context Diff_20260505` で commit 済み。
+- Macro 編集 preview / pending changes / Save all 統合を追加中:
+  - `parseKeymap.js` の `parseMacros` を拡張し、`sourceRange` / `bodyRange` / `bindingEntries[].sourceRange` / `bindingsRange` / `waitMs` + `waitMsRange` / `tapMs` + `tapMsRange` を追加。
+  - `tools/roba-keymap-viewer/src/keymap/macroPreview.js` を新規作成。
+    - `buildMacroPreviewState(source, macro, draft)` で binding / wait-ms / tap-ms の draft preview を生成。
+    - binding は Phase 2 editable binding set に含まれるものだけ編集可能（`isEditableBindingExpression`）。
+    - wait-ms / tap-ms は insert / replace / remove に対応。値は 0..10000 の整数。
+    - `buildLineInsertionDiff` / `buildLineRemovalDiff` を `comboPreview.js` から import して再利用。
+    - 内部 helper（`lineStart` / `lineIndent` / `linePropertyRange` / `buildPropertyInsertion` / `applyReplacements`）は combo と同じ構造で macro 用に複製。
+  - `pendingChanges.js` に `buildMacroDraftChanges` を追加し、`macro-binding` / `wait-ms-{insert,replace,remove}` / `tap-ms-{insert,replace,remove}` kind を生成。
+  - `validatePendingChange` と `saveBindingChange.js` の `validateSourceChange` に macro 用 7 種の kind を追加。
+  - `App.jsx` に `selectedMacroName` / `macroDraft` state、`buildMacroPreviewState` 呼び出し、`MacroDetailPanel` を追加。
+  - Macros タブで macro 行を選択でき、右 detail panel で binding ごとに draft 入力欄、wait-ms / tap-ms draft 入力欄を表示。
+  - `Add macro draft` / `Remove macro draft` で pending changes に積み、`Save all` でまとめて保存できる。
+  - `PreviewPanel` の single-preview fallback を `combo -> macro -> editor` の優先で fall through するよう更新。
+  - `parseKeymap.test.js` に macro source range の 2 テスト（canonical macro、wait-ms/tap-ms 定義時）を追加。
+  - `tools/roba-keymap-viewer/src/keymap/macroPreview.test.js` を新規作成し、binding 編集 / 編集対象外 binding rejection / wait-ms+tap-ms insert/replace/remove / validation の 6 テストを追加。
+  - `npm test` 成功。60 tests / 6 suites。`npm run build` 成功。生成された `dist/` は削除済み。
+  - 2026-05-05 実 UI で往復保存確認済み:
+    - Macros タブで `to_layer_0` を選択。Binding 0/1 が disabled、Binding 2 が編集可、wait-ms/tap-ms が空欄 placeholder 表示であることを確認。
+    - Binding 2 を `&kp A` に変更、wait-ms `10` / tap-ms `20` を入力。`Add macro draft` → `Save all` で `git diff -- config/roBa.keymap` は binding 1 行置換と wait-ms/tap-ms 2 行挿入のみであることを確認。
+    - Binding 2 を `&kp MACRO_PLACEHOLDER` に戻し、wait-ms/tap-ms を空欄にして remove preview を表示。`Save all` 後、`git diff -- config/roBa.keymap` が空に戻ることを確認。
+    - dev server 停止後、port 5173 listener なし。
+  - commit 待ち。
 
 ## 次にやること
 
 以下の順で進める。
 
-### 1. macro 編集
+### 1. macro 編集の commit
 
-combo 編集と同じ流れで、macro の binding を preview / pending changes / Save all できるようにする。
+実装と実 UI 往復確認は完了済み（60 tests / 6 suites、dev server 往復保存で `git diff` が空に戻ることを確認）。残作業は commit のみ:
 
-**現状:** Macros タブは read-only。`parseMacros` は `name` / `bindings` / `waitMs` / `tapMs` を返すが source range なし。
+- 関連変更を 1 commit にまとめる:
+  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.js`
+  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.test.js`
+  - `tools/roba-keymap-viewer/src/keymap/macroPreview.js`（新規）
+  - `tools/roba-keymap-viewer/src/keymap/macroPreview.test.js`（新規）
+  - `tools/roba-keymap-viewer/src/keymap/pendingChanges.js`
+  - `tools/roba-keymap-viewer/src/keymap/saveBindingChange.js`
+  - `tools/roba-keymap-viewer/src/App.jsx`
+  - `docs/current-work-status.md`
 
-**作業ステップ:**
-
-1. `parseKeymap.js` の `parseMacros` を拡張し、combo と同様に次の source range を追加する。
-   - macro node 全体の `sourceRange` / `bodyRange`
-   - `bindings` 内の各 binding の `bindingEntry` (source range 付き)
-   - `wait-ms` / `tap-ms` 値の `waitMsRange` / `tapMsRange`
-2. `tools/roba-keymap-viewer/src/keymap/macroPreview.js` を新規作成。
-   - `buildMacroPreviewState` — binding / wait-ms / tap-ms の draft を受けて preview を返す。
-   - combo と同様に `buildPropertyInsertion` / `linePropertyRange` 相当のロジックで insert/replace/remove を扱う。
-   - `buildMacroChange` / `buildWaitMsChange` / `buildTapMsChange` を export。
-3. `pendingChanges.js` の `buildComboDraftChanges` に倣って `buildMacroDraftChanges` を追加。
-   - kind は `macro-binding` / `wait-ms-insert` / `wait-ms-replace` / `wait-ms-remove` / `tap-ms-insert` / `tap-ms-replace` / `tap-ms-remove`。
-4. `saveBindingChange.js` / `pendingChanges.js` の `validatePendingChange` / `validateSourceChange` に新 kind を追加。
-5. Macros タブの右 detail panel に draft 入力欄を追加し、`Add macro draft` / `Save all` に接続。
-6. `parseKeymap.test.js` に macro source range の smoke test を追加。
-7. `macroPreview.test.js` を新規作成し、insert/replace/remove の主要ケースをカバー。
-
-**注意:** macro には複数 binding があるため、combo の `bindingEntry`（先頭1件）と異なり、binding ごとに source range が必要。まず `tap-action` / `hold-action` / `release-action` を持たない単純な `bindings = <...>` 形式の macro だけを Phase 2 対象にすると小さく進められる。
+**注意:** canonical macro `to_layer_0` は 3 binding のうち `&kp MACRO_PLACEHOLDER` 1 件だけが Phase 2 editable。`&to 0` / `&macro_param_1to1` は read-only 表示。
 
 ---
 

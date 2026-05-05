@@ -6,10 +6,12 @@ import { buildMarkdown } from "./export/markdown.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
 import { buildComboPreviewState } from "./keymap/comboPreview.js";
 import { buildEditorState } from "./keymap/editorPreview.js";
+import { buildMacroPreviewState } from "./keymap/macroPreview.js";
 import { countDtsPhysicalKeys, parseKeymap } from "./keymap/parseKeymap.js";
 import {
   buildDraftChange,
   buildComboDraftChanges,
+  buildMacroDraftChanges,
   buildPendingChangesState,
   getDraftId,
   removeDraftChange,
@@ -57,6 +59,12 @@ function App() {
     layersRaw: "",
     timeoutMsRaw: "",
   });
+  const [selectedMacroName, setSelectedMacroName] = useState("");
+  const [macroDraft, setMacroDraft] = useState({
+    bindingDrafts: {},
+    waitMsRaw: "",
+    tapMsRaw: "",
+  });
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -77,6 +85,15 @@ function App() {
       ]
     : [];
   const selectedComboPendingCount = pendingChanges.filter((change) => selectedComboDraftIds.includes(change.id)).length;
+  const selectedMacro = document.macros.find((macro) => macro.name === selectedMacroName);
+  const selectedMacroDraftIds = selectedMacro
+    ? [
+        ...(selectedMacro.bindingEntries || []).map((_, index) => `macro-${selectedMacro.name}-binding-${index}`),
+        `macro-${selectedMacro.name}-wait-ms`,
+        `macro-${selectedMacro.name}-tap-ms`,
+      ]
+    : [];
+  const selectedMacroPendingCount = pendingChanges.filter((change) => selectedMacroDraftIds.includes(change.id)).length;
   const selectedParsed = describeBinding(selectedBinding, layerNames);
   const selectedRange = selectedEntry?.sourceRange;
   const effectiveDraftBinding = draftBinding ?? selectedPendingChange?.nextRaw ?? selectedEntry?.raw ?? selectedBinding;
@@ -98,6 +115,10 @@ function App() {
     ),
     [keymapSource, selectedCombo, comboDraft, document.physicalLayout.length, document.layers.length],
   );
+  const macroPreviewState = useMemo(
+    () => buildMacroPreviewState(keymapSource, selectedMacro, macroDraft),
+    [keymapSource, selectedMacro, macroDraft],
+  );
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
 
@@ -113,6 +134,16 @@ function App() {
       timeoutMsRaw: selectedCombo?.timeoutMsRange ? String(selectedCombo.timeoutMs) : "",
     });
   }, [selectedCombo]);
+
+  useEffect(() => {
+    setMacroDraft({
+      bindingDrafts: Object.fromEntries(
+        (selectedMacro?.bindingEntries || []).map((entry, index) => [index, entry.raw]),
+      ),
+      waitMsRaw: selectedMacro?.waitMsRange ? String(selectedMacro.waitMs) : "",
+      tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
+    });
+  }, [selectedMacro]);
 
   const reloadKeymapSource = async () => {
     if (!saveEndpointAvailable) {
@@ -334,6 +365,37 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const selectMacro = (macro) => {
+    setSelectedMacroName(macro.name);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  const addSelectedMacroDraft = () => {
+    if (!selectedMacro || !macroPreviewState.changed || !macroPreviewState.valid) return;
+    const changes = buildMacroDraftChanges({
+      source: keymapSource,
+      macro: selectedMacro,
+      bindingDrafts: macroDraft.bindingDrafts,
+      waitMsRaw: macroDraft.waitMsRaw,
+      tapMsRaw: macroDraft.tapMsRaw,
+    });
+    setPendingChanges((current) => upsertDraftChanges(current, changes));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const removeSelectedMacroDraft = () => {
+    setPendingChanges((changes) => changes.filter((change) => !selectedMacroDraftIds.includes(change.id)));
+    setMacroDraft({
+      bindingDrafts: Object.fromEntries(
+        (selectedMacro?.bindingEntries || []).map((entry, index) => [index, entry.raw]),
+      ),
+      waitMsRaw: selectedMacro?.waitMsRange ? String(selectedMacro.waitMs) : "",
+      tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
+    });
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
   return (
     <div className="appShell">
       <header className="topBar">
@@ -453,6 +515,20 @@ function App() {
               }}
             />
           )}
+          {activeTab === "Macros" && selectedMacro && (
+            <MacroDetailPanel
+              macro={selectedMacro}
+              draft={macroDraft}
+              previewState={macroPreviewState}
+              pendingCount={selectedMacroPendingCount}
+              onAddDraft={addSelectedMacroDraft}
+              onRemoveDraft={removeSelectedMacroDraft}
+              onDraftChange={(nextDraft) => {
+                setMacroDraft(nextDraft);
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
+            />
+          )}
           <div className={editorState.canEdit ? "editorBox" : "editorBox disabled"}>
             <div className="editorHeader">
               <strong>Phase 2 Preview</strong>
@@ -526,13 +602,16 @@ function App() {
           diagnostics={diagnostics}
           editorState={editorState}
           comboPreviewState={comboPreviewState}
+          macroPreviewState={macroPreviewState}
           pendingChanges={pendingChanges}
           pendingState={pendingState}
           saveStatus={saveStatus}
           selectedPosition={selectedPosition}
           selectedComboName={selectedComboName}
+          selectedMacroName={selectedMacroName}
           onSelectBinding={selectBinding}
           onSelectCombo={selectCombo}
+          onSelectMacro={selectMacro}
           onRemovePendingChange={(id) => setPendingChanges((changes) => removeDraftChange(changes, id))}
           onClearPendingChanges={clearPendingChanges}
           onSavePendingChanges={saveAllPendingChanges}
@@ -639,6 +718,102 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
   );
 }
 
+function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange }) {
+  const editableSet = new Set(previewState.editableIndices || []);
+  const bindingDrafts = draft.bindingDrafts || {};
+
+  return (
+    <section className="comboDetailPanel" aria-label="selected macro details">
+      <div className="editorHeader">
+        <strong>Macro</strong>
+        <span>{macro.name}</span>
+      </div>
+      <dl className="detailList compactList">
+        <div>
+          <dt>Compatible</dt>
+          <dd>{macro.compatible}</dd>
+        </div>
+        <div>
+          <dt>Binding cells</dt>
+          <dd>{macro.bindingCells}</dd>
+        </div>
+        <div>
+          <dt>wait-ms</dt>
+          <dd>{macro.waitMsRange ? `${macro.waitMs}ms` : "default"}</dd>
+        </div>
+        <div>
+          <dt>tap-ms</dt>
+          <dd>{macro.tapMsRange ? `${macro.tapMs}ms` : "default"}</dd>
+        </div>
+        <div>
+          <dt>Node range</dt>
+          <dd>{formatRange(macro.sourceRange)}</dd>
+        </div>
+        <div>
+          <dt>Bindings range</dt>
+          <dd>{formatRange(macro.bindingsRange)}</dd>
+        </div>
+      </dl>
+      <div className={previewState.changed ? "comboPreviewBox active" : "comboPreviewBox"}>
+        {(macro.bindingEntries || []).map((entry, index) => {
+          const editable = editableSet.has(index);
+          const value = bindingDrafts[index] ?? entry.raw;
+          return (
+            <label key={index}>
+              <span>{`Binding ${index} draft${editable ? "" : " (read-only)"}`}</span>
+              <input
+                aria-label={`Macro binding ${index} draft`}
+                disabled={!editable}
+                value={value}
+                onChange={(event) => onDraftChange({
+                  ...draft,
+                  bindingDrafts: { ...bindingDrafts, [index]: event.target.value },
+                })}
+              />
+            </label>
+          );
+        })}
+        <label>
+          <span>wait-ms draft</span>
+          <input
+            aria-label="Macro wait-ms draft"
+            placeholder="empty = no wait-ms property"
+            value={draft.waitMsRaw}
+            onChange={(event) => onDraftChange({ ...draft, waitMsRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>tap-ms draft</span>
+          <input
+            aria-label="Macro tap-ms draft"
+            placeholder="empty = no tap-ms property"
+            value={draft.tapMsRaw}
+            onChange={(event) => onDraftChange({ ...draft, tapMsRaw: event.target.value })}
+          />
+        </label>
+        <div className="editorStatus">{previewState.message}</div>
+        <div className="editorActions">
+          <button
+            type="button"
+            disabled={!previewState.changed || !previewState.valid}
+            onClick={onAddDraft}
+          >
+            {pendingCount ? "Update macro draft" : "Add macro draft"}
+          </button>
+          <button
+            type="button"
+            disabled={!pendingCount}
+            onClick={onRemoveDraft}
+          >
+            Remove macro draft
+          </button>
+        </div>
+      </div>
+      <pre className="rawNodePreview">{macro.raw}</pre>
+    </section>
+  );
+}
+
 function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlightedPositions, onSelect }) {
   const bounds = keys.reduce(
     (acc, key) => ({
@@ -708,13 +883,16 @@ function PanelContent({
   diagnostics,
   editorState,
   comboPreviewState,
+  macroPreviewState,
   pendingChanges,
   pendingState,
   saveStatus,
   selectedPosition,
   selectedComboName,
+  selectedMacroName,
   onSelectBinding,
   onSelectCombo,
+  onSelectMacro,
   onRemovePendingChange,
   onClearPendingChanges,
   onSavePendingChanges,
@@ -749,7 +927,11 @@ function PanelContent({
         columns={["Name", "Compatible", "Binding cells", "Bindings"]}
         rows={document.macros}
         renderRow={(macro) => (
-          <tr key={macro.name}>
+          <tr
+            className={macro.name === selectedMacroName ? "selectedRow clickableRow" : "clickableRow"}
+            key={macro.name}
+            onClick={() => onSelectMacro(macro)}
+          >
             <td>{macro.name}</td>
             <td>{macro.compatible}</td>
             <td>{macro.bindingCells}</td>
@@ -817,6 +999,7 @@ function PanelContent({
       <PreviewPanel
         editorState={editorState}
         comboPreviewState={comboPreviewState}
+        macroPreviewState={macroPreviewState}
         pendingChanges={pendingChanges}
         pendingState={pendingState}
         saveStatus={saveStatus}
@@ -919,6 +1102,7 @@ function BindingsTable({ document, activeLayer, layerNames, search, selectedPosi
 function PreviewPanel({
   editorState,
   comboPreviewState,
+  macroPreviewState,
   pendingChanges,
   pendingState,
   saveStatus,
@@ -928,7 +1112,11 @@ function PreviewPanel({
   onSavePendingChanges,
   saveEndpointAvailable,
 }) {
-  const activeSinglePreview = comboPreviewState?.changed ? comboPreviewState : editorState;
+  const activeSinglePreview = comboPreviewState?.changed
+    ? comboPreviewState
+    : macroPreviewState?.changed
+      ? macroPreviewState
+      : editorState;
   const previewSource = pendingChanges.length ? pendingState.nextSource : activeSinglePreview.nextSource;
   const contextDiff = pendingChanges.length
     ? pendingState.contextDiff || pendingState.message
@@ -986,7 +1174,7 @@ function PendingChangesList({ changes, message, onSelect, onRemove }) {
               if (change.kind === "binding" || !change.kind) onSelect(change.layerIndex, change.position);
             }}
           >
-            <strong>{change.layerName || change.comboName || "Keymap"}</strong>
+            <strong>{change.layerName || change.comboName || change.macroName || "Keymap"}</strong>
             <span>{change.position === undefined ? change.kind : `POS${change.position}`}</span>
             <code>{change.currentRaw} {"->"} {change.nextRaw}</code>
           </button>

@@ -1,6 +1,7 @@
 import { isEditableBindingExpression, parseKeymap, replaceBindings } from "./parseKeymap.js";
 import { buildContextDiff } from "./editorPreview.js";
 import { buildLayersChange, buildLineInsertionDiff, buildLineRemovalDiff, buildTimeoutMsChange } from "./comboPreview.js";
+import { buildTapMsChange, buildWaitMsChange } from "./macroPreview.js";
 
 export function getDraftId(layerIndex, position) {
   return `layer-${layerIndex}-pos-${position}`;
@@ -79,6 +80,65 @@ export function buildComboDraftChanges({ source = null, combo, bindingRaw, posit
       }
     }
   }
+  return changes;
+}
+
+export function buildMacroDraftChanges({ source, macro, bindingDrafts, waitMsRaw, tapMsRaw }) {
+  const changes = [];
+  if (bindingDrafts) {
+    for (const [indexStr, nextRaw] of Object.entries(bindingDrafts)) {
+      const index = Number(indexStr);
+      const entry = macro.bindingEntries?.[index];
+      if (!entry || nextRaw === entry.raw) continue;
+      changes.push({
+        id: `macro-${macro.name}-binding-${index}`,
+        kind: "macro-binding",
+        label: `${macro.name} binding ${index}`,
+        macroName: macro.name,
+        macroBindingIndex: index,
+        range: entry.sourceRange,
+        currentRaw: entry.raw,
+        nextRaw,
+      });
+    }
+  }
+
+  if (source != null && waitMsRaw !== undefined) {
+    const waitCurrent = macro.waitMsRange ? String(macro.waitMs) : "";
+    if ((waitMsRaw ?? "").trim() !== waitCurrent) {
+      const edit = buildWaitMsChange(source, macro, waitMsRaw ?? "");
+      if (edit) {
+        changes.push({
+          id: `macro-${macro.name}-wait-ms`,
+          kind: edit.kind,
+          label: `${macro.name} wait-ms`,
+          macroName: macro.name,
+          range: edit.range,
+          currentRaw: source.slice(edit.range.start, edit.range.end).trim(),
+          nextRaw: edit.after,
+        });
+      }
+    }
+  }
+
+  if (source != null && tapMsRaw !== undefined) {
+    const tapCurrent = macro.tapMsRange ? String(macro.tapMs) : "";
+    if ((tapMsRaw ?? "").trim() !== tapCurrent) {
+      const edit = buildTapMsChange(source, macro, tapMsRaw ?? "");
+      if (edit) {
+        changes.push({
+          id: `macro-${macro.name}-tap-ms`,
+          kind: edit.kind,
+          label: `${macro.name} tap-ms`,
+          macroName: macro.name,
+          range: edit.range,
+          currentRaw: source.slice(edit.range.start, edit.range.end).trim(),
+          nextRaw: edit.after,
+        });
+      }
+    }
+  }
+
   return changes;
 }
 
@@ -179,7 +239,7 @@ function applyPendingChanges(source, changes) {
 }
 
 function validatePendingChange(change) {
-  if (change.kind === "combo-binding") {
+  if (change.kind === "combo-binding" || change.kind === "macro-binding") {
     if (!isEditableBindingExpression(change.currentRaw)) {
       throw new Error(`${change.label} is outside the Phase 2 edit set.`);
     }
@@ -200,6 +260,12 @@ function validatePendingChange(change) {
     if (change.nextRaw !== "") throw new Error(`${change.label}: timeout-ms-remove must have empty nextRaw.`);
   } else if (change.kind === "timeout-ms-insert") {
     validateTimeoutMsInsertionContent(change.nextRaw);
+  } else if (change.kind === "wait-ms-replace" || change.kind === "tap-ms-replace") {
+    validateMacroMsValue(change.nextRaw, change.kind.replace("-replace", ""));
+  } else if (change.kind === "wait-ms-remove" || change.kind === "tap-ms-remove") {
+    if (change.nextRaw !== "") throw new Error(`${change.label}: ${change.kind} must have empty nextRaw.`);
+  } else if (change.kind === "wait-ms-insert" || change.kind === "tap-ms-insert") {
+    validateMacroMsInsertionContent(change.nextRaw, change.kind.replace("-insert", ""));
   }
 }
 
@@ -256,6 +322,20 @@ function validateTimeoutMsInsertionContent(nextRaw) {
   const match = nextRaw.match(/timeout-ms\s*=\s*<(\d+)>;\r?\n$/);
   if (!match) throw new Error("timeout-ms-insert content is invalid.");
   validateTimeoutMsValue(match[1]);
+}
+
+function validateMacroMsValue(raw, propertyName) {
+  const text = String(raw || "").trim();
+  if (!/^\d+$/.test(text)) throw new Error(`${propertyName} must be a non-negative integer.`);
+  const value = Number(text);
+  if (value < 0 || value > 10000) throw new Error(`${propertyName} must be between 0 and 10000.`);
+}
+
+function validateMacroMsInsertionContent(nextRaw, propertyName) {
+  const pattern = new RegExp(`${propertyName}\\s*=\\s*<(\\d+)>;\\r?\\n$`);
+  const match = nextRaw.match(pattern);
+  if (!match) throw new Error(`${propertyName}-insert content is invalid.`);
+  validateMacroMsValue(match[1], propertyName);
 }
 
 function normalizeSpace(value) {

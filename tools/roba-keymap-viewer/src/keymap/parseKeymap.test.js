@@ -122,6 +122,53 @@ describe("roBa keymap parser", () => {
     assert.equal(source[combo.bodyRange.end], "}");
   });
 
+  it("tracks source ranges for macro nodes and macro binding expressions", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const macro = parsed.macros.find((item) => item.name === "to_layer_0");
+
+    assert.ok(macro);
+    assert.equal(macro.bindingEntries.length, 3);
+    assert.equal(macro.bindingEntries[0].raw, "&to 0");
+    assert.equal(macro.bindingEntries[2].raw, "&kp MACRO_PLACEHOLDER");
+    assert.equal(
+      source.slice(macro.bindingEntries[2].sourceRange.start, macro.bindingEntries[2].sourceRange.end),
+      "&kp MACRO_PLACEHOLDER",
+    );
+    assert.ok(macro.bindingsRange);
+    assert.ok(macro.bodyRange);
+    assert.equal(source[macro.bodyRange.end], "}");
+    assert.equal(macro.waitMsRange, undefined);
+    assert.equal(macro.tapMsRange, undefined);
+    assert.equal(macro.waitMs, null);
+    assert.equal(macro.tapMs, null);
+  });
+
+  it("captures wait-ms and tap-ms ranges when macros define them", () => {
+    const source = `/
+{
+    macros {
+        sample: sample {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            wait-ms = <30>;
+            tap-ms = <40>;
+            bindings = <&kp A &kp B>;
+        };
+    };
+};
+`;
+    const parsed = parseKeymap(source);
+    const macro = parsed.macros[0];
+
+    assert.equal(macro.waitMs, 30);
+    assert.ok(macro.waitMsRange);
+    assert.equal(source.slice(macro.waitMsRange.start, macro.waitMsRange.end), "30");
+    assert.equal(macro.tapMs, 40);
+    assert.ok(macro.tapMsRange);
+    assert.equal(source.slice(macro.tapMsRange.start, macro.tapMsRange.end), "40");
+  });
+
   it("captures timeout-ms and layers ranges when combos define them", () => {
     const source = `/
 {
