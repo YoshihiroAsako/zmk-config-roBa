@@ -3,6 +3,7 @@ import roBaMetadata from "../../../config/roBa.json";
 import dtsiSource from "../../../boards/shields/roBa/roBa.dtsi?raw";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarkdown } from "./export/markdown.js";
+import { captureKeyToBinding } from "./keymap/keyCapture.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
 import { buildComboPreviewState } from "./keymap/comboPreview.js";
 import { buildEditorState } from "./keymap/editorPreview.js";
@@ -67,6 +68,8 @@ function App() {
     tapMsRaw: "",
   });
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
+  const [captureMode, setCaptureMode] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState(null);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -126,6 +129,7 @@ function App() {
 
   useEffect(() => {
     setDraftBinding(selectedPendingChange?.nextRaw || selectedEntry?.raw || selectedBinding);
+    setCaptureStatus(null);
   }, [selectedEntry, selectedBinding, selectedPendingChange]);
 
   useEffect(() => {
@@ -146,6 +150,49 @@ function App() {
       tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
     });
   }, [selectedMacro]);
+
+  useEffect(() => {
+    if (!captureMode) return;
+
+    const handleKeyDown = (event) => {
+      const result = captureKeyToBinding({
+        code: event.code,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey,
+        repeat: event.repeat,
+        isComposing: event.isComposing,
+      });
+
+      if (result.cancelled) {
+        event.preventDefault();
+        setCaptureMode(false);
+        setCaptureStatus(null);
+        return;
+      }
+
+      if (result.ignored) return;
+
+      if (result.unsupported) {
+        setCaptureStatus(`未対応: ${result.reason}`);
+        return;
+      }
+
+      // supported binding
+      event.preventDefault();
+      if (!editorState.canEdit) {
+        setCaptureStatus("このキーは編集できません");
+        return;
+      }
+      setDraftBinding(result.binding);
+      setCaptureStatus(`入力: ${result.binding}`);
+      setSaveStatus(EMPTY_SAVE_STATUS);
+      setActiveTab("Preview");
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [captureMode, editorState.canEdit]);
 
   const layerRenameDraftId = `layer-${activeLayer}-rename`;
   const layerRenamePending = pendingChanges.find((change) => change.id === layerRenameDraftId);
@@ -609,11 +656,30 @@ function App() {
                 value={effectiveDraftBinding}
                 onChange={(event) => {
                   setDraftBinding(event.target.value);
+                  setCaptureStatus(null);
                   setSaveStatus(EMPTY_SAVE_STATUS);
                   setActiveTab("Preview");
                 }}
               />
             </label>
+            <div className="captureRow">
+              <button
+                type="button"
+                disabled={!editorState.canEdit}
+                className={captureMode ? "captureToggle active" : "captureToggle"}
+                onClick={() => {
+                  setCaptureMode((prev) => !prev);
+                  setCaptureStatus(null);
+                }}
+              >
+                {captureMode ? "Capture ON" : "Capture"}
+              </button>
+              {captureMode && (
+                <span className="captureHint">
+                  {captureStatus || "キーを押して &kp を入力 / Esc で終了"}
+                </span>
+              )}
+            </div>
             <div className="editorStatus">{editorState.message}</div>
             <SaveStatusPanel status={saveStatus} compact />
             <div className="editorActions">

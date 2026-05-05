@@ -1015,6 +1015,47 @@ td code {
   flex-basis: 100%;
 }
 
+.captureRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.editorBox .captureToggle {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+  background: #eef2f7;
+  color: #7d8da3;
+  font-size: 12px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.editorBox .captureToggle:not(:disabled) {
+  border-color: #b7dfe4;
+  color: #52647b;
+  cursor: pointer;
+}
+
+.editorBox .captureToggle.active:not(:disabled) {
+  border-color: #2a9d8f;
+  background: #e0f5f2;
+  color: #0d6b5f;
+  font-weight: 700;
+}
+
+.captureHint {
+  overflow: hidden;
+  color: #65758b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .drawerStatusLine {
   display: flex;
   gap: 6px;

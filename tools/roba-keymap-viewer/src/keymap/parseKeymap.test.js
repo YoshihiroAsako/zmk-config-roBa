@@ -22,7 +22,7 @@ describe("roBa keymap parser", () => {
     assert.equal(parsed.layers.length, 7);
     assert.deepEqual(
       parsed.layers.map((layer) => layer.name),
-      ["default_layer", "FUNCTION", "NUM", "ARROW", "MOUSE", "SCROLL", "layer_6"],
+      ["default_layer", "FUNCTION", "NUM", "ARROW", "MOUSE", "SCROLL", "BT"],
     );
     assert.deepEqual(
       parsed.layers.map((layer) => layer.bindings.length),
