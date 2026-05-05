@@ -116,6 +116,35 @@ describe("roBa keymap parser", () => {
     assert.equal(source.slice(combo.bindingEntry.sourceRange.start, combo.bindingEntry.sourceRange.end), "&kp AT_SIGN");
     assert.deepEqual(combo.layers, []);
     assert.equal(combo.layersRange, undefined);
+    assert.equal(combo.timeoutMsRange, undefined);
+    assert.equal(combo.timeoutMs, 50);
+    assert.ok(combo.bodyRange);
+    assert.equal(source[combo.bodyRange.end], "}");
+  });
+
+  it("captures timeout-ms and layers ranges when combos define them", () => {
+    const source = `/
+{
+    combos {
+        compatible = "zmk,combos";
+        sample {
+            timeout-ms = <120>;
+            key-positions = <0 1>;
+            bindings = <&kp A>;
+            layers = <0 1>;
+        };
+    };
+};
+`;
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos[0];
+
+    assert.equal(combo.timeoutMs, 120);
+    assert.ok(combo.timeoutMsRange);
+    assert.equal(source.slice(combo.timeoutMsRange.start, combo.timeoutMsRange.end), "120");
+    assert.deepEqual(combo.layers, [0, 1]);
+    assert.ok(combo.layersRange);
+    assert.equal(source.slice(combo.layersRange.start, combo.layersRange.end), "0 1");
   });
 
   it("replaces one key binding while preserving every other byte of the keymap source", async () => {

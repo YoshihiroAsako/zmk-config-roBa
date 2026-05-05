@@ -157,6 +157,7 @@ function parseCombos(source) {
       const positionsProperty = getAnglePropertyInfo(child.body, "key-positions", child.bodyStart);
       const bindingsProperty = getAnglePropertyInfo(child.body, "bindings", child.bodyStart);
       const layersProperty = getAnglePropertyInfo(child.body, "layers", child.bodyStart);
+      const timeoutMsProperty = getAnglePropertyInfo(child.body, "timeout-ms", child.bodyStart);
       const bindingEntries = bindingsProperty
         ? splitBindingEntries(bindingsProperty.value, bindingsProperty.sourceRange.start)
         : [];
@@ -166,13 +167,15 @@ function parseCombos(source) {
         .split(/\s+/)
         .filter(Boolean)
         .map(Number);
+      const timeoutMsParsed = Number((timeoutMsProperty?.value || "").trim());
       return {
         name: child.name,
         positions,
         binding: bindingEntries[0]?.raw || "",
         bindingEntry: bindingEntries[0],
         keyPositionsRange: positionsProperty?.sourceRange,
-        timeoutMs: getNumberProperty(child.body, "timeout-ms") ?? 50,
+        timeoutMs: Number.isFinite(timeoutMsParsed) && timeoutMsProperty ? timeoutMsParsed : 50,
+        timeoutMsRange: timeoutMsProperty?.sourceRange,
         layers: (layersProperty?.value || "")
           .trim()
           .split(/\s+/)
@@ -182,6 +185,10 @@ function parseCombos(source) {
         sourceRange: {
           start: child.rawStart,
           end: child.rawEnd,
+        },
+        bodyRange: {
+          start: child.bodyStart,
+          end: child.bodyEnd,
         },
         raw: child.raw,
       };

@@ -192,6 +192,17 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - combo positions は 2キー以上、重複なし、物理キー範囲内の整数リストとして保存前にも validation する。
   - dev server endpoint `POST /__roba/save-bindings` で combo binding / positions の往復保存を確認済み。
 - Combo pending/save 統合は `Save combo drafts from roBa viewer pending changes` で commit 済み。
+- Combo `layers` / `timeout-ms` の preview-only 編集土台を追加中:
+  - `parseCombos` が combo node 全体の `bodyRange` と `timeout-ms` 値の `timeoutMsRange` を持つようにした。
+  - `timeoutMs` 値は実際に property がある時だけパース値を使い、無い時は default `50` のまま。
+  - `comboPreview.js` を拡張し、combo の `layers` / `timeout-ms` を preview-only 編集できるようにした。
+    - 既存 property は値を置換、未存在 property は body 末尾に挿入、空入力で property 行を削除する。
+    - layers は layer index の重複なし整数リスト、timeout-ms は 1..10000 の整数として validation する。
+    - 挿入位置は `}` の手前、property indent は `key-positions` 行から取得、改行は CRLF/LF を保持する。
+  - Combo preview の `valid` 判定を combo 数 + layer binding 数の維持で確認するようにした。
+  - Combos タブの右 detail panel に `Layers draft` / `Timeout draft (ms)` 入力欄を追加。
+  - layers / timeout-ms draft は preview-only であり、`Add draft` / `Save all` の対象には現状含まないことを UI 上に注記表示。
+  - parser metadata と combo preview に新規テストを追加。
 
 ## 検証状況
 
@@ -381,13 +392,20 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - 同 endpoint で `&kp AT_SIGN` / `18 19` に戻し、往復後の `git diff -- config/roBa.keymap` は空。
   - headless Edge `--dump-dom` で title、43 key UI、主要 DOM 表示を確認。
   - `agent-browser` CLI は PATH 上になく、ブラウザ操作による手動 smoke check は未実施。
+- Combo `layers` / `timeout-ms` preview-only 編集追加後:
+  - `tools/roba-keymap-viewer/` で `npm test` 成功。44 tests / 5 suites。
+  - `tools/roba-keymap-viewer/` で `npm run build` 成功。生成された `dist/` は削除済み。
+  - 追加したテスト: parser に既存 `timeout-ms` / `layers` 値 range を追える `captures timeout-ms and layers ranges when combos define them`、combo preview に insert / replace / remove / validation の 5 ケース。
+  - 実ファイル `config/roBa.keymap` は変更していない。`git diff -- config/roBa.keymap` は空。
+  - dev server / 手動ブラウザ smoke check はまだ未実施。
 
 ## 次にやること
 
 優先順:
 
-1. 次に combo `layers` / `timeout-ms` の preview-only 編集設計に進むか、macro 編集に進むかを決める。
-2. sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
+1. dev server で combo の Layers / Timeout draft preview を手動確認する。Context Diff と `.keymap` Preview に挿入・置換・削除が正しく出ることを確認する。
+2. combo `layers` / `timeout-ms` を pending changes / `Save all` に統合するか、macro 編集に進むかを決める。
+3. sensor-bindings 編集、layer rename、keymap-drawer 自動更新は別作業に分ける。
 
 ## 現在の注意点
 

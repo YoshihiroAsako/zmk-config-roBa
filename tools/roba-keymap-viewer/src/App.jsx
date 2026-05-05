@@ -51,7 +51,12 @@ function App() {
   const [draftBinding, setDraftBinding] = useState(null);
   const [pendingChanges, setPendingChanges] = useState([]);
   const [selectedComboName, setSelectedComboName] = useState("");
-  const [comboDraft, setComboDraft] = useState({ bindingRaw: "", positionsRaw: "" });
+  const [comboDraft, setComboDraft] = useState({
+    bindingRaw: "",
+    positionsRaw: "",
+    layersRaw: "",
+    timeoutMsRaw: "",
+  });
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -79,8 +84,14 @@ function App() {
     [keymapSource, pendingChanges, document.layers],
   );
   const comboPreviewState = useMemo(
-    () => buildComboPreviewState(keymapSource, selectedCombo, comboDraft, document.physicalLayout.length),
-    [keymapSource, selectedCombo, comboDraft, document.physicalLayout.length],
+    () => buildComboPreviewState(
+      keymapSource,
+      selectedCombo,
+      comboDraft,
+      document.physicalLayout.length,
+      document.layers.length,
+    ),
+    [keymapSource, selectedCombo, comboDraft, document.physicalLayout.length, document.layers.length],
   );
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
@@ -93,6 +104,8 @@ function App() {
     setComboDraft({
       bindingRaw: selectedCombo?.binding || "",
       positionsRaw: selectedCombo?.positions.join(" ") || "",
+      layersRaw: selectedCombo?.layers.join(" ") || "",
+      timeoutMsRaw: selectedCombo?.timeoutMsRange ? String(selectedCombo.timeoutMs) : "",
     });
   }, [selectedCombo]);
 
@@ -305,6 +318,8 @@ function App() {
     setComboDraft({
       bindingRaw: selectedCombo?.binding || "",
       positionsRaw: selectedCombo?.positions.join(" ") || "",
+      layersRaw: selectedCombo?.layers.join(" ") || "",
+      timeoutMsRaw: selectedCombo?.timeoutMsRange ? String(selectedCombo.timeoutMs) : "",
     });
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
@@ -573,7 +588,26 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
             onChange={(event) => onDraftChange({ ...draft, positionsRaw: event.target.value })}
           />
         </label>
+        <label>
+          <span>Layers draft</span>
+          <input
+            aria-label="Combo layers draft"
+            placeholder="empty = all layers"
+            value={draft.layersRaw}
+            onChange={(event) => onDraftChange({ ...draft, layersRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Timeout draft (ms)</span>
+          <input
+            aria-label="Combo timeout-ms draft"
+            placeholder="empty = default 50ms"
+            value={draft.timeoutMsRaw}
+            onChange={(event) => onDraftChange({ ...draft, timeoutMsRaw: event.target.value })}
+          />
+        </label>
         <div className="editorStatus">{previewState.message}</div>
+        <div className="editorNote">Layers / timeout-ms drafts are preview-only. Add draft / Save all currently covers binding and positions only.</div>
         <div className="editorActions">
           <button
             type="button"

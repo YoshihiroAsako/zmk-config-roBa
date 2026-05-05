@@ -517,6 +517,16 @@ pre {
   font-size: 11px;
 }
 
+.editorNote {
+  color: #8a6d3b;
+  font-size: 11px;
+  background: #fdf6e3;
+  border: 1px solid #f3e1b7;
+  border-radius: 4px;
+  padding: 6px 8px;
+  line-height: 1.4;
+}
+
 .saveStatus,
 .previewSaveStatus {
   display: grid;
