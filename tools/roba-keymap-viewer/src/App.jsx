@@ -2,6 +2,7 @@ import initialKeymapSource from "../../../config/roBa.keymap?raw";
 import roBaMetadata from "../../../config/roBa.json";
 import dtsiSource from "../../../boards/shields/roBa/roBa.dtsi?raw";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CATEGORIES, searchCatalog } from "./keymap/keycodeCatalog.js";
 import { buildMarkdown } from "./export/markdown.js";
 import { captureKeyToBinding } from "./keymap/keyCapture.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
@@ -70,6 +71,7 @@ function App() {
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -674,6 +676,18 @@ function App() {
               >
                 {captureMode ? "Capture ON" : "Capture"}
               </button>
+              <button
+                type="button"
+                disabled={!editorState.canEdit}
+                className="captureToggle"
+                onClick={() => {
+                  setCaptureMode(false);
+                  setCaptureStatus(null);
+                  setPickerOpen(true);
+                }}
+              >
+                Pick keycode
+              </button>
               {captureMode && (
                 <span className="captureHint">
                   {captureStatus || "キーを押して &kp を入力 / Esc で終了"}
@@ -708,6 +722,18 @@ function App() {
           </div>
         </aside>
       </main>
+
+      {pickerOpen && editorState.canEdit && (
+        <KeycodePicker
+          onSelect={(binding) => {
+            setDraftBinding(binding);
+            setSaveStatus(EMPTY_SAVE_STATUS);
+            setPickerOpen(false);
+            setActiveTab("Preview");
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
 
       <section className="bottomPanel">
         <nav className="tabBar" aria-label="viewer sections">
@@ -1423,6 +1449,85 @@ function shorten(value, max) {
 
 function formatRange(range) {
   return range ? `${range.start}..${range.end}` : "Unavailable";
+}
+
+function KeycodePicker({ onSelect, onClose }) {
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const results = searchCatalog(search, category);
+
+  return (
+    <div className="pickerOverlay" onClick={onClose}>
+      <div
+        className="pickerDialog"
+        role="dialog"
+        aria-label="Pick keycode"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="pickerHeader">
+          <strong>Pick keycode</strong>
+          <button type="button" className="pickerClose" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <input
+          ref={searchRef}
+          className="pickerSearch"
+          placeholder="Search code, label, alias…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search keycodes"
+        />
+        <div className="pickerCategories">
+          <button type="button" className={!category ? "active" : ""} onClick={() => setCategory("")}>
+            All
+          </button>
+          {CATEGORIES.map((cat) => (
+            <button
+              type="button"
+              key={cat}
+              className={category === cat ? "active" : ""}
+              onClick={() => setCategory(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        <div className="pickerList">
+          {results.map((item) => (
+            <button
+              type="button"
+              key={item.code}
+              className="pickerItem"
+              onClick={() => onSelect(`&kp ${item.code}`)}
+            >
+              <span className="pickerItemLabel">{item.label}</span>
+              <code className="pickerItemCode">{item.code}</code>
+              {item.note && <span className="pickerItemNote">{item.note}</span>}
+            </button>
+          ))}
+          {results.length === 0 && (
+            <div className="pickerEmpty">No keycodes match.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default App;

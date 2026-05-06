@@ -1056,6 +1056,151 @@ td code {
   white-space: nowrap;
 }
 
+.pickerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(24, 32, 47, 0.45);
+}
+
+.pickerDialog {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  width: 520px;
+  max-height: 520px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 32px rgba(24, 32, 47, 0.2);
+  overflow: hidden;
+}
+
+.pickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 9px;
+  border-bottom: 1px solid #dfe6f0;
+}
+
+.pickerClose {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #65758b;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pickerClose:hover {
+  background: #eef2f7;
+  color: #18202f;
+}
+
+.pickerSearch {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: none;
+  border-bottom: 1px solid #dfe6f0;
+  background: #f8fbff;
+  color: #18202f;
+  font: inherit;
+  font-size: 13px;
+}
+
+.pickerSearch:focus {
+  outline: none;
+  background: #ffffff;
+  border-bottom-color: #087f8c;
+}
+
+.pickerCategories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #dfe6f0;
+  background: #f8fbff;
+}
+
+.pickerCategories button {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid #d7e0ec;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #52647b;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pickerCategories button.active {
+  border-color: #087f8c;
+  background: #e0f5f2;
+  color: #0d6b5f;
+  font-weight: 700;
+}
+
+.pickerList {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.pickerItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pickerItem:hover {
+  border-color: #b7dfe4;
+  background: #f0fbfc;
+}
+
+.pickerItemLabel {
+  min-width: 110px;
+  color: #18202f;
+  font-size: 13px;
+}
+
+.pickerItemCode {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #eef2f7;
+  color: #315b9b;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+}
+
+.pickerItemNote {
+  margin-left: auto;
+  color: #65758b;
+  font-size: 11px;
+}
+
+.pickerEmpty {
+  padding: 16px;
+  color: #65758b;
+  font-size: 12px;
+  text-align: center;
+}
+
 .drawerStatusLine {
   display: flex;
   gap: 6px;

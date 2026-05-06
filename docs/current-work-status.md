@@ -38,19 +38,28 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
-### 2026-05-06: Key Capture 入力 MVP 実装完了
+### 2026-05-06: Keycode Picker / List Selection 実装完了（テスト全パス、ブラウザ確認待ち）
 
-実装・確認済み:
+実装済み:
 
-- **`src/keymap/keyCapture.js`**: `captureKeyToBinding()` 純関数 helper。
-  - `event.code` ベースで `&kp KEYCODE` を生成。
-  - 対応: A-Z、N0-N9、Enter/Tab/Space/Backspace/Delete/矢印4方向。
-  - Esc → `{ cancelled: true }`、Ctrl/Alt/Meta/repeat/isComposing → `{ ignored: true }`、未対応 → `{ unsupported: true, reason: code }`。
-- **`src/keymap/keyCapture.test.js`**: 31 tests / 9 suites 全パス。
-- **`App.jsx`**: `captureMode` / `captureStatus` state 追加、`keydown` useEffect 追加、Capture トグルボタン + ヒント UI を editorBox に追加。
-- **`styles.css`**: `.captureRow` / `.captureToggle` / `.captureHint` スタイル追加。
-- **`parseKeymap.test.js`**: `layer_6` → `BT` に期待値を修正（既存のリネームとのズレを解消）。
-- **テスト**: 95 tests / 15 suites 全パス。
+- **`src/keymap/keycodeCatalog.js`**: curated list（Letters/Numbers/Function keys/Navigation/Editing/Symbols/Modifiers/International の 8 カテゴリ、約 90 エントリ）+ `searchCatalog(query, category)` helper。
+  - 各 item は `{ code, label, category, aliases, note }` 形式。
+  - code は keyCapture.js と同じ ZMK 表記（ENTER, BACKSPACE, LEFT_ARROW, ESCAPE 等）。
+- **`src/keymap/keycodeCatalog.test.js`**: 26 tests / 2 suites（`node:test` 形式）。
+- **`App.jsx`**: `pickerOpen` state 追加、`Pick keycode` ボタンを captureRow に追加、`KeycodePicker` コンポーネント追加、appShell 内でモーダル render。
+  - Pick keycode クリック時は captureMode を OFF にしてピッカーを開く。
+  - 選択後は `draftBinding` を `&kp CODE` に set し、Preview タブへ遷移してピッカーを閉じる。
+- **`styles.css`**: `.pickerOverlay` / `.pickerDialog` / `.pickerHeader` / `.pickerClose` / `.pickerSearch` / `.pickerCategories` / `.pickerList` / `.pickerItem` / `.pickerItemLabel` / `.pickerItemCode` / `.pickerItemNote` / `.pickerEmpty` スタイル追加。
+- **テスト**: 121 tests / 17 suites 全パス。
+
+ブラウザ動作確認済み（2026-05-06）。
+
+### 2026-05-06: Key Capture 入力 MVP 実装・UI動作確認完了
+
+実装・確認済み（概要）:
+
+- `src/keymap/keyCapture.js`: `captureKeyToBinding()` 純関数 helper。event.code ベースで `&kp` 生成。
+- `App.jsx`: captureMode / captureStatus state、keydown useEffect、Capture トグルボタン。
 
 ### 2026-05-06: Layer rename + keymap-drawer 自動更新 完了・実生成確認済み
 
@@ -81,48 +90,17 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - Layer rename と Save all 統合
 - keymap-drawer 自動更新（probe-first pattern、CLI 未配置時の graceful fallback）
 
-## 動作確認プロンプト（次のチャット用）
-
-```md
-このリポジトリ `zmk-config-roBa` で、Key Capture 入力 MVP の動作確認をしてください。
-回答は日本語でお願いします。
-
-まず `@AGENTS.md` と `@docs/current-work-status.md` を読んで現在の状況を把握してください。
-
-### 確認対象
-
-`tools/roba-keymap-viewer/` の dev サーバーを起動し、以下を確認してください。
-
-### 確認手順
-
-1. `npm run dev` でサーバー起動（`tools/roba-keymap-viewer/` ディレクトリで実行）。
-2. ブラウザで開く。
-3. Bindings タブを表示し、編集可能なキー（editability: source-only）を選択。
-4. detailPane 下部の editorBox に **Capture** ボタンが表示されることを確認。
-5. **Capture をクリックして ON** にし、ヒント文「キーを押して &kp を入力 / Esc で終了」が表示されることを確認。
-6. アルファベットキーを押す → Raw binding 欄が `&kp A`（押したキーに応じた値）に変わること。
-7. `Tab` / `Space` / `Enter` / 矢印キーを押す → それぞれ `&kp TAB` 等に変わること。
-8. `F1` など未対応キーを押す → 「未対応: F1」と表示され、binding が変わらないこと。
-9. `Esc` を押す → Capture が OFF になり、binding が変わらないこと。
-10. Capture OFF 中にキーを押す → binding が変わらないこと。
-11. Capture ON のまま別のキーをクリック選択 → captureStatus がクリアされること。
-12. Add draft → Preview タブで差分が表示されること（既存フロー回帰）。
-13. Save all が実行できること（既存フロー回帰）。
-
-### 確認後
-
-問題がなければコミットしてください。
-問題があれば修正して再確認してください。
-```
-
 ## 次にやること
 
-### [Post-Phase 2-B] Keycode Picker / List Selection
+### ブラウザ動作確認・必要なら修正
 
-- Key Capture MVP は完了。
-- 次は PC キーボードで直接押しにくいキーコード（F1〜F12、Esc、IntlYen など）を選べる picker を追加する。
-- 設計は `docs/zmk-studio-like-app-key-capture-plan.md` の「後続フェーズ案」セクションに記載済み。
-- `src/keymap/keycodeCatalog.js` に curated list を作り、`captureKeyToBinding` の変換テーブルと共通化する。
+Keycode Picker のブラウザ確認を行い、問題があれば修正する（確認手順は最新チェックポイントに記載）。
+
+### [Post-Phase 2-B 完了後] 次候補
+
+- Capture で unsupported になったキーに「picker で選べる」誘導 UI（captureStatus に "Pick keycode で選択可" のようなリンク/ヒント）。
+- `&lt` / `&mt` / `&mo` の構造化 picker（Phase 3 候補）。
+- Combo / Macro への keycode picker 展開。
 
 ## 現在の注意点
 
