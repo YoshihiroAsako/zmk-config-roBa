@@ -7,6 +7,7 @@ import { buildMarkdown } from "./export/markdown.js";
 import { captureKeyToBinding } from "./keymap/keyCapture.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
 import { buildComboPreviewState } from "./keymap/comboPreview.js";
+import { buildNewComboPreviewState, createEmptyComboDraft } from "./keymap/comboInsert.js";
 import { buildEditorState } from "./keymap/editorPreview.js";
 import {
   HOLD_TAP_MODIFIERS,
@@ -20,6 +21,7 @@ import { countDtsPhysicalKeys, parseKeymap } from "./keymap/parseKeymap.js";
 import {
   buildDraftChange,
   buildComboDraftChanges,
+  buildNewComboDraftChanges,
   buildLayerRenameDraftChange,
   buildMacroDraftChanges,
   buildPendingChangesState,
@@ -69,6 +71,8 @@ function App() {
     layersRaw: "",
     timeoutMsRaw: "",
   });
+  const [isAddingCombo, setIsAddingCombo] = useState(false);
+  const [newComboDraft, setNewComboDraft] = useState(() => createEmptyComboDraft([]));
   const [selectedMacroName, setSelectedMacroName] = useState("");
   const [macroDraft, setMacroDraft] = useState({
     bindingDrafts: {},
@@ -82,9 +86,10 @@ function App() {
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
-  const selectedCombo = document.combos.find((combo) => combo.name === selectedComboName);
-  const comboDraftPositionSet = activeTab === "Combos" && selectedCombo
-    ? new Set(comboDraft.positionsRaw.trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0))
+  const selectedCombo = isAddingCombo ? null : document.combos.find((combo) => combo.name === selectedComboName);
+  const activeComboPositionsRaw = isAddingCombo ? newComboDraft.positionsRaw : comboDraft.positionsRaw;
+  const comboDraftPositionSet = activeTab === "Combos" && (selectedCombo || isAddingCombo)
+    ? new Set(activeComboPositionsRaw.trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0))
     : new Set();
   const comboHighlightPositions = comboDraftPositionSet;
   const comboSavedOnlyPositions = activeTab === "Combos" && selectedCombo
@@ -133,6 +138,16 @@ function App() {
     ),
     [keymapSource, selectedCombo, comboDraft, document.physicalLayout.length, document.layers.length],
   );
+  const newComboPreviewState = useMemo(
+    () => buildNewComboPreviewState(
+      keymapSource,
+      newComboDraft,
+      document.combos,
+      document.physicalLayout.length,
+      document.layers.length,
+    ),
+    [keymapSource, newComboDraft, document.combos, document.physicalLayout.length, document.layers.length],
+  );
   const macroPreviewState = useMemo(
     () => buildMacroPreviewState(keymapSource, selectedMacro, macroDraft),
     [keymapSource, selectedMacro, macroDraft],
@@ -153,6 +168,15 @@ function App() {
       timeoutMsRaw: selectedCombo?.timeoutMsRange ? String(selectedCombo.timeoutMs) : "",
     });
   }, [selectedCombo]);
+
+  useEffect(() => {
+    if (!isAddingCombo) {
+      setNewComboDraft((current) => ({
+        ...createEmptyComboDraft(document.combos),
+        bindingRaw: current.bindingRaw || "&kp A",
+      }));
+    }
+  }, [document.combos, isAddingCombo]);
 
   useEffect(() => {
     setMacroDraft({
@@ -240,6 +264,7 @@ function App() {
       setKeymapSource(payload.source);
       setDraftBinding(null);
       setPendingChanges([]);
+      setIsAddingCombo(false);
       setSaveStatus({
         tone: "ok",
         title: "Reloaded source",
@@ -370,6 +395,7 @@ function App() {
       setKeymapSource(payload.source);
       setDraftBinding(null);
       setPendingChanges([]);
+      setIsAddingCombo(false);
       setSaveStatus({
         tone: "ok",
         title: "Saved pending changes",
@@ -398,9 +424,18 @@ function App() {
   };
 
   const selectCombo = (combo) => {
+    setIsAddingCombo(false);
     setSelectedComboName(combo.name);
     if (combo.layers.length) setActiveLayer(combo.layers[0]);
     if (combo.positions.length) setSelectedPosition(combo.positions[0]);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  const startNewCombo = () => {
+    setIsAddingCombo(true);
+    setSelectedComboName("");
+    setNewComboDraft(createEmptyComboDraft(document.combos));
+    setActiveTab("Combos");
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -477,17 +512,41 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const addNewComboDraft = () => {
+    if (!newComboPreviewState.changed || !newComboPreviewState.valid) return;
+    const changes = buildNewComboDraftChanges({
+      source: keymapSource,
+      draft: newComboDraft,
+      existingCombos: document.combos,
+      keyCount: document.physicalLayout.length,
+      layerCount: document.layers.length,
+    });
+    setPendingChanges((current) => upsertDraftChanges(current, changes));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const removeNewComboDraft = () => {
+    const id = `combo-${newComboDraft.nameRaw.trim()}-node-insert`;
+    setPendingChanges((changes) => removeDraftChange(changes, id));
+    setNewComboDraft(createEmptyComboDraft(document.combos));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
   const selectMacro = (macro) => {
     setSelectedMacroName(macro.name);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
   const handleSvgKeyClick = (position) => {
-    if (activeTab === "Combos" && selectedCombo) {
-      const posSet = new Set(comboDraft.positionsRaw.trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0));
+    if (activeTab === "Combos" && (selectedCombo || isAddingCombo)) {
+      const sourceRaw = isAddingCombo ? newComboDraft.positionsRaw : comboDraft.positionsRaw;
+      const posSet = new Set(sourceRaw.trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0));
       if (posSet.has(position)) posSet.delete(position);
       else posSet.add(position);
-      setComboDraft((prev) => ({ ...prev, positionsRaw: [...posSet].sort((a, b) => a - b).join(" ") }));
+      const positionsRaw = [...posSet].sort((a, b) => a - b).join(" ");
+      if (isAddingCombo) setNewComboDraft((prev) => ({ ...prev, positionsRaw }));
+      else setComboDraft((prev) => ({ ...prev, positionsRaw }));
       setSaveStatus(EMPTY_SAVE_STATUS);
     } else {
       selectBinding(activeLayer, position);
@@ -524,6 +583,8 @@ function App() {
     ? effectiveDraftBinding
     : pickerContext?.type === "combo"
       ? comboDraft.bindingRaw
+      : pickerContext?.type === "new-combo"
+        ? newComboDraft.bindingRaw
       : pickerContext?.type === "macro"
         ? macroDraft.bindingDrafts?.[pickerContext.index] ?? selectedMacro?.bindingEntries?.[pickerContext.index]?.raw
         : "";
@@ -664,6 +725,20 @@ function App() {
               onPickBinding={() => setPickerContext({ type: "combo" })}
             />
           )}
+          {activeTab === "Combos" && isAddingCombo && (
+            <NewComboDetailPanel
+              draft={newComboDraft}
+              previewState={newComboPreviewState}
+              pending={pendingChanges.some((change) => change.id === `combo-${newComboDraft.nameRaw.trim()}-node-insert`)}
+              onAddDraft={addNewComboDraft}
+              onRemoveDraft={removeNewComboDraft}
+              onDraftChange={(nextDraft) => {
+                setNewComboDraft(nextDraft);
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
+              onPickBinding={() => setPickerContext({ type: "new-combo" })}
+            />
+          )}
           {activeTab === "Macros" && selectedMacro && (
             <MacroDetailPanel
               macro={selectedMacro}
@@ -767,6 +842,8 @@ function App() {
               setActiveTab("Preview");
             } else if (pickerContext.type === "combo") {
               setComboDraft((prev) => ({ ...prev, bindingRaw: binding }));
+            } else if (pickerContext.type === "new-combo") {
+              setNewComboDraft((prev) => ({ ...prev, bindingRaw: binding }));
             } else if (pickerContext.type === "macro") {
               setMacroDraft((prev) => ({
                 ...prev,
@@ -815,6 +892,7 @@ function App() {
           selectedMacroName={selectedMacroName}
           onSelectBinding={selectBinding}
           onSelectCombo={selectCombo}
+          onNewCombo={startNewCombo}
           onSelectMacro={selectMacro}
           onRemovePendingChange={(id) => setPendingChanges((changes) => removeDraftChange(changes, id))}
           onClearPendingChanges={clearPendingChanges}
@@ -928,6 +1006,84 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
         </div>
       </div>
       <pre className="rawNodePreview">{combo.raw}</pre>
+    </section>
+  );
+}
+
+function NewComboDetailPanel({ draft, previewState, pending, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
+  return (
+    <section className="comboDetailPanel" aria-label="new combo details">
+      <div className="editorHeader">
+        <strong>New combo</strong>
+        <span>{draft.nameRaw || "unnamed"}</span>
+      </div>
+      <div className="comboPreviewBox active">
+        <label>
+          <span>Node name</span>
+          <input
+            aria-label="New combo node name"
+            value={draft.nameRaw}
+            onChange={(event) => onDraftChange({ ...draft, nameRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Binding</span>
+          <div className="comboPickerRow">
+            <input
+              aria-label="New combo binding"
+              value={draft.bindingRaw}
+              onChange={(event) => onDraftChange({ ...draft, bindingRaw: event.target.value })}
+            />
+            <button type="button" className="pickerInlineBtn" onClick={onPickBinding}>
+              Pick
+            </button>
+          </div>
+        </label>
+        <label>
+          <span>Positions (SVG keys toggle)</span>
+          <input
+            aria-label="New combo positions"
+            value={draft.positionsRaw}
+            onChange={(event) => onDraftChange({ ...draft, positionsRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Layers</span>
+          <input
+            aria-label="New combo layers"
+            placeholder="empty = all layers"
+            value={draft.layersRaw}
+            onChange={(event) => onDraftChange({ ...draft, layersRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Timeout (ms)</span>
+          <input
+            aria-label="New combo timeout-ms"
+            placeholder="empty = default 50ms"
+            value={draft.timeoutMsRaw}
+            onChange={(event) => onDraftChange({ ...draft, timeoutMsRaw: event.target.value })}
+          />
+        </label>
+        <div className="editorStatus">{previewState.message}</div>
+        <div className="editorActions">
+          <button
+            type="button"
+            disabled={!previewState.changed || !previewState.valid}
+            onClick={onAddDraft}
+          >
+            {pending ? "Update new combo draft" : "Add new combo draft"}
+          </button>
+          <button
+            type="button"
+            disabled={!pending}
+            onClick={onRemoveDraft}
+          >
+            Remove new combo draft
+          </button>
+        </div>
+      </div>
+      <pre className="rawNodePreview">{previewState.change?.nextRaw || "Fill in a valid new combo draft."}</pre>
     </section>
   );
 }
@@ -1148,6 +1304,7 @@ function PanelContent({
   selectedMacroName,
   onSelectBinding,
   onSelectCombo,
+  onNewCombo,
   onSelectMacro,
   onRemovePendingChange,
   onClearPendingChanges,
@@ -1173,6 +1330,7 @@ function PanelContent({
         combos={document.combos}
         selectedComboName={selectedComboName}
         onSelectCombo={onSelectCombo}
+        onNewCombo={onNewCombo}
       />
     );
   }
@@ -1281,25 +1439,30 @@ function PanelContent({
   );
 }
 
-function CombosTable({ combos, selectedComboName, onSelectCombo }) {
+function CombosTable({ combos, selectedComboName, onSelectCombo, onNewCombo }) {
   return (
-    <Table
-      columns={["Name", "Positions", "Binding", "Layers", "Timeout"]}
-      rows={combos}
-      renderRow={(combo) => (
-        <tr
-          className={combo.name === selectedComboName ? "selectedRow clickableRow" : "clickableRow"}
-          key={combo.name}
-          onClick={() => onSelectCombo(combo)}
-        >
-          <td>{combo.name}</td>
-          <td>{combo.positions.join(" + ")}</td>
-          <td><code>{combo.binding}</code></td>
-          <td>{combo.layers.join(", ") || "all"}</td>
-          <td>{combo.timeoutMs}ms</td>
-        </tr>
-      )}
-    />
+    <div className="tableSection">
+      <div className="tableActions">
+        <button type="button" onClick={onNewCombo}>New combo</button>
+      </div>
+      <Table
+        columns={["Name", "Positions", "Binding", "Layers", "Timeout"]}
+        rows={combos}
+        renderRow={(combo) => (
+          <tr
+            className={combo.name === selectedComboName ? "selectedRow clickableRow" : "clickableRow"}
+            key={combo.name}
+            onClick={() => onSelectCombo(combo)}
+          >
+            <td>{combo.name}</td>
+            <td>{combo.positions.join(" + ")}</td>
+            <td><code>{combo.binding}</code></td>
+            <td>{combo.layers.join(", ") || "all"}</td>
+            <td>{combo.timeoutMs}ms</td>
+          </tr>
+        )}
+      />
+    </div>
   );
 }
 
@@ -1502,7 +1665,7 @@ function getDiagnostics(document) {
     { label: "DTS physical layout key count", value: document.dtsPhysicalKeyCount, ok: document.dtsPhysicalKeyCount === 43 },
     { label: "Layer count", value: document.layers.length, ok: document.layers.length === 7 },
     { label: "Every layer binding count", value: layerCountsOk ? "43 each" : "mismatch", ok: layerCountsOk },
-    { label: "Combo count", value: document.combos.length, ok: document.combos.length === 5 },
+    { label: "Combo count", value: document.combos.length, ok: document.combos.length >= 5 },
     { label: "Macro count", value: document.macros.length, ok: document.macros.length === 1 },
     { label: "Sensor binding count", value: sensorBindingCount, ok: sensorBindingCount === 2 },
   ];

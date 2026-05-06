@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parseKeymap } from "./parseKeymap.js";
 import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
+import { buildNewComboDraftChange } from "./comboInsert.js";
 import { buildSaveDiagnostics, replaceKeymapChanges, saveBindingChange, saveBindingChanges } from "./saveBindingChange.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -436,6 +437,49 @@ describe("save binding change helper", () => {
       );
 
       assert.equal(await readTempKeymap(tempRoot), source);
+    });
+  });
+
+  it("backs up once and saves a new combo insertion", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const change = buildNewComboDraftChange({
+      source,
+      draft: {
+        nameRaw: "combo_save_test",
+        bindingRaw: "&kp A",
+        positionsRaw: "0 1",
+        layersRaw: "0",
+        timeoutMsRaw: "70",
+      },
+      existingCombos: parsed.combos,
+      keyCount: 43,
+      layerCount: parsed.layers.length,
+    });
+
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({
+        repoRoot: tempRoot,
+        changes: [
+          {
+            kind: change.kind,
+            range: change.range,
+            currentRaw: change.currentRaw,
+            nextRaw: change.nextRaw,
+          },
+        ],
+        now: new Date(2026, 4, 6, 9, 30, 0),
+      });
+      const savedSource = await readTempKeymap(tempRoot);
+      const savedParsed = parseKeymap(savedSource);
+      const inserted = savedParsed.combos.find((combo) => combo.name === "combo_save_test");
+
+      assert.equal(result.ok, true);
+      assert.equal(result.backupPath, "config/.roBa.keymap.bak/20260506-093000.roBa.keymap");
+      assert.equal(savedParsed.combos.length, parsed.combos.length + 1);
+      assert.equal(inserted.binding, "&kp A");
+      assert.deepEqual(inserted.positions, [0, 1]);
+      assert.equal(result.diagnostics.every((item) => item.ok), true);
     });
   });
 });

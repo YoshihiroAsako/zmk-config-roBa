@@ -1,6 +1,7 @@
 import { isEditableBindingExpression, parseKeymap, replaceBindings } from "./parseKeymap.js";
 import { buildContextDiff } from "./editorPreview.js";
 import { buildLayersChange, buildLineInsertionDiff, buildLineRemovalDiff, buildTimeoutMsChange } from "./comboPreview.js";
+import { buildNewComboDraftChange } from "./comboInsert.js";
 import { buildTapMsChange, buildWaitMsChange } from "./macroPreview.js";
 
 export function getDraftId(layerIndex, position) {
@@ -81,6 +82,10 @@ export function buildComboDraftChanges({ source = null, combo, bindingRaw, posit
     }
   }
   return changes;
+}
+
+export function buildNewComboDraftChanges({ source, draft, existingCombos, keyCount = 43, layerCount = 7 }) {
+  return [buildNewComboDraftChange({ source, draft, existingCombos, keyCount, layerCount })];
 }
 
 export function buildLayerRenameDraftChange({ layerIndex, currentName, nextName, nameRange }) {
@@ -187,7 +192,7 @@ export function buildPendingChangesState(source, changes, layers) {
       if (currentRaw !== change.currentRaw) {
         throw new Error(`${change.label || change.id} changed on disk. Reload source.`);
       }
-      validatePendingChange(change);
+      validatePendingChange(source, change);
     }
 
     const nextSource = applyPendingChanges(source, changes);
@@ -254,7 +259,7 @@ function applyPendingChanges(source, changes) {
     ), source);
 }
 
-function validatePendingChange(change) {
+function validatePendingChange(source, change) {
   if (change.kind === "combo-binding" || change.kind === "macro-binding") {
     if (!isEditableBindingExpression(change.currentRaw)) {
       throw new Error(`${change.label} is outside the Phase 2 edit set.`);
@@ -284,6 +289,15 @@ function validatePendingChange(change) {
     validateMacroMsInsertionContent(change.nextRaw, change.kind.replace("-insert", ""));
   } else if (change.kind === "layer-rename") {
     validateLayerName(change.nextRaw);
+  } else if (change.kind === "combo-node-insert") {
+    if (change.range.start !== change.range.end) throw new Error(`${change.label}: combo-node-insert must be a zero-length range.`);
+    if (change.currentRaw !== "") throw new Error(`${change.label}: combo-node-insert must have empty currentRaw.`);
+    const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+    const beforeParsed = parseKeymap(source);
+    const afterParsed = parseKeymap(nextSource);
+    if (afterParsed.combos.length !== beforeParsed.combos.length + 1) {
+      throw new Error(`${change.label}: combo-node-insert must add exactly one combo.`);
+    }
   }
 }
 

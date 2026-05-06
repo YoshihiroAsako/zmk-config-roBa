@@ -727,6 +727,30 @@ pre {
   overflow: auto;
 }
 
+.tableSection {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.tableActions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e4eaf2;
+}
+
+.tableActions button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #9fcfd3;
+  border-radius: 6px;
+  background: #e9f7f8;
+  color: #0d5963;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

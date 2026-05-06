@@ -38,6 +38,17 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-06: Phase 5 新規 combo 追加 MVP 実装・検証済み
+
+実装済み（Phase 5 の combo 追加 MVP）:
+
+- **Combos タブに New combo 導線を追加**: "New combo" ボタンから右ペインに新規 combo draft UI を表示。node name / binding / positions / layers / timeout-ms を入力でき、binding は既存 picker と連携する。
+- **SVG クリックで新規 combo positions を入力**: New combo 作成中も、Combos タブで SVG のキークリックにより positions draft をトグル更新する。
+- **新規 combo node insertion helper 追加**: `combo-node-insert` pending change として、`combos { }` ブロック末尾へ安全にノードを挿入する `keymap/comboInsert.js` を追加。
+- **Save all 対応**: `saveBindingChanges` が `combo-node-insert` のときだけ combo count +1 を許可。保存前に挿入後 keymap を再パースして、1 combo だけ増えることを検証する。
+- **テスト追加**: `comboInsert.test.js` と `saveBindingChange.test.js` の新規 combo 保存テストを追加。
+- **検証**: `npm test` は 128 tests / 19 suites 全パス。`npm run build` 成功。Vite dev server は `http://localhost:5173` で HTTP 200 と HTML 応答を確認済み。`agent-browser` CLI は PATH に無かったためブラウザ自動操作は未実施。
+
 ### 2026-05-06: Step 4 構造化 picker MVP 実装・検証済み
 
 実装済み（Step 4 MVP 相当）:
@@ -84,14 +95,15 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - ビヘイビア選択（`&kp` / `&lt` / `&mt` など）→ パラメータ入力（レイヤー番号 or モディファイア ＋ キーコード）
 - Combo / Macro での利用ニーズも踏まえて設計する。
 
-### Phase 5: 新規コンボ・マクロ追加（大規模・次の設計タスク）
+### Phase 5: 新規コンボ・マクロ追加（進行中）
 
-- Combos タブに "New combo" ボタンを設け、`.keymap` の `combos { }` ブロックに新しいノードを挿入する。
+- ~~Combos タブに "New combo" ボタンを設け、`.keymap` の `combos { }` ブロックに新しいノードを挿入する。~~
 - Macros タブに "New macro" ボタンを設け、`macros { }` ブロックに新しいノードを挿入する。
 - 既存マクロへの binding 行の追加/削除も含む。
-- 既存の「ソース範囲を上書きする」ロジックとは異なり、新しいテキストブロックをゼロから挿入する設計が必要なため、Step 4 完了後に別途設計する。
-- 最初の次アクション:
-  - まず新規 combo / macro 追加の保存設計を小さく切る。推奨は combo 追加から始め、ノード名・binding・positions・layers・timeout-ms の draft UI と、`combos { }` ブロック末尾への安全な node insertion helper を作る。
+- 次の候補:
+  - New combo UI の手動ブラウザ確認（`agent-browser` が使える環境、またはユーザー側ブラウザ）。
+  - New macro の node insertion helper と draft UI を、今回の `combo-node-insert` と同じ pending change 方針で設計する。
+  - 既存マクロへの binding 行追加/削除を小さく切って設計する。
 
 ## 現在の注意点
 

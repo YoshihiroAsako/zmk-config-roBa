@@ -91,7 +91,8 @@ export async function saveBindingChanges({
   const beforeParsed = parseKeymap(source);
   const nextSource = replaceKeymapChanges(source, changes);
   const afterParsed = parseKeymap(nextSource);
-  const diagnostics = buildSaveDiagnostics(beforeParsed, afterParsed);
+  const expectedDeltas = getExpectedDeltas(changes);
+  const diagnostics = buildSaveDiagnostics(beforeParsed, afterParsed, expectedDeltas);
   const failedDiagnostic = diagnostics.find((item) => !item.ok);
   if (failedDiagnostic) {
     throw new Error(`Save rejected because ${failedDiagnostic.label} changed.`);
@@ -146,7 +147,9 @@ export function replaceKeymapChanges(source, changes) {
   ), source);
 }
 
-export function buildSaveDiagnostics(beforeParsed, afterParsed) {
+export function buildSaveDiagnostics(beforeParsed, afterParsed, expectedDeltas = {}) {
+  const expectedComboDelta = expectedDeltas.comboDelta || 0;
+  const expectedMacroDelta = expectedDeltas.macroDelta || 0;
   const beforeLayerBindingCounts = beforeParsed.layers.map((layer) => layer.bindings.length);
   const afterLayerBindingCounts = afterParsed.layers.map((layer) => layer.bindings.length);
   const beforeSensorBindingCount = countSensorBindings(beforeParsed);
@@ -179,13 +182,13 @@ export function buildSaveDiagnostics(beforeParsed, afterParsed) {
       label: "Combo count",
       before: beforeParsed.combos.length,
       after: afterParsed.combos.length,
-      ok: beforeParsed.combos.length === afterParsed.combos.length,
+      ok: afterParsed.combos.length === beforeParsed.combos.length + expectedComboDelta,
     },
     {
       label: "Macro count",
       before: beforeParsed.macros.length,
       after: afterParsed.macros.length,
-      ok: beforeParsed.macros.length === afterParsed.macros.length,
+      ok: afterParsed.macros.length === beforeParsed.macros.length + expectedMacroDelta,
     },
     {
       label: "Sensor binding count",
@@ -312,9 +315,44 @@ function validateSourceChange(source, change) {
     if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(source.slice(change.range.start, change.range.end))) {
       throw new Error("Layer rename source range does not contain a valid identifier.");
     }
+  } else if (change.kind === "combo-node-insert") {
+    if (change.range.start !== change.range.end) throw new Error("combo-node-insert must be a zero-length range.");
+    if (change.currentRaw !== "") throw new Error("combo-node-insert must have empty currentRaw.");
+    validateComboNodeInsertion(source, change);
   } else {
     throw new Error("Unsupported pending change kind.");
   }
+}
+
+function getExpectedDeltas(changes) {
+  return {
+    comboDelta: changes.filter((change) => change.kind === "combo-node-insert").length,
+    macroDelta: 0,
+  };
+}
+
+function validateComboNodeInsertion(source, change) {
+  if (typeof change.nextRaw !== "string" || !change.nextRaw.endsWith("\n")) {
+    throw new Error("combo-node-insert content must end with a newline.");
+  }
+  if (!/^\s*[A-Za-z_][A-Za-z0-9_-]*\s*\{[\s\S]*\};\r?\n$/.test(change.nextRaw)) {
+    throw new Error("combo-node-insert content is invalid.");
+  }
+
+  const beforeParsed = parseKeymap(source);
+  const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+  const afterParsed = parseKeymap(nextSource);
+  if (afterParsed.combos.length !== beforeParsed.combos.length + 1) {
+    throw new Error("combo-node-insert must add exactly one combo.");
+  }
+  const inserted = afterParsed.combos.find((combo) => !beforeParsed.combos.some((before) => before.name === combo.name));
+  if (!inserted) throw new Error("combo-node-insert did not add a unique combo name.");
+  if (!isEditableBindingExpression(inserted.binding)) {
+    throw new Error("combo-node-insert binding is not supported.");
+  }
+  validateComboPositions(inserted.positions.join(" "));
+  if (inserted.layers.length) validateLayerValues(inserted.layers.join(" "));
+  if (inserted.timeoutMsRange) validateTimeoutMsValue(String(inserted.timeoutMs));
 }
 
 function validateRange(source, range) {
