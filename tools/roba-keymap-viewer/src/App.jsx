@@ -8,6 +8,13 @@ import { captureKeyToBinding } from "./keymap/keyCapture.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
 import { buildComboPreviewState } from "./keymap/comboPreview.js";
 import { buildEditorState } from "./keymap/editorPreview.js";
+import {
+  HOLD_TAP_MODIFIERS,
+  STRUCTURED_BEHAVIORS,
+  buildStructuredBinding,
+  parseStructuredBinding,
+  validateStructuredBinding,
+} from "./keymap/structuredBinding.js";
 import { buildMacroPreviewState } from "./keymap/macroPreview.js";
 import { countDtsPhysicalKeys, parseKeymap } from "./keymap/parseKeymap.js";
 import {
@@ -513,6 +520,14 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const pickerInitialBinding = pickerContext?.type === "binding"
+    ? effectiveDraftBinding
+    : pickerContext?.type === "combo"
+      ? comboDraft.bindingRaw
+      : pickerContext?.type === "macro"
+        ? macroDraft.bindingDrafts?.[pickerContext.index] ?? selectedMacro?.bindingEntries?.[pickerContext.index]?.raw
+        : "";
+
   return (
     <div className="appShell">
       <header className="topBar">
@@ -744,6 +759,8 @@ function App() {
 
       {pickerContext && (
         <KeycodePicker
+          initialBinding={pickerInitialBinding}
+          layerNames={layerNames}
           onSelect={(binding) => {
             if (pickerContext.type === "binding") {
               setDraftBinding(binding);
@@ -1500,7 +1517,12 @@ function formatRange(range) {
   return range ? `${range.start}..${range.end}` : "Unavailable";
 }
 
-function KeycodePicker({ onSelect, onClose }) {
+function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose }) {
+  const initialDraft = useMemo(
+    () => parseStructuredBinding(initialBinding, layerNames.length),
+    [initialBinding, layerNames.length],
+  );
+  const [draft, setDraft] = useState(initialDraft);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const searchRef = useRef(null);
@@ -1521,18 +1543,84 @@ function KeycodePicker({ onSelect, onClose }) {
   }, [onClose]);
 
   const results = searchCatalog(search, category);
+  const structuredState = validateStructuredBinding(draft, layerNames.length);
+
+  const chooseKeycode = (keycode) => {
+    const nextDraft = { ...draft, keycode };
+    const nextState = validateStructuredBinding(nextDraft, layerNames.length);
+    if (nextState.ok) onSelect(nextState.binding);
+    else setDraft(nextDraft);
+  };
 
   return (
     <div className="pickerOverlay" onClick={onClose}>
       <div
         className="pickerDialog"
         role="dialog"
-        aria-label="Pick keycode"
+        aria-label="Pick binding"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="pickerHeader">
-          <strong>Pick keycode</strong>
+          <strong>Pick binding</strong>
           <button type="button" className="pickerClose" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="structuredPicker">
+          <div className="behaviorPicker" role="group" aria-label="Behavior">
+            {STRUCTURED_BEHAVIORS.map((behavior) => (
+              <button
+                type="button"
+                key={behavior}
+                className={draft.behavior === behavior ? "active" : ""}
+                onClick={() => setDraft((prev) => ({ ...prev, behavior }))}
+              >
+                {behavior}
+              </button>
+            ))}
+          </div>
+          {draft.behavior === "&lt" && (
+            <label>
+              <span>Hold layer</span>
+              <select
+                value={draft.layerIndex}
+                onChange={(event) => setDraft((prev) => ({ ...prev, layerIndex: Number(event.target.value) }))}
+              >
+                {layerNames.map((name, index) => (
+                  <option key={index} value={index}>{index}: {name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {draft.behavior === "&mt" && (
+            <label>
+              <span>Hold modifier</span>
+              <select
+                value={draft.modifier}
+                onChange={(event) => setDraft((prev) => ({ ...prev, modifier: event.target.value }))}
+              >
+                {HOLD_TAP_MODIFIERS.map((modifier) => (
+                  <option key={modifier.code} value={modifier.code}>{modifier.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label>
+            <span>Tap keycode</span>
+            <input
+              value={draft.keycode}
+              onChange={(event) => setDraft((prev) => ({ ...prev, keycode: event.target.value }))}
+              aria-label="Structured picker keycode"
+            />
+          </label>
+          <div className="structuredPreview">
+            <code>{structuredState.ok ? structuredState.binding : structuredState.message}</code>
+            <button
+              type="button"
+              disabled={!structuredState.ok}
+              onClick={() => onSelect(buildStructuredBinding(draft, layerNames.length))}
+            >
+              Use binding
+            </button>
+          </div>
         </div>
         <input
           ref={searchRef}
@@ -1563,7 +1651,7 @@ function KeycodePicker({ onSelect, onClose }) {
               type="button"
               key={item.code}
               className="pickerItem"
-              onClick={() => onSelect(`&kp ${item.code}`)}
+              onClick={() => chooseKeycode(item.code)}
             >
               <span className="pickerItemLabel">{item.label}</span>
               <code className="pickerItemCode">{item.code}</code>

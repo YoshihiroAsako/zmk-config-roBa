@@ -38,15 +38,25 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
-### 2026-05-06: Step 2 完了・テスト済み（コミット未）
+### 2026-05-06: Step 4 構造化 picker MVP 実装・検証済み
 
-実装済み（Step 2 相当）:
+実装済み（Step 4 MVP 相当）:
 
-- **pickerContext への変換**: `pickerOpen` (boolean) を `pickerContext` (null | `{ type, index? }`) に変更。`type` は `"binding"` / `"combo"` / `"macro"` の 3 種。
-- **Combo Binding への picker 展開**: `ComboDetailPanel` の Binding draft 行に "Pick" ボタンを追加。クリックで `KeycodePicker` モーダルが開き、選択値が `comboDraft.bindingRaw` にセットされる。`previewState.canEditBinding` が false のときは無効化。
-- **Macro Binding への picker 展開**: `MacroDetailPanel` の各編集可能 Binding 行に "Pick" ボタンを追加。インデックスを `pickerContext.index` として保持し、選択値が `macroDraft.bindingDrafts[index]` にセットされる。
-- **CSS 追加**: `.comboPickerRow`（flex レイアウト）と `.pickerInlineBtn`（teal スタイル）を追加。
-- **テスト**: 121 tests / 17 suites 全パス。ブラウザ確認待ち。
+- **`&kp` / `&lt` / `&mt` 構造化 picker**: 既存 `KeycodePicker` を "Pick binding" に拡張し、ビヘイビア選択、`&lt` の hold layer、`&mt` の hold modifier、tap keycode 入力、生成 binding preview を追加。
+- **Bindings / Combo / Macro で共通利用**: `pickerContext` の対象に応じて現在 draft を初期値にし、選択結果を raw binding / combo binding / macro binding draft に反映する。
+- **テスト helper 追加**: `keymap/structuredBinding.js` と `structuredBinding.test.js` を追加。`&kp` / `&lt` / `&mt` の build / parse / validation をテスト。
+- **検証**: `npm test` は 124 tests / 18 suites 全パス。`npm run build` 成功。Vite dev server は `http://localhost:5173` で HTTP 200 確認済み。`agent-browser` CLI は PATH に無かったが、ユーザー側ブラウザで一通り操作確認済み・問題なし。
+- **コミット/プッシュ**: ユーザー報告ではコミット・プッシュ済み。ただしこの作業ツリーでは 2026-05-06 時点で Step 4 関連ファイルが未コミット差分として見えているため、新ブランチ作成前に `git status` と直近コミット内容を確認すること。
+
+### 2026-05-06: Step 3 完了・コミット済み
+
+実装済み（Step 3 相当）:
+
+- **SVG クリックによる Combo ポジション入力**: Combos タブ + combo 選択中に SVG のキーをクリックすると `comboDraft.positionsRaw` をトグル追加/削除する。Bindings タブでは従来通り binding 選択として動作。
+- **ハイライトを draft 連動に変更**: `comboHighlightPositions` を `selectedCombo.positions`（保存済み）から `comboDraft.positionsRaw`（パース済み）ベースに変更。
+- **comboSavedOnly スタイル**: 保存済みだが draft から外れたポジションに amber 破線ボーダーを適用（`.keyCap.comboSavedOnly`）。
+- **Remove draft 系ボタンの修正**: Bindings / Combo / Macro / Layer rename の 4 箇所で、pending 未追加でも draft 変更済みなら Remove ボタンをアクティブにするよう条件を修正。
+- **テスト**: 121 tests / 17 suites 全パス。ブラウザ確認済み・コミット済み。
 
 ### 過去の主な実装済み機能（概要）
 
@@ -64,28 +74,24 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ### ~~Step 1: Capture 未対応キーへの誘導（完了）~~
 
-### ~~Step 2: Combo / Macro への picker 展開（完了・コミット未）~~
+### ~~Step 2: Combo / Macro への picker 展開（完了）~~
 
-- ブラウザ動作確認 → コミット → push。
+### ~~Step 3: SVG クリックによる Combo ポジション入力（完了）~~
 
-### Step 3: SVG クリックによる Combo ポジション入力（中規模・次のタスク）
-
-- Combos タブで既存コンボを選択中、キーボード SVG のキーをクリックすると `positionsRaw` にそのキー番号をトグル追加/削除する。
-- Bindings タブでは従来通り `selectedPosition` を切り替える動作を維持し、Combos タブのみ別ハンドラーに分岐させる。
-- コンボハイライト表示を `comboDraft.positionsRaw` の状態に連動させる（draft と確定済みポジションを視覚的に区別できると望ましい）。
-
-### Step 4: `&lt` / `&mt` 構造化 picker（大規模）
+### ~~Step 4: `&lt` / `&mt` 構造化 picker（MVP 実装・検証完了）~~
 
 - hold-tap ビヘイビアを複数パラメータで GUI 設定できる専用 picker を新設する。
   - ビヘイビア選択（`&kp` / `&lt` / `&mt` など）→ パラメータ入力（レイヤー番号 or モディファイア ＋ キーコード）
 - Combo / Macro での利用ニーズも踏まえて設計する。
 
-### Phase 5: 新規コンボ・マクロ追加（大規模・将来）
+### Phase 5: 新規コンボ・マクロ追加（大規模・次の設計タスク）
 
 - Combos タブに "New combo" ボタンを設け、`.keymap` の `combos { }` ブロックに新しいノードを挿入する。
 - Macros タブに "New macro" ボタンを設け、`macros { }` ブロックに新しいノードを挿入する。
 - 既存マクロへの binding 行の追加/削除も含む。
 - 既存の「ソース範囲を上書きする」ロジックとは異なり、新しいテキストブロックをゼロから挿入する設計が必要なため、Step 4 完了後に別途設計する。
+- 最初の次アクション:
+  - まず新規 combo / macro 追加の保存設計を小さく切る。推奨は combo 追加から始め、ノード名・binding・positions・layers・timeout-ms の draft UI と、`combos { }` ブロック末尾への安全な node insertion helper を作る。
 
 ## 現在の注意点
 
