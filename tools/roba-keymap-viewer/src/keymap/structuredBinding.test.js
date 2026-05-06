@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   KEY_PRESS_MODIFIERS,
+  MOUSE_BUTTONS,
   buildStructuredBinding,
   parseStructuredBinding,
   validateStructuredBinding,
@@ -106,6 +107,57 @@ describe("structured binding helpers", () => {
     const plainLt = "&lt 1 SPACE";
     assert.deepEqual(parseStructuredBinding(plainLt, 7).keypressModifiers, []);
     assert.equal(buildStructuredBinding(parseStructuredBinding(plainLt, 7), 7), plainLt);
+  });
+
+  it("builds and parses mouse button press bindings", () => {
+    assert.equal(buildStructuredBinding({ behavior: "&mkp", mouseButton: "MB1" }), "&mkp MB1");
+    assert.equal(buildStructuredBinding({ behavior: "&mkp", mouseButton: "MB4" }), "&mkp MB4");
+    assert.equal(buildStructuredBinding({ behavior: "&mkp", mouseButton: "MB5" }), "&mkp MB5");
+    assert.equal(buildStructuredBinding({ behavior: "&mkp" }), "&mkp MB1");
+
+    assert.deepEqual(parseStructuredBinding("&mkp MB1"), {
+      behavior: "&mkp",
+      mouseButton: "MB1",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+    assert.deepEqual(parseStructuredBinding("&mkp MB3"), {
+      behavior: "&mkp",
+      mouseButton: "MB3",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+    assert.deepEqual(parseStructuredBinding("&mkp MB5"), {
+      behavior: "&mkp",
+      mouseButton: "MB5",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+  });
+
+  it("round-trips all mouse button bindings", () => {
+    for (const btn of MOUSE_BUTTONS) {
+      const raw = `&mkp ${btn.code}`;
+      const parsed = parseStructuredBinding(raw);
+      assert.equal(buildStructuredBinding(parsed), raw);
+    }
+  });
+
+  it("falls back to MB1 for unknown mouse button code in parse", () => {
+    const parsed = parseStructuredBinding("&mkp UNKNOWN");
+    assert.equal(parsed.behavior, "&mkp");
+    assert.equal(parsed.mouseButton, "MB1");
+  });
+
+  it("rejects invalid mouse button in build", () => {
+    assert.equal(validateStructuredBinding({ behavior: "&mkp", mouseButton: "MB9" }).ok, false);
+    assert.equal(validateStructuredBinding({ behavior: "&mkp", mouseButton: "MB1" }).ok, true);
   });
 
   it("rejects unsupported token characters before preview/save", () => {

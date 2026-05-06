@@ -188,14 +188,14 @@ export function describeBinding(raw, layerNames = []) {
 
   match = /^&mkp (\S+)$/.exec(value);
   if (match) {
-    const labels = { MB1: "LMB", MB2: "RMB", MB3: "MMB" };
+    const labels = { MB1: "LMB", MB2: "RMB", MB3: "MMB", MB4: "Back", MB5: "Fwd" };
     return {
       raw: value,
       behavior: "&mkp",
       params: [match[1]],
       kind: "mouse-button",
       display: labels[match[1]] || match[1],
-      editability: "build-required",
+      editability: "studio-direct",
       note: "Mouse button",
     };
   }

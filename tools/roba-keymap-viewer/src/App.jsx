@@ -13,6 +13,7 @@ import { buildEditorState } from "./keymap/editorPreview.js";
 import {
   HOLD_TAP_MODIFIERS,
   KEY_PRESS_MODIFIERS,
+  MOUSE_BUTTONS,
   STRUCTURED_BEHAVIOR_LABELS,
   STRUCTURED_BEHAVIORS,
   buildStructuredBinding,
@@ -2563,30 +2564,47 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
               </select>
             </label>
           )}
-          <label>
-            <span>Tap keycode</span>
-            <input
-              value={draft.keycode}
-              onChange={(event) => setDraft((prev) => ({ ...prev, keycode: event.target.value }))}
-              aria-label="Structured picker keycode"
-            />
-          </label>
-          <div className="keypressModifierGroup" role="group" aria-label="Tap keycode modifiers">
-            {KEY_PRESS_MODIFIERS.map((modifier) => {
-              const active = (draft.keypressModifiers || []).includes(modifier.code);
-              return (
-                <button
-                  type="button"
-                  key={modifier.code}
-                  className={active ? "active" : ""}
-                  aria-pressed={active}
-                  onClick={() => toggleKeypressModifier(modifier.code)}
-                >
-                  {modifier.label}
-                </button>
-              );
-            })}
-          </div>
+          {draft.behavior === "&mkp" && (
+            <label>
+              <span>Mouse button</span>
+              <select
+                value={draft.mouseButton ?? "MB1"}
+                onChange={(event) => setDraft((prev) => ({ ...prev, mouseButton: event.target.value }))}
+              >
+                {MOUSE_BUTTONS.map((btn) => (
+                  <option key={btn.code} value={btn.code}>{btn.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {draft.behavior !== "&mkp" && (
+            <>
+              <label>
+                <span>Tap keycode</span>
+                <input
+                  value={draft.keycode}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, keycode: event.target.value }))}
+                  aria-label="Structured picker keycode"
+                />
+              </label>
+              <div className="keypressModifierGroup" role="group" aria-label="Tap keycode modifiers">
+                {KEY_PRESS_MODIFIERS.map((modifier) => {
+                  const active = (draft.keypressModifiers || []).includes(modifier.code);
+                  return (
+                    <button
+                      type="button"
+                      key={modifier.code}
+                      className={active ? "active" : ""}
+                      aria-pressed={active}
+                      onClick={() => toggleKeypressModifier(modifier.code)}
+                    >
+                      {modifier.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
           <div className="structuredPreview">
             <code>{structuredState.ok ? structuredState.binding : structuredState.message}</code>
             <button
@@ -2598,46 +2616,50 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
             </button>
           </div>
         </div>
-        <input
-          ref={searchRef}
-          className="pickerSearch"
-          placeholder="Search code, label, alias…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search keycodes"
-        />
-        <div className="pickerCategories">
-          <button type="button" className={!category ? "active" : ""} onClick={() => setCategory("")}>
-            All
-          </button>
-          {CATEGORIES.map((cat) => (
-            <button
-              type="button"
-              key={cat}
-              className={category === cat ? "active" : ""}
-              onClick={() => setCategory(cat)}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-        <div className="pickerList">
-          {results.map((item) => (
-            <button
-              type="button"
-              key={item.code}
-              className="pickerItem"
-              onClick={() => chooseKeycode(item.code)}
-            >
-              <span className="pickerItemLabel">{item.label}</span>
-              <code className="pickerItemCode">{item.code}</code>
-              {item.note && <span className="pickerItemNote">{item.note}</span>}
-            </button>
-          ))}
-          {results.length === 0 && (
-            <div className="pickerEmpty">No keycodes match.</div>
-          )}
-        </div>
+        {draft.behavior !== "&mkp" && (
+          <>
+            <input
+              ref={searchRef}
+              className="pickerSearch"
+              placeholder="Search code, label, alias…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search keycodes"
+            />
+            <div className="pickerCategories">
+              <button type="button" className={!category ? "active" : ""} onClick={() => setCategory("")}>
+                All
+              </button>
+              {CATEGORIES.map((cat) => (
+                <button
+                  type="button"
+                  key={cat}
+                  className={category === cat ? "active" : ""}
+                  onClick={() => setCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="pickerList">
+              {results.map((item) => (
+                <button
+                  type="button"
+                  key={item.code}
+                  className="pickerItem"
+                  onClick={() => chooseKeycode(item.code)}
+                >
+                  <span className="pickerItemLabel">{item.label}</span>
+                  <code className="pickerItemCode">{item.code}</code>
+                  {item.note && <span className="pickerItemNote">{item.note}</span>}
+                </button>
+              ))}
+              {results.length === 0 && (
+                <div className="pickerEmpty">No keycodes match.</div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
