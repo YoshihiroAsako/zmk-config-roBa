@@ -40,6 +40,20 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-06: Undo/Redo + キーボードショートカット実装・検証済み（未 push）
+
+実装済み:
+
+- **`undoStack` / `redoStack` state 追加**: `pendingChanges` 操作履歴を最大 50 件保持。
+- **`commitPendingChanges(newChanges)` 追加**: undo 履歴を積んで `setPendingChanges` を呼ぶ共通ヘルパー。ユーザー操作による全 pending 変更関数から呼ぶ。save 完了後の `setPendingChanges([])` は呼ばない（save はアンドゥ対象外）。
+- **`undo()` / `redo()`**: stack を pop/push して `pendingChanges` を巻き戻し/やり直す。
+- **キーボードショートカット useEffect**: `shortcutsRef` 経由で最新関数を呼ぶパターン（空 deps で一度だけ登録）。
+  - `Ctrl+Z` = Undo（input/textarea フォーカス中は除外）
+  - `Ctrl+Shift+Z` / `Ctrl+Y` = Redo（同）
+  - `Ctrl+S` = Save all（常に有効、保存できない状態なら関数内でハンドル済み）
+- **PreviewPanel に Undo/Redo ボタン追加**: "Save all" / "Clear all" と並べて表示。`canUndo` / `canRedo` で無効化制御。tooltip で shortcut 表示。
+- **検証**: `npm test` は 139 tests / 20 suites 全パス。`npm run build` 成功。実ブラウザ確認: 未実施。
+
 ### 2026-05-06: Save 前バリデーション実装・検証済み（未 push）
 
 実装済み:
@@ -160,14 +174,12 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 主要機能は一通り実装済み。以下は「使いやすさ」を高めるための候補で、優先度順に並べる。着手する場合は、先に目的と編集範囲をこのファイルへ短く追記してから進める。
 
-1. ~~**外部変更検知付き Save all（安全性強化）** — 実装済み・未 push~~
-   - mtime チェック（FILE_CHANGED）と keymap-drawer 未コミット差分警告（DRAWER_DIRTY）を実装。実ブラウザ確認は未実施。push 前にブラウザで動作確認すること。
-2. ~~**Save 前バリデーション（推し）** — 実装済み・未 push~~
-   - `&lt N` / `&mo N` / `&to N` の layer range チェック、`combo-positions` / `layers` の range チェック（hardcode 排除）を実装。node name 重複は既存の change-build 時検証で対応済み。実ブラウザ確認は未実施。push 前に動作確認すること。
-3. **Undo / Redo（pending changes ベース）**
-   - `pendingChanges` 配列の履歴スタックを持ち、1 個前の状態へ戻せるようにする。今は「全 discard」しか戻し方がない。
-4. **キーボードショートカット**
-   - `Ctrl+S` = `Save all`、`Esc` = picker / capture を閉じる、`Ctrl+Z` = Undo（上記 3 と連動）。
+1. ~~**外部変更検知付き Save all（安全性強化）** — 実装済み・push 済み~~
+2. ~~**Save 前バリデーション（推し）** — 実装済み・push 済み~~
+3. ~~**Undo / Redo（pending changes ベース）** — 実装済み・未 push~~
+   - `undoStack` / `redoStack` + `commitPendingChanges` で pending 履歴管理。Ctrl+Z / Ctrl+Shift+Z ショートカット付き。
+4. ~~**キーボードショートカット** — 実装済み（Undo/Redo と同時）・未 push~~
+   - `Ctrl+S` = Save all、`Ctrl+Z` = Undo、`Ctrl+Shift+Z` / `Ctrl+Y` = Redo。
 5. **バックアップ復元 UI**
    - `Save all` 直前バックアップの最近 N 件を UI に列挙し、1 クリックで `config/roBa.keymap` を戻せるようにする。`docs/viewer-to-device-guide.md` 8 章の手動 PowerShell リカバリを UI で完結させる。
 

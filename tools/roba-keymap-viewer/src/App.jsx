@@ -66,6 +66,9 @@ function App() {
   const [search, setSearch] = useState("");
   const [draftBinding, setDraftBinding] = useState(null);
   const [pendingChanges, setPendingChanges] = useState([]);
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const shortcutsRef = useRef(null);
   const [selectedComboName, setSelectedComboName] = useState("");
   const [comboDraft, setComboDraft] = useState({
     bindingRaw: "",
@@ -508,6 +511,51 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const commitPendingChanges = (newChanges) => {
+    setUndoStack((prev) => [...prev.slice(-49), pendingChanges]);
+    setRedoStack([]);
+    setPendingChanges(newChanges);
+  };
+
+  const undo = () => {
+    if (undoStack.length === 0) return;
+    setRedoStack((prev) => [...prev, pendingChanges]);
+    setUndoStack((prev) => prev.slice(0, -1));
+    setPendingChanges(undoStack[undoStack.length - 1]);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  const redo = () => {
+    if (redoStack.length === 0) return;
+    setUndoStack((prev) => [...prev, pendingChanges]);
+    setRedoStack((prev) => prev.slice(0, -1));
+    setPendingChanges(redoStack[redoStack.length - 1]);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  shortcutsRef.current = { undo, redo, saveAllPendingChanges };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      const isEditable = tag === "input" || tag === "textarea" || e.target?.isContentEditable;
+      if (e.ctrlKey && !e.shiftKey && e.key === "z") {
+        if (!isEditable) { e.preventDefault(); shortcutsRef.current?.undo(); }
+        return;
+      }
+      if ((e.ctrlKey && e.shiftKey && e.key === "z") || (e.ctrlKey && !e.shiftKey && e.key === "y")) {
+        if (!isEditable) { e.preventDefault(); shortcutsRef.current?.redo(); }
+        return;
+      }
+      if (e.ctrlKey && e.key === "s") {
+        e.preventDefault();
+        shortcutsRef.current?.saveAllPendingChanges();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const addSelectedDraft = () => {
     if (!editorState.canEdit || !selectedEntry?.sourceRange) return;
     const change = buildDraftChange({
@@ -517,19 +565,19 @@ function App() {
       entry: selectedEntry,
       nextRaw: effectiveDraftBinding,
     });
-    setPendingChanges((changes) => upsertDraftChange(changes, change));
+    commitPendingChanges(upsertDraftChange(pendingChanges, change));
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeSelectedDraft = () => {
-    setPendingChanges((changes) => removeDraftChange(changes, selectedDraftId));
+    commitPendingChanges(removeDraftChange(pendingChanges, selectedDraftId));
     setDraftBinding(selectedEntry?.raw || selectedBinding);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
   const clearPendingChanges = () => {
-    setPendingChanges([]);
+    commitPendingChanges([]);
     setDraftBinding(selectedEntry?.raw || selectedBinding);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
@@ -543,13 +591,13 @@ function App() {
       nextName: trimmed,
       nameRange: currentLayer.nameRange,
     });
-    setPendingChanges((current) => upsertDraftChange(current, change));
+    commitPendingChanges(upsertDraftChange(pendingChanges, change));
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeLayerRenameDraft = () => {
-    setPendingChanges((changes) => removeDraftChange(changes, layerRenameDraftId));
+    commitPendingChanges(removeDraftChange(pendingChanges, layerRenameDraftId));
     setLayerRenameDraft(currentLayer.name);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
@@ -565,13 +613,13 @@ function App() {
       timeoutMsRaw: comboDraft.timeoutMsRaw,
       layerCount: document.layers.length,
     });
-    setPendingChanges((current) => upsertDraftChanges(current, changes));
+    commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeSelectedComboDraft = () => {
-    setPendingChanges((changes) => changes.filter((change) => !selectedComboDraftIds.includes(change.id)));
+    commitPendingChanges(pendingChanges.filter((change) => !selectedComboDraftIds.includes(change.id)));
     setComboDraft({
       bindingRaw: selectedCombo?.binding || "",
       positionsRaw: selectedCombo?.positions.join(" ") || "",
@@ -590,14 +638,14 @@ function App() {
       keyCount: document.physicalLayout.length,
       layerCount: document.layers.length,
     });
-    setPendingChanges((current) => upsertDraftChanges(current, changes));
+    commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeNewComboDraft = () => {
     const id = `combo-${newComboDraft.nameRaw.trim()}-node-insert`;
-    setPendingChanges((changes) => removeDraftChange(changes, id));
+    commitPendingChanges(removeDraftChange(pendingChanges, id));
     setNewComboDraft(createEmptyComboDraft(document.combos));
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
@@ -641,13 +689,13 @@ function App() {
       waitMsRaw: macroDraft.waitMsRaw,
       tapMsRaw: macroDraft.tapMsRaw,
     });
-    setPendingChanges((current) => upsertDraftChanges(current, changes));
+    commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeSelectedMacroDraft = () => {
-    setPendingChanges((changes) => changes.filter((change) => !selectedMacroDraftIds.includes(change.id)));
+    commitPendingChanges(pendingChanges.filter((change) => !selectedMacroDraftIds.includes(change.id)));
     setMacroDraft({
       bindingDrafts: Object.fromEntries(
         (selectedMacro?.bindingEntries || []).map((entry, index) => [index, entry.raw]),
@@ -666,14 +714,14 @@ function App() {
       draft: newMacroDraft,
       existingMacros: document.macros,
     });
-    setPendingChanges((current) => upsertDraftChanges(current, changes));
+    commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeNewMacroDraft = () => {
     const id = `macro-${newMacroDraft.nameRaw.trim()}-node-insert`;
-    setPendingChanges((changes) => removeDraftChange(changes, id));
+    commitPendingChanges(removeDraftChange(pendingChanges, id));
     setNewMacroDraft(createEmptyMacroDraft(document.macros));
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
@@ -1059,9 +1107,13 @@ function App() {
           onNewCombo={startNewCombo}
           onSelectMacro={selectMacro}
           onNewMacro={startNewMacro}
-          onRemovePendingChange={(id) => setPendingChanges((changes) => removeDraftChange(changes, id))}
+          onRemovePendingChange={(id) => commitPendingChanges(removeDraftChange(pendingChanges, id))}
           onClearPendingChanges={clearPendingChanges}
           onSavePendingChanges={saveAllPendingChanges}
+          canUndo={undoStack.length > 0}
+          canRedo={redoStack.length > 0}
+          onUndo={undo}
+          onRedo={redo}
           saveEndpointAvailable={saveEndpointAvailable}
         />
       </section>
@@ -1648,6 +1700,10 @@ function PanelContent({
   onRemovePendingChange,
   onClearPendingChanges,
   onSavePendingChanges,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   saveEndpointAvailable,
 }) {
   if (tab === "Bindings") {
@@ -1765,6 +1821,10 @@ function PanelContent({
         onRemovePendingChange={onRemovePendingChange}
         onClearPendingChanges={onClearPendingChanges}
         onSavePendingChanges={onSavePendingChanges}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={onUndo}
+        onRedo={onRedo}
         saveEndpointAvailable={saveEndpointAvailable}
       />
     );
@@ -1873,6 +1933,10 @@ function PreviewPanel({
   onRemovePendingChange,
   onClearPendingChanges,
   onSavePendingChanges,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   saveEndpointAvailable,
 }) {
   const activeSinglePreview = comboPreviewState?.changed
@@ -1897,10 +1961,13 @@ function PreviewPanel({
                 type="button"
                 disabled={!saveEndpointAvailable || !pendingChanges.length || !pendingState.valid || saveStatus.tone === "saving"}
                 onClick={onSavePendingChanges}
+                title="Save all (Ctrl+S)"
               >
                 {saveStatus.tone === "saving" ? "Saving..." : "Save all"}
               </button>
               <button type="button" disabled={!pendingChanges.length} onClick={onClearPendingChanges}>Clear all</button>
+              <button type="button" disabled={!canUndo} onClick={onUndo} title="Undo (Ctrl+Z)">Undo</button>
+              <button type="button" disabled={!canRedo} onClick={onRedo} title="Redo (Ctrl+Shift+Z)">Redo</button>
             </div>
           </div>
           <PendingChangesList
