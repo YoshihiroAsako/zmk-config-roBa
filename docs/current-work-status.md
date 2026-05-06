@@ -41,6 +41,20 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-07: Task A 実装・検証・push 済み（MKP マウスボタン Picker）
+
+実装済み:
+
+- **`STRUCTURED_BEHAVIORS` 拡張**: `"&mkp"` を追加（KP / LT / MT と同列）。
+- **`MOUSE_BUTTONS` 定数追加**: MB1〜MB5（Left / Right / Middle / Back / Forward）。
+- **`parseStructuredBinding` 拡張**: `&mkp MB1` 等を `{ behavior: "&mkp", mouseButton: "MB1", ... }` に変換。未知の button code は `"MB1"` にフォールバック。
+- **`buildStructuredBinding` 拡張**: `behavior === "&mkp"` のとき `validateToken` をスキップし `&mkp ${mouseButton}` を返す。無効 button code はエラー。
+- **`bindingDisplay.js` 更新**: MB4 → "Back"、MB5 → "Fwd" ラベル追加。`editability` を `"studio-direct"` に変更。
+- **`KeycodePicker` UI 更新**: `MKP` ボタン追加。`&mkp` 選択時は Mouse button セレクト（MB1〜MB5）を表示し、Tap keycode 入力・modifier toggle・検索カタログを非表示。
+- **テスト追加**: build / parse / round-trip / fallback / invalid mouse button。168 tests / 24 suites 全パス。`npm run build` 成功。
+- **commit/push**: `f6af2ae MKPマウスボタンPickerを実装_20260507` として `main` に push 済み。
+- **ブラウザ確認**: 未実施（手動で確認すること）。
+
 ### 2026-05-07: Task C 実装・検証・push 済み（LT/MT の tap keycode に KP modifier 引き継ぎ）
 
 実装済み:
@@ -286,16 +300,9 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ユーザー確認済み（2026-05-07）。次回チャットではここから着手する。
 
-#### A. マウスボタン Pick（`&mkp` 対応）
+#### ~~A. マウスボタン Pick（`&mkp` 対応）~~（完了）
 
-- **目的**: Pick Keycode から `&mkp MB1` 〜 `&mkp MB5`（左クリック / 右クリック / 中クリック / 戻る / 進む）を選べるようにする。
-- **方針**: 既存の構造化 picker に 4 番目の behavior `MKP`（Mouse Button Press）を追加する。`KP` / `LT` / `MT` と同じレベルで並べる。
-- **対象ファイル（想定）**:
-  - `tools/roba-keymap-viewer/src/keymap/structuredBinding.js`: `STRUCTURED_BEHAVIORS` に `&mkp` を追加。`STRUCTURED_BEHAVIOR_LABELS` に `{ short: "MKP", long: "Mouse Button Press" }` を追加。`MOUSE_BUTTONS = [{ code: "MB1", label: "Left (MB1)" }, ...MB5 まで]` を定義。`parseStructuredBinding` / `buildStructuredBinding` を `&mkp` に対応。
-  - `tools/roba-keymap-viewer/src/keymap/structuredBinding.test.js`: build / parse / round-trip テスト追加。
-  - `tools/roba-keymap-viewer/src/keymap/bindingDisplay.js`: 既存 `&mkp` 解析に MB4/MB5 ラベル（例: "Back" / "Forward"）を追加。
-  - `tools/roba-keymap-viewer/src/App.jsx`: `KeycodePicker` の behavior ボタンに `MKP` を追加し、選択時は keycode 入力欄ではなく MB1〜MB5 のラジオ/セレクトを表示。
-- **注意**: `&mkp` は keycode 検索ではなく 5 択固定。modifier toggle は不要。
+- 168 tests / 24 suites 全パス。push 済み。ブラウザ確認は手動で実施すること。
 
 #### B. エンコーダー回転（`sensor-bindings`）編集
 
@@ -320,8 +327,8 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 #### 実装順の推奨
 
 1. ~~**C**（完了）~~
-2. **A**（structured picker 拡張に慣れた状態で着手）← 次はここ
-3. **B**（parse / save / UI と影響範囲が広いので最後）
+2. ~~**A**（完了）~~
+3. **B**（parse / save / UI と影響範囲が広いので最後）← 次はここ
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。
 
