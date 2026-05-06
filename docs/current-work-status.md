@@ -327,7 +327,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - 181 tests / 26 suites 全パス。`npm run build` 成功。手動ブラウザ確認後に commit/push。
 
-#### D. Consumer code カタログ拡張（Task B 完了後の候補）
+#### D. Consumer code カタログ拡張（候補）
 
 - **目的**: Sensors タブや Bindings タブで音量（`C_VOL_UP` / `C_VOL_DN`）・メディア（`C_NEXT` / `C_PREV`）・明るさ（`C_BRI_INC` / `C_BRI_DEC`）等を Picker から選べるようにする。
 - **対象ファイル**: `tools/roba-keymap-viewer/src/keymap/keycodeCatalog.js`（および関連表示・テスト）。
@@ -337,12 +337,38 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - `structuredBinding.js` / `App.jsx` を更新。164 tests / 24 suites 全パス。push 済み。
 
+#### E. sensor-bindings のレイヤー追加・削除 UI（ユーザー要望・未着手）
+
+- **目的**: Sensors タブから、任意のレイヤーに `sensor-bindings = <&inc_dec_kp X Y>;` を追加したり、既存の sensor-bindings を削除できるようにする。
+- **設計方針（草案）**:
+  - **追加**: 左ペインの下部に "Add layer" ボタンを設け、sensor-bindings を持たないレイヤーをドロップダウンで選択 → 初期値 `&inc_dec_kp PG_UP PAGE_DOWN` で draft を作成。
+  - **削除**: 右ペインの `SensorDetailPanel` に "Remove sensor-binding" ボタンを追加。対象レイヤーの `sensor-bindings = <...>;` 行全体を削除する pending change を生成。
+  - **実装種別**: 追加は `sensor-binding-insert` kind、削除は `sensor-binding-remove` kind として `pendingChanges.js` / `saveBindingChange.js` に追加。
+  - **スコープ**: `&inc_dec_kp X Y` 形式のみ。追加時は keymap の対象レイヤーブロック内に `sensor-bindings` プロパティが存在しないことを確認してから挿入する。
+- **詳細計画**: 着手時に設計詳細を詰める。
+
+#### F. `&inc_dec_cp` behavior 対応（候補・D の後）
+
+- **目的**: Consumer-press（音量・メディア等）専用の `&inc_dec_cp` behavior を Sensors タブで選択・編集できるようにする。
+- **前提**: Task D（Consumer code カタログ拡張）が完了していることが望ましい。
+
+#### G. マウスホイール（`&msc`）sensor-binding 対応（低優先）
+
+- **目的**: `sensor-bindings = <&msc SCRL_UP>` 等を Sensors タブで編集できるようにする。
+
+#### H. ハードウェアレベル方向反転（スコープ外）
+
+- `.overlay` / `.dtsi` 編集が必要でファームウェア再ビルドが必要なため、Viewer から操作する対象外。Sensors タブ UI の注記のみで対応済み。
+
 #### 実装順の推奨
 
 1. ~~**C**（完了）~~
 2. ~~**A**（完了）~~
 3. ~~**B**（完了・ブラウザ確認待ち）~~
-4. **D**（Consumer code カタログ拡張）— B 完了後の任意タスク
+4. **E**（sensor-bindings のレイヤー追加・削除 UI）— ユーザー要望
+5. **D**（Consumer code カタログ拡張）— E と前後しても可
+6. **F**（`&inc_dec_cp` 対応）— D の後
+7. **G**（`&msc` 対応）— 低優先
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。
 
