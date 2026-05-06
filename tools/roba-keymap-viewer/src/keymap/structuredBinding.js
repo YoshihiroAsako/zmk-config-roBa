@@ -1,5 +1,22 @@
 export const STRUCTURED_BEHAVIORS = ["&kp", "&lt", "&mt"];
 
+export const STRUCTURED_BEHAVIOR_LABELS = {
+  "&kp": { short: "KP", long: "Key Press" },
+  "&lt": { short: "LT", long: "Layer-Tap" },
+  "&mt": { short: "MT", long: "Mod-Tap" },
+};
+
+export const KEY_PRESS_MODIFIERS = [
+  { code: "LC", label: "L Ctrl" },
+  { code: "LS", label: "L Shift" },
+  { code: "LA", label: "L Alt" },
+  { code: "LG", label: "L GUI" },
+  { code: "RC", label: "R Ctrl" },
+  { code: "RS", label: "R Shift" },
+  { code: "RA", label: "R Alt" },
+  { code: "RG", label: "R GUI" },
+];
+
 export const HOLD_TAP_MODIFIERS = [
   { code: "LEFT_SHIFT", label: "L Shift" },
   { code: "RIGHT_SHIFT", label: "R Shift" },
@@ -36,11 +53,13 @@ export function parseStructuredBinding(raw, layerCount = 0) {
 
   match = /^&kp (\S+)$/.exec(value);
   if (match) {
+    const parsedKeypress = parseKeypressValue(match[1]);
     return {
       behavior: "&kp",
       layerIndex: 0,
       modifier: HOLD_TAP_MODIFIERS[0].code,
-      keycode: match[1],
+      keycode: parsedKeypress.keycode,
+      keypressModifiers: parsedKeypress.modifiers,
     };
   }
 
@@ -49,16 +68,17 @@ export function parseStructuredBinding(raw, layerCount = 0) {
     layerIndex: 0,
     modifier: HOLD_TAP_MODIFIERS[0].code,
     keycode: "A",
+    keypressModifiers: [],
   };
 }
 
-export function buildStructuredBinding({ behavior, layerIndex, modifier, keycode }, layerCount = 0) {
+export function buildStructuredBinding({ behavior, layerIndex, modifier, keycode, keypressModifiers = [] }, layerCount = 0) {
   if (!STRUCTURED_BEHAVIORS.includes(behavior)) {
     throw new Error("Unsupported behavior.");
   }
   validateToken(keycode, "Keycode");
 
-  if (behavior === "&kp") return `&kp ${keycode}`;
+  if (behavior === "&kp") return `&kp ${buildKeypressValue(keycode, keypressModifiers)}`;
 
   if (behavior === "&lt") {
     if (!Number.isInteger(layerIndex)) {
@@ -94,4 +114,37 @@ function validateToken(value, label) {
 function clampLayer(layer, layerCount) {
   if (layerCount <= 0) return Math.max(0, layer);
   return Math.min(Math.max(0, layer), layerCount - 1);
+}
+
+function parseKeypressValue(value) {
+  const modifiers = [];
+  let current = value;
+
+  while (true) {
+    const match = /^([LR][CSAG])\((.+)\)$/.exec(current);
+    if (!match || !KEY_PRESS_MODIFIERS.some((modifier) => modifier.code === match[1])) break;
+    modifiers.push(match[1]);
+    current = match[2];
+  }
+
+  return {
+    keycode: current,
+    modifiers: sortKeypressModifiers(modifiers),
+  };
+}
+
+function buildKeypressValue(keycode, modifiers) {
+  const selected = sortKeypressModifiers(modifiers);
+  let value = keycode;
+  for (let index = selected.length - 1; index >= 0; index -= 1) {
+    value = `${selected[index]}(${value})`;
+  }
+  return value;
+}
+
+function sortKeypressModifiers(modifiers) {
+  const order = new Map(KEY_PRESS_MODIFIERS.map((modifier, index) => [modifier.code, index]));
+  return [...new Set(modifiers)]
+    .filter((modifier) => order.has(modifier))
+    .sort((left, right) => order.get(left) - order.get(right));
 }

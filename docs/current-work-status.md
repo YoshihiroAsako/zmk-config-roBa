@@ -36,9 +36,35 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
 - 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
-- 現在、明示された主要実装候補は一通り完了。次にやる場合は「次にやること > その他、必要に応じて」から小さな UX 調整や追加確認を選ぶ。
+- ZMK Studio 風の `Key Press` 修飾キー選択 UI まで実装済み。次はブラウザ上の手動確認と commit/push 整理が候補。
 
 ## 最新チェックポイント
+
+### 2026-05-06: Key Press 修飾キー選択 UI 実装・検証済み（未 push）
+
+実装済み:
+
+- **`&kp` 用 modifier toggle 追加**: `KeycodePicker` の `KP` 選択時に `L Ctrl` / `L Shift` / `L Alt` / `L GUI` / `R Ctrl` / `R Shift` / `R Alt` / `R GUI` の複数選択 toggle を表示するようにした。
+- **Behavior 表示変更**: 構造化 picker の Behavior ボタン表示を `&kp` / `&lt` / `&mt` から `KP` / `LT` / `MT` に変更し、`title` / `aria-label` に正式名称を入れた。
+- **parse / build 拡張**: `structuredBinding.js` が `&kp LS(PSCRN)` や `&kp LC(LS(PSCRN))` を base keycode + modifier 群へ分解し、安定順（`LC` → `LS` → `LA` → `LG` → `RC` → `RS` → `RA` → `RG`）で nested modifier syntax を生成するようにした。
+- **表示補強**: `bindingDisplay.js` で nested Key Press modifier を `C+S+PSCRN` や `RC+RS+TAB` のように読める表示へ補強した。既存の Windows JIS 補正（例: `LS(INT_YEN)` → `|`）は維持。
+- **テスト追加**: `structuredBinding.test.js` に modifier 付き `&kp` の build / parse / round-trip、`parseKeymap.test.js` に modifier 付き表示テストを追加。
+- **検証**: `tools/roba-keymap-viewer/` で `npm test` は 144 tests / 21 suites 全パス。`npm run build` 成功。dev server は `http://127.0.0.1:5184/` で HTTP 200 確認済み。ユーザーによる実機確認も完了。
+- **ブラウザ自動確認**: `agent-browser` CLI は PATH に無かったため未実施。
+
+### 2026-05-06: Key Press 修飾キー選択 UI の開発計画を追加（実装済み）
+
+計画済み:
+
+- **目的**: 添付画像の ZMK Studio に近い操作で、`&kp LS(PSCRN)` や `&kp LC(LS(TAB))` のような Shift / Ctrl / Alt / GUI 付き Key Press を raw binding 手入力なしで作れるようにする。
+- **Behavior ボタン表示変更**: 現在の `&kp` / `&lt` / `&mt` 表示を、`KP`（Key Press）/ `LT`（Layer-Tap）/ `MT`（Mod-Tap）へ変更する。
+- **`&kp` 用 modifier toggle**: `L Ctrl` / `L Shift` / `L Alt` / `L GUI` / `R Ctrl` / `R Shift` / `R Alt` / `R GUI` を複数選択できる UI を追加する。
+- **parse / build 対応**: 既存の `&kp LS(INT_YEN)` や `&kp LC(LS(PSCRN))` を開いた時に、Key と modifier toggle 状態へ復元できるようにする。
+- **既存機能維持**: `&lt` の Hold layer、`&mt` の Hold modifier + Tap keycode は現在の構造化 picker の挙動を維持する。
+- **詳細計画**: `docs/zmk-studio-like-app-advanced-editing-ux-notes.md` の「Key Press 修飾キー選択 UX（次回実装計画）」を参照。
+- **想定編集ファイル**: `tools/roba-keymap-viewer/src/keymap/structuredBinding.js`、`tools/roba-keymap-viewer/src/keymap/structuredBinding.test.js`、`tools/roba-keymap-viewer/src/App.jsx`、必要に応じて `tools/roba-keymap-viewer/src/keymap/bindingDisplay.js` と関連テスト。
+- **検証**: 後続実装で `npm test`、`npm run build`、dev server HTTP 200 まで確認済み。実ブラウザ自動確認は `agent-browser` CLI 不在のため未実施。
+- **後回し**: PC の物理キー入力から modifier 付き binding を直接 capture する機能は、ブラウザショートカット衝突があるため別タスクにする。
 
 ### 2026-05-06: バックアップ復元 UI 実装・検証・push 済み
 
@@ -198,15 +224,20 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ### 次の候補（任意・未着手）
 
-主要機能は一通り実装済み。以下は「使いやすさ」を高めるための候補で、優先度順に並べる。着手する場合は、先に目的と編集範囲をこのファイルへ短く追記してから進める。
+主要機能と Key Press 修飾キー選択 UI は実装済み。次に着手するなら、ブラウザ上での手動確認、微調整、または未 push 差分の整理を優先する。
 
-1. ~~**外部変更検知付き Save all（安全性強化）** — 実装済み・push 済み~~
-2. ~~**Save 前バリデーション（推し）** — 実装済み・push 済み~~
-3. ~~**Undo / Redo（pending changes ベース）** — 実装済み・push 済み~~
+1. **Key Press 修飾キー選択 UI の手動ブラウザ確認**
+   - dev server は `http://127.0.0.1:5184/` で起動確認済み。
+   - `Pick` から `KP` を選び、modifier toggle と keycode 検索で `&kp LS(PSCRN)` や `&kp LC(LS(TAB))` が作れることを確認する。
+   - 問題なければ未 push 差分を整理して commit/push する。
+
+2. ~~**外部変更検知付き Save all（安全性強化）** — 実装済み・push 済み~~
+3. ~~**Save 前バリデーション（推し）** — 実装済み・push 済み~~
+4. ~~**Undo / Redo（pending changes ベース）** — 実装済み・push 済み~~
    - `undoStack` / `redoStack` + `commitPendingChanges` で pending 履歴管理。Ctrl+Z / Ctrl+Shift+Z ショートカット付き。
-4. ~~**キーボードショートカット** — 実装済み（Undo/Redo と同時）・push 済み~~
+5. ~~**キーボードショートカット** — 実装済み（Undo/Redo と同時）・push 済み~~
    - `Ctrl+S` = Save all、`Ctrl+Z` = Undo、`Ctrl+Shift+Z` / `Ctrl+Y` = Redo。
-5. ~~**バックアップ復元 UI** — 実装済み・push 済み~~
+6. ~~**バックアップ復元 UI** — 実装済み・push 済み~~
    - `Save all` 直前バックアップの最近 N 件を UI に列挙し、1 クリックで `config/roBa.keymap` を戻せるようにする。`docs/viewer-to-device-guide.md` 8 章の手動 PowerShell リカバリを UI で完結させる。
 
 その他、必要に応じて:

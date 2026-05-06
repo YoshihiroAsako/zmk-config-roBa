@@ -101,12 +101,9 @@ function describeKeycode(key) {
   if (KEY_LABELS[key]) return { display: KEY_LABELS[key], note };
 
   if (key.includes("(")) {
-    const base = key.replace(/L[SGCA]\(/g, "").replace(/\)/g, "");
-    const mods = [];
-    if (key.includes("LC(")) mods.push("C");
-    if (key.includes("LA(")) mods.push("A");
-    if (key.includes("LS(")) mods.push("S");
-    if (key.includes("LG(")) mods.push("G");
+    const base = key.replace(/[LR][CSAG]\(/g, "").replace(/\)/g, "");
+    const modifierLabels = { LC: "C", LS: "S", LA: "A", LG: "G", RC: "RC", RS: "RS", RA: "RA", RG: "RG" };
+    const mods = key.match(/[LR][CSAG]\(/g)?.map((modifier) => modifierLabels[modifier.slice(0, 2)]) || [];
     return { display: `${mods.join("+")}+${KEY_LABELS[base] || base}`, note };
   }
 

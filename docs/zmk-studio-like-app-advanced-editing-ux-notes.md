@@ -228,6 +228,98 @@ Phase 2 の 1 キー編集で復帰させる。
 - Windows JIS 補正表を必ず介す
 - 直接適用ではなく、候補表示 → 確認 → diff の順にする
 
+## Key Press 修飾キー選択 UX（次回実装計画）
+
+目的:
+
+- `&kp` の編集を、添付画像の ZMK Studio に近い「Key Press + Key + modifier toggle」操作に寄せる。
+- `&kp LS(PSCRN)` や `&kp LC(LS(TAB))` のような修飾キー付き Key Press を、raw binding 手入力なしで作れるようにする。
+- 既存の `&lt` / `&mt` 構造化 picker は維持しつつ、Behavior 選択の表示名を分かりやすくする。
+
+現状:
+
+- `tools/roba-keymap-viewer/src/keymap/structuredBinding.js` は `&kp` / `&lt` / `&mt` の build / parse / validation に対応済み。
+- `KeycodePicker` は `&lt` の Hold layer と `&mt` の Hold modifier を選べる。
+- `&kp LS(INT_YEN)` などの修飾キー付き keycode は表示側で一部解釈できるが、`&kp` 用の修飾キー toggle UI はまだない。
+- `captureKeyToBinding()` は `Ctrl` / `Alt` / `Meta` 入力を無視し、`Shift` も修飾キーとしては binding に反映していない。
+
+UI 要件:
+
+- Behavior 選択ボタンの表示を次のように変更する。
+
+| 内部 behavior | 表示 |
+| --- | --- |
+| `&kp` | `KP`（Key Press） |
+| `&lt` | `LT`（Layer-Tap） |
+| `&mt` | `MT`（Mod-Tap） |
+
+- ボタン本体は短いラベル（`KP` / `LT` / `MT`）を主表示にし、title / aria-label で正式名称も分かるようにする。
+- `&kp` 選択時は、Key 入力欄または keycode 検索の下に modifier toggle を横並びで表示する。
+- modifier toggle の候補:
+  - `L Ctrl`
+  - `L Shift`
+  - `L Alt`
+  - `L GUI`
+  - `R Ctrl`
+  - `R Shift`
+  - `R Alt`
+  - `R GUI`
+- toggle は複数選択可能にする。
+- 生成 preview は残す。ただし、普段の操作は ZMK Studio 風のフォーム操作を主にする。
+
+binding 生成方針:
+
+- modifier 未選択: `&kp PSCRN`
+- modifier 1 個: `&kp LS(PSCRN)` など
+- modifier 複数: `&kp LC(LS(PSCRN))` のように ZMK の nested modifier syntax を生成する。
+- 生成順は安定させる。初期案は `LC` → `LS` → `LA` → `LG` → `RC` → `RS` → `RA` → `RG`。
+- `&mt` の Hold modifier（`LEFT_SHIFT` など）と、`&kp` の modifier wrapper（`LS(...)` など）は別モデルとして扱う。
+
+parse / 復元方針:
+
+- `&kp PSCRN` を開くと、Behavior = `KP`、Key = `PSCRN`、modifier なしで復元する。
+- `&kp LS(PSCRN)` を開くと、Behavior = `KP`、Key = `PSCRN`、`L Shift` toggle ON で復元する。
+- `&kp LC(LS(PSCRN))` のような nested modifier は、Key と modifier toggle 群へ戻す。
+- 既存の Windows JIS 補正表示（例: `LS(INT_YEN)` → `|`）を壊さない。
+- 未対応の複雑な keycode は raw keycode として保持し、壊して保存しない。
+
+実装候補:
+
+1. `structuredBinding.js` に Key Press modifier 用の定義を追加する。
+   - 例: `KEYPRESS_MODIFIERS = [{ code: "LS", label: "L Shift", order: ... }, ...]`
+   - draft に `keypressModifiers` を追加する。
+2. `parseStructuredBinding()` を拡張する。
+   - `&kp <keycode>` から nested modifier wrapper を剥がし、base keycode と selected modifiers に分解する。
+   - `&lt` / `&mt` の既存 parse は維持する。
+3. `buildStructuredBinding()` を拡張する。
+   - `behavior === "&kp"` のとき、selected modifiers を安定順に適用して `&kp LC(LS(KEY))` を生成する。
+4. `KeycodePicker` UI を更新する。
+   - Behavior ボタンを `KP` / `LT` / `MT` 表示に変更する。
+   - `&kp` 選択時に modifier toggle 群を追加する。
+   - `&lt` の Hold layer、`&mt` の Hold modifier、Tap keycode 入力は現在の役割を維持する。
+5. テストを追加・更新する。
+   - `&kp PSCRN`
+   - `&kp LS(PSCRN)`
+   - `&kp LC(LS(PSCRN))`
+   - parse → build の round-trip
+   - `&lt` / `&mt` の既存挙動が変わらないこと
+6. 必要に応じて `bindingDisplay.js` の表示テストを追加する。
+   - modifier 付き Key Press の表示が `C+S+PSCRN` のように読めること。
+
+後回しにすること:
+
+- PC の物理キー入力から `Ctrl+Shift+P` などを直接 capture して modifier 付き binding にする機能。
+- ブラウザショートカットとの衝突があるため、Key Capture の modifier 対応は UI toggle 実装後に別タスクとして扱う。
+
+検証:
+
+- `tools/roba-keymap-viewer/` で `npm test`。
+- `tools/roba-keymap-viewer/` で `npm run build`。
+- dev server で picker を開き、次を手動確認する。
+  - `KP` で modifier toggle を選んで `&kp LS(PSCRN)` 相当を生成できる。
+  - 既存の `&kp LS(INT_YEN)` を開いて toggle 状態に復元できる。
+  - `LT` / `MT` の既存操作が変わっていない。
+
 ## 保存 UX
 
 保存前に必ず以下を表示する。

@@ -64,6 +64,11 @@ describe("roBa keymap parser", () => {
     assert.equal(describeBinding("&kp LS(INT_YEN)").display, "|");
   });
 
+  it("shows nested keypress modifiers without hiding the base key", () => {
+    assert.equal(describeBinding("&kp LC(LS(PSCRN))").display, "C+S+PSCRN");
+    assert.equal(describeBinding("&kp RC(RS(TAB))").display, "RC+RS+TAB");
+  });
+
   it("keeps uncertain Windows JIS symbol keycodes visibly marked", () => {
     const tilde = describeBinding("&kp TILDE");
     const rightParenthesis = describeBinding("&kp RIGHT_PARENTHESIS");

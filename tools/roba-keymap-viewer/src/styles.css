@@ -1318,6 +1318,32 @@ td code {
   font-size: 12px;
 }
 
+.keypressModifierGroup {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.keypressModifierGroup button {
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid #d7e0ec;
+  border-radius: 6px;
+  background: #f8fbff;
+  color: #52647b;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.keypressModifierGroup button.active {
+  border-color: #315b9b;
+  background: #e8f0ff;
+  color: #244d88;
+  font-weight: 700;
+}
+
 .structuredPreview {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

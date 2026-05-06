@@ -12,6 +12,8 @@ import { buildNewMacroPreviewState, createEmptyMacroDraft } from "./keymap/macro
 import { buildEditorState } from "./keymap/editorPreview.js";
 import {
   HOLD_TAP_MODIFIERS,
+  KEY_PRESS_MODIFIERS,
+  STRUCTURED_BEHAVIOR_LABELS,
   STRUCTURED_BEHAVIORS,
   buildStructuredBinding,
   parseStructuredBinding,
@@ -2296,6 +2298,15 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
     else setDraft(nextDraft);
   };
 
+  const toggleKeypressModifier = (code) => {
+    setDraft((prev) => {
+      const selected = new Set(prev.keypressModifiers || []);
+      if (selected.has(code)) selected.delete(code);
+      else selected.add(code);
+      return { ...prev, keypressModifiers: [...selected] };
+    });
+  };
+
   return (
     <div className="pickerOverlay" onClick={onClose}>
       <div
@@ -2310,16 +2321,21 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
         </div>
         <div className="structuredPicker">
           <div className="behaviorPicker" role="group" aria-label="Behavior">
-            {STRUCTURED_BEHAVIORS.map((behavior) => (
-              <button
-                type="button"
-                key={behavior}
-                className={draft.behavior === behavior ? "active" : ""}
-                onClick={() => setDraft((prev) => ({ ...prev, behavior }))}
-              >
-                {behavior}
-              </button>
-            ))}
+            {STRUCTURED_BEHAVIORS.map((behavior) => {
+              const label = STRUCTURED_BEHAVIOR_LABELS[behavior];
+              return (
+                <button
+                  type="button"
+                  key={behavior}
+                  className={draft.behavior === behavior ? "active" : ""}
+                  onClick={() => setDraft((prev) => ({ ...prev, behavior }))}
+                  title={label.long}
+                  aria-label={label.long}
+                >
+                  {label.short}
+                </button>
+              );
+            })}
           </div>
           {draft.behavior === "&lt" && (
             <label>
@@ -2355,6 +2371,24 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
               aria-label="Structured picker keycode"
             />
           </label>
+          {draft.behavior === "&kp" && (
+            <div className="keypressModifierGroup" role="group" aria-label="Key Press modifiers">
+              {KEY_PRESS_MODIFIERS.map((modifier) => {
+                const active = (draft.keypressModifiers || []).includes(modifier.code);
+                return (
+                  <button
+                    type="button"
+                    key={modifier.code}
+                    className={active ? "active" : ""}
+                    aria-pressed={active}
+                    onClick={() => toggleKeypressModifier(modifier.code)}
+                  >
+                    {modifier.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="structuredPreview">
             <code>{structuredState.ok ? structuredState.binding : structuredState.message}</code>
             <button
