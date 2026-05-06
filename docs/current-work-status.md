@@ -38,28 +38,26 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
-### 2026-05-06: Keycode Picker / List Selection 実装完了（テスト全パス、ブラウザ確認待ち）
+### 2026-05-06: Keycode Picker 実装・ブラウザ確認・コミット済み
 
-実装済み:
+実装・確認済み:
 
-- **`src/keymap/keycodeCatalog.js`**: curated list（Letters/Numbers/Function keys/Navigation/Editing/Symbols/Modifiers/International の 8 カテゴリ、約 90 エントリ）+ `searchCatalog(query, category)` helper。
-  - 各 item は `{ code, label, category, aliases, note }` 形式。
-  - code は keyCapture.js と同じ ZMK 表記（ENTER, BACKSPACE, LEFT_ARROW, ESCAPE 等）。
+- **`src/keymap/keycodeCatalog.js`**: 8 カテゴリ約 90 エントリの curated list + `searchCatalog(query, category)`。
 - **`src/keymap/keycodeCatalog.test.js`**: 26 tests / 2 suites（`node:test` 形式）。
-- **`App.jsx`**: `pickerOpen` state 追加、`Pick keycode` ボタンを captureRow に追加、`KeycodePicker` コンポーネント追加、appShell 内でモーダル render。
-  - Pick keycode クリック時は captureMode を OFF にしてピッカーを開く。
-  - 選択後は `draftBinding` を `&kp CODE` に set し、Preview タブへ遷移してピッカーを閉じる。
-- **`styles.css`**: `.pickerOverlay` / `.pickerDialog` / `.pickerHeader` / `.pickerClose` / `.pickerSearch` / `.pickerCategories` / `.pickerList` / `.pickerItem` / `.pickerItemLabel` / `.pickerItemCode` / `.pickerItemNote` / `.pickerEmpty` スタイル追加。
-- **テスト**: 121 tests / 17 suites 全パス。
+- **`App.jsx`**: `pickerOpen` state、`Pick keycode` ボタン（captureMode を OFF にして開く）、`KeycodePicker` モーダルコンポーネント。選択後は `&kp CODE` を draft に set し Preview タブへ遷移。
+- **`styles.css`**: picker 用スタイル追加。
+- **テスト**: 121 tests / 17 suites 全パス。ブラウザ確認済み。コミット・push 済み。
 
-ブラウザ動作確認済み（2026-05-06）。
+### 過去の主な実装済み機能（概要）
 
-### 2026-05-06: Key Capture 入力 MVP 実装・UI動作確認完了
-
-実装・確認済み（概要）:
-
-- `src/keymap/keyCapture.js`: `captureKeyToBinding()` 純関数 helper。event.code ベースで `&kp` 生成。
-- `App.jsx`: captureMode / captureStatus state、keydown useEffect、Capture トグルボタン。
+- Read-only MVP（43キー表示、7レイヤー、各種タブ）
+- Phase 2 source-range editing（replaceBinding / replaceBindings）
+- Preview UI（Context Diff / `.keymap Preview`）
+- Pending changes + Save all（`POST /__roba/save-bindings`）
+- Combo / Macro / Layer rename 編集 + Save all 統合
+- keymap-drawer 自動更新（probe-first pattern）
+- Key Capture MVP（`captureKeyToBinding`、keydown useEffect、Capture トグル UI）
+- Keycode Picker（`keycodeCatalog.js`、検索・カテゴリ絞り込み、`KeycodePicker` モーダル）
 
 ### 2026-05-06: Layer rename + keymap-drawer 自動更新 完了・実生成確認済み
 
@@ -92,15 +90,24 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 次にやること
 
-### ブラウザ動作確認・必要なら修正
+Post-Phase 2-B（Keycode Picker）は完了。以下の順序で進める:
 
-Keycode Picker のブラウザ確認を行い、問題があれば修正する（確認手順は最新チェックポイントに記載）。
+### Step 1: Capture 未対応キーへの誘導（小規模・最優先）
 
-### [Post-Phase 2-B 完了後] 次候補
+- unsupported キーを Capture した時に captureStatus で「Pick keycode で選択可」のヒントを追加する。
+- 変更量が少なく、既存の Key Capture UX をすぐ改善できる。
 
-- Capture で unsupported になったキーに「picker で選べる」誘導 UI（captureStatus に "Pick keycode で選択可" のようなリンク/ヒント）。
-- `&lt` / `&mt` / `&mo` の構造化 picker（Phase 3 候補）。
-- Combo / Macro への keycode picker 展開。
+### Step 2: Combo / Macro への picker 展開（中規模）
+
+- 既存の `KeycodePicker` コンポーネントを Combo 編集・Macro 編集からも呼び出せるようにする。
+- 新規 UI 設計は不要。既存 picker をそのまま再利用するだけ。
+- Step 1 完了後に着手。
+
+### Step 3: `&lt` / `&mt` 構造化 picker（大規模・Phase 3）
+
+- hold-tap ビヘイビアを複数パラメータで GUI 設定できる専用 picker を新設する。
+  - ビヘイビア選択（`&kp` / `&lt` / `&mt` など）→ パラメータ入力（レイヤー番号 or モディファイア ＋ キーコード）
+- Step 2 完了後に設計・着手（Combo/Macro での利用ニーズも踏まえて設計する）。
 
 ## 現在の注意点
 

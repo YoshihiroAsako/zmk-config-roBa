@@ -176,7 +176,7 @@ function App() {
       if (result.ignored) return;
 
       if (result.unsupported) {
-        setCaptureStatus(`未対応: ${result.reason}`);
+        setCaptureStatus(`未対応: ${result.reason} → Pick keycode で選択できます`);
         return;
       }
 

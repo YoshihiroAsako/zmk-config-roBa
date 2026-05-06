@@ -162,6 +162,7 @@ pre {
 .visualPane,
 .bottomPanel {
   min-height: 0;
+  min-width: 0;
   background: #ffffff;
   border-color: #dfe6f0;
 }
@@ -1018,7 +1019,8 @@ td code {
 .captureRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   min-height: 28px;
 }
 
@@ -1036,8 +1038,9 @@ td code {
 }
 
 .editorBox .captureToggle:not(:disabled) {
-  border-color: #b7dfe4;
-  color: #52647b;
+  border-color: #087f8c;
+  background: #f0fbfc;
+  color: #0d5963;
   cursor: pointer;
 }
 
@@ -1049,11 +1052,10 @@ td code {
 }
 
 .captureHint {
-  overflow: hidden;
+  flex-basis: 100%;
   color: #65758b;
   font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
 }
 
 .pickerOverlay {

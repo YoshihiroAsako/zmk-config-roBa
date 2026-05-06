@@ -5,6 +5,7 @@ export const CATEGORIES = [
   "Navigation",
   "Editing",
   "Symbols",
+  "Shifted Symbols",
   "Modifiers",
   "International",
 ];
@@ -76,6 +77,29 @@ export const KEYCODE_CATALOG = [
   { code: "COMMA",         label: ", Comma",      category: "Symbols", aliases: [],                       note: "Comma / Less-than" },
   { code: "PERIOD",        label: ". Period",     category: "Symbols", aliases: ["DOT"],                  note: "Period / Greater-than" },
   { code: "SLASH",         label: "/ Slash",      category: "Symbols", aliases: ["FSLH"],                 note: "Slash / Question mark" },
+
+  // Shifted Symbols
+  { code: "EXCL",  label: "! Exclamation", category: "Shifted Symbols", aliases: ["EXCLAMATION"],          note: "Shift+1" },
+  { code: "AT",    label: "@ At",          category: "Shifted Symbols", aliases: [],                       note: "Shift+2" },
+  { code: "HASH",  label: "# Hash",        category: "Shifted Symbols", aliases: [],                       note: "Shift+3" },
+  { code: "DLLR",  label: "$ Dollar",      category: "Shifted Symbols", aliases: ["DOLLAR"],               note: "Shift+4" },
+  { code: "PRCNT", label: "% Percent",     category: "Shifted Symbols", aliases: ["PERCENT"],              note: "Shift+5" },
+  { code: "CARET", label: "^ Caret",       category: "Shifted Symbols", aliases: [],                       note: "Shift+6" },
+  { code: "AMPS",  label: "& Ampersand",   category: "Shifted Symbols", aliases: ["AMPERSAND"],            note: "Shift+7" },
+  { code: "STAR",  label: "* Star",        category: "Shifted Symbols", aliases: ["ASTERISK"],             note: "Shift+8" },
+  { code: "LPAR",  label: "( L Paren",     category: "Shifted Symbols", aliases: ["LEFT_PARENTHESIS"],     note: "Shift+9" },
+  { code: "RPAR",  label: ") R Paren",     category: "Shifted Symbols", aliases: ["RIGHT_PARENTHESIS"],    note: "Shift+0" },
+  { code: "UNDER", label: "_ Underscore",  category: "Shifted Symbols", aliases: ["UNDERSCORE"],           note: "Shift+Minus" },
+  { code: "PLUS",  label: "+ Plus",        category: "Shifted Symbols", aliases: [],                       note: "Shift+Equal" },
+  { code: "LBRC",  label: "{ L Brace",     category: "Shifted Symbols", aliases: ["LEFT_BRACE"],           note: "Shift+[" },
+  { code: "RBRC",  label: "} R Brace",     category: "Shifted Symbols", aliases: ["RIGHT_BRACE"],          note: "Shift+]" },
+  { code: "PIPE",  label: "| Pipe",        category: "Shifted Symbols", aliases: [],                       note: "Shift+Backslash" },
+  { code: "COLON", label: ": Colon",       category: "Shifted Symbols", aliases: [],                       note: "Shift+Semicolon" },
+  { code: "DQT",   label: "\" D-Quote",    category: "Shifted Symbols", aliases: ["DOUBLE_QUOTES"],        note: "Shift+Quote" },
+  { code: "TILDE", label: "~ Tilde",       category: "Shifted Symbols", aliases: [],                       note: "Shift+Grave" },
+  { code: "LT",    label: "< Less-than",   category: "Shifted Symbols", aliases: ["LESS_THAN"],            note: "Shift+Comma" },
+  { code: "GT",    label: "> Greater-than",category: "Shifted Symbols", aliases: ["GREATER_THAN"],         note: "Shift+Period" },
+  { code: "QMARK", label: "? Question",    category: "Shifted Symbols", aliases: ["QUESTION"],             note: "Shift+Slash" },
 
   // Modifiers
   { code: "LEFT_SHIFT",    label: "L Shift", category: "Modifiers", aliases: ["LSHFT", "LSHIFT"],           note: "" },
