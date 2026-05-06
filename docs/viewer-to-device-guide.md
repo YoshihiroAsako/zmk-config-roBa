@@ -38,13 +38,28 @@
 
 ### 2-1. Viewer の起動確認
 
+通常はリポジトリ直下の次のファイルをダブルクリックする。
+
+- 起動: `start-roba-viewer.cmd`
+- 終了: `stop-roba-viewer.cmd`
+
+`start-roba-viewer.cmd` は `http://127.0.0.1:5183/` でローカルサーバーを起動し、ブラウザを自動で開く。サーバーは裏で動き、停止は `stop-roba-viewer.cmd` で行う。
+
+初回だけ `node_modules` が無い場合は、PowerShell で次を実行する。
+
 ```powershell
-# tools/roba-keymap-viewer ディレクトリで開発サーバーを起動
+cd tools\roba-keymap-viewer
+npm install
+```
+
+手動で起動したい場合は、従来通り次でもよい。
+
+```powershell
 cd tools\roba-keymap-viewer
 npm run dev
 ```
 
-ブラウザで `http://127.0.0.1:5173/`（既に使用中の場合は Vite が表示する別ポートの URL）を開き、キーマップが読み込まれていることを確認する。
+ブラウザで `http://127.0.0.1:5183/`（手動起動時は Vite が表示する URL）を開き、キーマップが読み込まれていることを確認する。
 
 > **`Save all` は `npm run dev` の開発サーバー上でのみ有効**。`npm run preview` や `npm run build` の成果物では保存 API が動作しない。実機反映を伴う作業では必ず `npm run dev` で起動すること。
 >

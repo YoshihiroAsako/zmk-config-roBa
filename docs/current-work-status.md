@@ -40,7 +40,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
-### 2026-05-06: バックアップ復元 UI 実装・検証済み（未 push）
+### 2026-05-06: バックアップ復元 UI 実装・検証・push 済み
 
 実装済み:
 
@@ -50,6 +50,18 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **復元後処理**: keymap source / mtime を更新し、pending changes / undo / redo / 新規 combo・macro draft 状態をクリア。復元後に keymap-drawer 自動更新も呼ぶ。
 - **ドキュメント更新**: `docs/viewer-to-device-guide.md` の復元手順を手動 PowerShell から UI 復元へ更新。
 - **検証**: `npm test` は 142 tests / 21 suites 全パス。`npm run build` 成功。dev server は `http://127.0.0.1:5183/` で HTTP 200、`/__roba/keymap-backups` 応答確認済み。`agent-browser` CLI は PATH に無かったため実ブラウザ自動確認は未実施。
+- **commit/push**: `d95b794 バックアップ復元UIを実装_20260506` として `main` にコミット済み。`main` と `origin/main` は一致済み。
+
+### 2026-05-06: Viewer 簡単起動・停止スクリプト実装・検証済み（未 push）
+
+実装済み:
+
+- リポジトリ直下に `start-roba-viewer.cmd` / `stop-roba-viewer.cmd` を追加。
+- `start-roba-viewer.cmd` は `tools/roba-keymap-viewer/start-viewer.ps1` を呼び、`npm run dev -- --host 127.0.0.1 --port 5183` を裏で起動し、ブラウザで `http://127.0.0.1:5183/` を開く。
+- `stop-roba-viewer.cmd` は `tools/roba-keymap-viewer/stop-viewer.ps1` を呼び、pid ファイルから npm/cmd/node のプロセスツリーを停止する。
+- `.roba-viewer.pid` / `.roba-viewer.*.log` は `tools/roba-keymap-viewer/.roba-viewer.*` として `.gitignore` 済み。
+- `docs/viewer-to-device-guide.md` と `README.md` にダブルクリック起動・終了手順を追記。
+- **検証**: `start-roba-viewer.cmd` で起動し、`http://127.0.0.1:5183/` が HTTP 200。`stop-roba-viewer.cmd` で停止し、その後 HTTP 応答が停止することを確認済み。
 
 ### 2026-05-06: Undo/Redo + キーボードショートカット実装・検証・push 済み
 
@@ -194,7 +206,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
    - `undoStack` / `redoStack` + `commitPendingChanges` で pending 履歴管理。Ctrl+Z / Ctrl+Shift+Z ショートカット付き。
 4. ~~**キーボードショートカット** — 実装済み（Undo/Redo と同時）・push 済み~~
    - `Ctrl+S` = Save all、`Ctrl+Z` = Undo、`Ctrl+Shift+Z` / `Ctrl+Y` = Redo。
-5. ~~**バックアップ復元 UI** — 実装済み・未 push~~
+5. ~~**バックアップ復元 UI** — 実装済み・push 済み~~
    - `Save all` 直前バックアップの最近 N 件を UI に列挙し、1 クリックで `config/roBa.keymap` を戻せるようにする。`docs/viewer-to-device-guide.md` 8 章の手動 PowerShell リカバリを UI で完結させる。
 
 その他、必要に応じて:
