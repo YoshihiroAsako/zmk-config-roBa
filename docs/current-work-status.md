@@ -27,7 +27,7 @@
 
 ## 現在の作業テーマ
 
-roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/` の read-only MVP。
+roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/` のローカル keymap viewer/editor。
 
 目的:
 
@@ -35,7 +35,8 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - `config/roBa.json` を物理レイアウトの主な参照元として使う。
 - ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
-- 現在は Phase 5.5 まで完了。次は任意の UX 改善、または次フェーズの設計検討。
+- 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
+- 次にやる場合は「次にやること > 次の候補（任意・未着手）」から選ぶ。優先度上位は外部変更検知付き Save all と Save 前バリデーション。
 
 ## 最新チェックポイント
 
@@ -47,7 +48,8 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **Save all 修正・実ブラウザ確認済み**: 既存 macro binding 行追加・削除の `Save all` が `macro-bindings-replace target macro is missing after replacement.` で失敗したため、`App.jsx` の保存 payload に `macroName` を含めるよう修正。`npm test` / `npm run build` は再度成功。ユーザー側ブラウザで再試行し、エラーなしで保存成功を確認済み。
 - **Phase 5.5 Capture 拡張・実ブラウザ確認済み**: 確認用に `config/roBa.keymap` へ入った macro binding 追加差分を戻した。Combo / New combo / 既存 Macro binding 行 / New macro の binding draft に `Capture` ボタンを追加し、Capture 入力を該当 draft へ反映するようにした。`npm test` / `npm run build` は成功。ユーザー側ブラウザで確認済み。
 - **Phase 5.5 UI 調整・実ブラウザ確認済み**: Combo / Macro の個別 `Capture` ボタンが active 時に `Capture ON` 表示と強調色になるようにした。Macro binding 行で入力欄がボタンに押しつぶされないよう、binding 行を折り返し可能にして入力欄の最小幅を確保した。`npm test` / `npm run build` は成功。ユーザー側ブラウザで問題なし確認済み。
-- **commit/push**: `28445f1 phase 5.5 implementation_20260505` として `main` にコミット済み。`main` と `origin/main` は一致、作業ツリーはクリーン。
+- **commit/push**: `28445f1 phase 5.5 implementation_20260505` として `main` にコミット済み。`main` と `origin/main` は一致していた。
+- **現在の未コミット文書差分**: 2026-05-06 時点で、作業メモ整理として `docs/current-work-status.md` が変更済み、`docs/viewer-to-device-guide.md` が新規追加。どちらも文書差分で、追加確認事項や commit/push を止めるべき内容はない。
 
 ### 2026-05-06: Phase 5 既存 macro binding 行追加/削除 MVP 実装・検証済み
 
@@ -89,7 +91,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **Bindings / Combo / Macro で共通利用**: `pickerContext` の対象に応じて現在 draft を初期値にし、選択結果を raw binding / combo binding / macro binding draft に反映する。
 - **テスト helper 追加**: `keymap/structuredBinding.js` と `structuredBinding.test.js` を追加。`&kp` / `&lt` / `&mt` の build / parse / validation をテスト。
 - **検証**: `npm test` は 124 tests / 18 suites 全パス。`npm run build` 成功。Vite dev server は `http://localhost:5173` で HTTP 200 確認済み。`agent-browser` CLI は PATH に無かったが、ユーザー側ブラウザで一通り操作確認済み・問題なし。
-- **コミット/プッシュ**: ユーザー報告ではコミット・プッシュ済み。ただしこの作業ツリーでは 2026-05-06 時点で Step 4 関連ファイルが未コミット差分として見えているため、新ブランチ作成前に `git status` と直近コミット内容を確認すること。
+- **コミット/プッシュ**: 後続の Phase 5.5 コミットに含まれ、`main` へ push 済み。
 
 ### 2026-05-06: Step 3 完了・コミット済み
 
@@ -123,9 +125,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ### ~~Step 4: `&lt` / `&mt` 構造化 picker（MVP 実装・検証完了）~~
 
-- hold-tap ビヘイビアを複数パラメータで GUI 設定できる専用 picker を新設する。
-  - ビヘイビア選択（`&kp` / `&lt` / `&mt` など）→ パラメータ入力（レイヤー番号 or モディファイア ＋ キーコード）
-- Combo / Macro での利用ニーズも踏まえて設計する。
+- `&kp` / `&lt` / `&mt` の構造化 picker は実装済み。今後拡張する場合は、他の behavior を増やすか、Save 前バリデーション側へ寄せて扱う。
 
 ### Phase 5: 新規コンボ・マクロ追加（完了）
 
@@ -133,11 +133,29 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - ~~Macros タブに "New macro" ボタンを設け、`macros { }` ブロックに新しいノードを挿入する。~~
 - ~~既存マクロへの binding 行の追加/削除も含む。~~
 
-### 次の候補（任意）
+### 次の候補（任意・未着手）
 
-- New combo / New macro の保存フローを、必要に応じて追加で手動ブラウザ確認する。
-- Macro binding 行追加/削除の UX を必要に応じて微調整する（例: 行の並べ替え、undo 表示）。
-- 次フェーズを始める場合は、先に目的と編集範囲を `docs/current-work-status.md` に短く追記する。
+主要機能は一通り実装済み。以下は「使いやすさ」を高めるための候補で、優先度順に並べる。着手する場合は、先に目的と編集範囲をこのファイルへ短く追記してから進める。
+
+1. **外部変更検知付き Save all（安全性強化・推し）**
+   - 読み込み時の `config/roBa.keymap` の mtime / hash を保持し、`Save all` 直前に変わっていれば確認ダイアログを出す。
+   - `keymap-drawer/roBa.yaml` / `keymap-drawer/roBa.svg` も Save all 後に自動再生成され得るため、関連ファイルに未コミット差分がある場合は保存前に警告する。
+   - 目的: 手動編集や別セッションの保存を黙って上書きする事故を防ぐ。バックアップ機構の補完。
+2. **Save 前バリデーション（推し）**
+   - `&lt N` / `&mo N` の `N` がレイヤー範囲外、combo の `key-positions` の範囲外・重複・数不足、combo / macro の node name 重複や不正名、macro の空 bindings、`layers = <...>` の範囲外などを保存前に警告。
+   - 既存 macro の非対応 binding を扱う場合は、保存前後で保持条件が崩れていないことも検査する。
+   - 目的: パースは通るが Actions ビルドで落ちる類のミスを push 前に検出する。
+3. **Undo / Redo（pending changes ベース）**
+   - `pendingChanges` 配列の履歴スタックを持ち、1 個前の状態へ戻せるようにする。今は「全 discard」しか戻し方がない。
+4. **キーボードショートカット**
+   - `Ctrl+S` = `Save all`、`Esc` = picker / capture を閉じる、`Ctrl+Z` = Undo（上記 3 と連動）。
+5. **バックアップ復元 UI**
+   - `Save all` 直前バックアップの最近 N 件を UI に列挙し、1 クリックで `config/roBa.keymap` を戻せるようにする。`docs/viewer-to-device-guide.md` 8 章の手動 PowerShell リカバリを UI で完結させる。
+
+その他、必要に応じて:
+
+- New combo / New macro の保存フローを追加で手動ブラウザ確認する。
+- Macro binding 行追加/削除の UX を微調整する（例: 行の並べ替え、undo 表示）。
 
 ## 現在の注意点
 
@@ -163,6 +181,7 @@ roBa Keymap Viewer:
 
 詳細資料:
 
+- `docs/viewer-to-device-guide.md`
 - `docs/zmk-studio-like-app-plan.md`
 - `docs/zmk-studio-like-app-phase0-research.md`
 - `docs/zmk-studio-like-app-phase0-rereview.md`
