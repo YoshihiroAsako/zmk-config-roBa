@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { execFile } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { saveBindingChange, saveBindingChanges } from "./src/keymap/saveBindingChange.js";
@@ -23,8 +23,8 @@ export default defineConfig({
           if (request.method !== "GET") return next();
 
           try {
-            const source = await readFile(keymapPath, "utf8");
-            sendJson(response, 200, { ok: true, source });
+            const [source, fileStat] = await Promise.all([readFile(keymapPath, "utf8"), stat(keymapPath)]);
+            sendJson(response, 200, { ok: true, source, mtime: fileStat.mtimeMs });
           } catch (error) {
             sendJson(response, 500, { ok: false, message: error.message });
           }
@@ -54,13 +54,38 @@ export default defineConfig({
 
           try {
             const body = await readJsonBody(request);
+            const { expectedMtime, forceMtime, forceDrawer } = body;
+
+            if (expectedMtime != null && !forceMtime) {
+              const fileStat = await stat(keymapPath);
+              if (Math.abs(fileStat.mtimeMs - expectedMtime) > 1000) {
+                return sendJson(response, 200, {
+                  ok: false,
+                  error: "FILE_CHANGED",
+                  message: "config/roBa.keymap がロード後に外部で変更されています。上書きして保存しますか？",
+                });
+              }
+            }
+
+            if (!forceDrawer) {
+              const drawerDirty = await checkDrawerDirty();
+              if (drawerDirty.dirty) {
+                return sendJson(response, 200, {
+                  ok: false,
+                  error: "DRAWER_DIRTY",
+                  paths: drawerDirty.paths,
+                  message: "keymap-drawer ファイルに未コミットの変更があります。",
+                });
+              }
+            }
+
             const result = await saveBindingChanges({
               repoRoot,
               sourcePath: body.sourcePath,
               changes: body.changes,
             });
-            const source = await readFile(keymapPath, "utf8");
-            sendJson(response, 200, { ...result, source });
+            const [source, fileStat] = await Promise.all([readFile(keymapPath, "utf8"), stat(keymapPath)]);
+            sendJson(response, 200, { ...result, source, mtime: fileStat.mtimeMs });
           } catch (error) {
             sendJson(response, 400, { ok: false, message: error.message });
           }
@@ -85,6 +110,20 @@ export default defineConfig({
     },
   },
 });
+
+async function checkDrawerDirty() {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["-C", repoRoot, "status", "--porcelain", "--", "keymap-drawer/roBa.yaml", "keymap-drawer/roBa.svg"],
+      { timeout: 5000 },
+    );
+    const lines = stdout.trim().split("\n").filter(Boolean);
+    return { dirty: lines.length > 0, paths: lines.map((l) => l.slice(3)) };
+  } catch {
+    return { dirty: false, paths: [] };
+  }
+}
 
 function sendJson(response, statusCode, payload) {
   response.statusCode = statusCode;

@@ -40,6 +40,17 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-06: 外部変更検知付き Save all 実装・検証済み（未 push）
+
+実装済み:
+
+- **`GET /__roba/keymap-source` に `mtime` 追加**: `stat()` で `mtimeMs` を取得し、`{ ok, source, mtime }` を返す。
+- **`POST /__roba/save-bindings` に mtime チェック追加**: `expectedMtime`, `forceMtime`, `forceDrawer` を受け付ける。外部変更があれば `{ ok: false, error: "FILE_CHANGED" }` を返す。
+- **`checkDrawerDirty()` ヘルパー追加**: `git status --porcelain` で `keymap-drawer/` の未コミット差分を検出し、`{ ok: false, error: "DRAWER_DIRTY", paths }` を返す。
+- **クライアント側 `keymapMtime` state 追加**: マウント時に初期 mtime を fetch。reload 時・save 成功時にも更新。
+- **`saveAllPendingChanges` に force フラグ対応**: `FILE_CHANGED` / `DRAWER_DIRTY` 時は `window.confirm` で確認し、確認後に force フラグを立てて再呼び出し。
+- **検証**: `npm test` は 135 tests / 20 suites 全パス。`npm run build` 成功。実ブラウザ確認: 未実施。
+
 ### 2026-05-06: Phase 5.5 実装・検証・push 済み
 
 - **検証**: `tools/roba-keymap-viewer/` で `npm test` は 135 tests / 20 suites 全パス。`npm run build` 成功。
@@ -137,10 +148,8 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 主要機能は一通り実装済み。以下は「使いやすさ」を高めるための候補で、優先度順に並べる。着手する場合は、先に目的と編集範囲をこのファイルへ短く追記してから進める。
 
-1. **外部変更検知付き Save all（安全性強化・推し）**
-   - 読み込み時の `config/roBa.keymap` の mtime / hash を保持し、`Save all` 直前に変わっていれば確認ダイアログを出す。
-   - `keymap-drawer/roBa.yaml` / `keymap-drawer/roBa.svg` も Save all 後に自動再生成され得るため、関連ファイルに未コミット差分がある場合は保存前に警告する。
-   - 目的: 手動編集や別セッションの保存を黙って上書きする事故を防ぐ。バックアップ機構の補完。
+1. ~~**外部変更検知付き Save all（安全性強化）** — 実装済み・未 push~~
+   - mtime チェック（FILE_CHANGED）と keymap-drawer 未コミット差分警告（DRAWER_DIRTY）を実装。実ブラウザ確認は未実施。push 前にブラウザで動作確認すること。
 2. **Save 前バリデーション（推し）**
    - `&lt N` / `&mo N` の `N` がレイヤー範囲外、combo の `key-positions` の範囲外・重複・数不足、combo / macro の node name 重複や不正名、macro の空 bindings、`layers = <...>` の範囲外などを保存前に警告。
    - 既存 macro の非対応 binding を扱う場合は、保存前後で保持条件が崩れていないことも検査する。

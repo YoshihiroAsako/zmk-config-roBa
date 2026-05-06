@@ -89,6 +89,7 @@ function App() {
   const [captureStatus, setCaptureStatus] = useState(null);
   const [captureContext, setCaptureContext] = useState({ type: "binding" });
   const [pickerContext, setPickerContext] = useState(null);
+  const [keymapMtime, setKeymapMtime] = useState(null);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -165,6 +166,14 @@ function App() {
   );
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
+
+  useEffect(() => {
+    if (!saveEndpointAvailable) return;
+    fetch("/__roba/keymap-source")
+      .then((r) => r.json())
+      .then((payload) => { if (payload.ok) setKeymapMtime(payload.mtime ?? null); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setDraftBinding(selectedPendingChange?.nextRaw || selectedEntry?.raw || selectedBinding);
@@ -297,6 +306,7 @@ function App() {
       }
 
       setKeymapSource(payload.source);
+      setKeymapMtime(payload.mtime ?? null);
       setDraftBinding(null);
       setPendingChanges([]);
       setIsAddingCombo(false);
@@ -391,7 +401,7 @@ function App() {
     }
   };
 
-  const saveAllPendingChanges = async () => {
+  const saveAllPendingChanges = async ({ forceMtime = false, forceDrawer = false } = {}) => {
     if (!pendingChanges.length || !pendingState.valid) return;
     if (!saveEndpointAvailable) {
       setSaveStatus({
@@ -422,14 +432,35 @@ function App() {
             currentRaw: change.currentRaw,
             nextRaw: change.nextRaw,
           })),
+          expectedMtime: keymapMtime,
+          forceMtime,
+          forceDrawer,
         }),
       });
       const payload = await response.json().catch(() => ({}));
+
       if (!response.ok || !payload.ok) {
+        if (payload.error === "FILE_CHANGED") {
+          setSaveStatus(EMPTY_SAVE_STATUS);
+          const confirmed = window.confirm(
+            "config/roBa.keymap がロード後に外部で変更されています。\n\n上書きして保存しますか？",
+          );
+          if (confirmed) saveAllPendingChanges({ forceMtime: true, forceDrawer });
+          return;
+        }
+        if (payload.error === "DRAWER_DIRTY") {
+          setSaveStatus(EMPTY_SAVE_STATUS);
+          const confirmed = window.confirm(
+            `keymap-drawer ファイルに未コミットの変更があります:\n  ${payload.paths.join("\n  ")}\n\nSave all 後の自動更新で上書きされる可能性があります。続行しますか？`,
+          );
+          if (confirmed) saveAllPendingChanges({ forceMtime, forceDrawer: true });
+          return;
+        }
         throw new Error(payload.message || "Save all failed.");
       }
 
       setKeymapSource(payload.source);
+      setKeymapMtime(payload.mtime ?? null);
       setDraftBinding(null);
       setPendingChanges([]);
       setIsAddingCombo(false);
