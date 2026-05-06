@@ -32,6 +32,8 @@ import {
   buildTrackballAutomouseDraftChange,
   buildTrackballScrollLayersDraftChange,
   buildSensorBindingDraftChange,
+  buildSensorBindingInsertDraftChange,
+  buildSensorBindingRemoveDraftChange,
   buildPendingChangesState,
   getDraftId,
   removeDraftChange,
@@ -96,6 +98,7 @@ function App() {
   const [trackballDraft, setTrackballDraft] = useState({ automouseLayerRaw: "", scrollLayersRaw: "" });
   const [sensorDrafts, setSensorDrafts] = useState({});
   const [selectedSensorLayerIndex, setSelectedSensorLayerIndex] = useState(null);
+  const [sensorInsertLayerIndex, setSensorInsertLayerIndex] = useState("");
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
@@ -355,6 +358,7 @@ function App() {
       setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
       setSensorDrafts({});
       setSelectedSensorLayerIndex(null);
+      setSensorInsertLayerIndex("");
       setSaveStatus({
         tone: "ok",
         title: "Reloaded source",
@@ -473,6 +477,7 @@ function App() {
           sourcePath: "config/roBa.keymap",
           changes: pendingChanges.map((change) => ({
             kind: change.kind,
+            layerIndex: change.layerIndex,
             macroName: change.macroName,
             range: change.range,
             currentRaw: change.currentRaw,
@@ -514,6 +519,7 @@ function App() {
       setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
       setSensorDrafts({});
       setSelectedSensorLayerIndex(null);
+      setSensorInsertLayerIndex("");
       setSaveStatus({
         tone: "ok",
         title: "Saved pending changes",
@@ -586,6 +592,7 @@ function App() {
       setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
       setSensorDrafts({});
       setSelectedSensorLayerIndex(null);
+      setSensorInsertLayerIndex("");
       setSaveStatus({
         tone: "ok",
         title: "Restored backup",
@@ -848,6 +855,10 @@ function App() {
   const sensorLayersWithBindings = document.layers.filter(
     (layer) => layer.sensorBindings.length > 0 && layer.sensorBindings[0].behavior === "&inc_dec_kp",
   );
+  const sensorLayersWithoutBindings = document.layers.filter((layer) => layer.sensorBindings.length === 0);
+  const effectiveSensorInsertLayerIndex = sensorInsertLayerIndex === "" && sensorLayersWithoutBindings.length
+    ? String(sensorLayersWithoutBindings[0].id)
+    : sensorInsertLayerIndex;
 
   const addSensorDraft = (layerIndex) => {
     const layer = document.layers.find((l) => l.id === layerIndex);
@@ -857,6 +868,27 @@ function App() {
     const draft = sensorDrafts[layerIndex];
     if (!draft) return;
     const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: draft.incKey, decKey: draft.decKey });
+    commitPendingChanges(upsertDraftChange(pendingChanges, change));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const addSensorLayerDraft = () => {
+    const layerIndex = Number(effectiveSensorInsertLayerIndex);
+    const layer = document.layers.find((l) => l.id === layerIndex);
+    if (!layer || layer.sensorBindings.length) return;
+    const change = buildSensorBindingInsertDraftChange({ source: keymapSource, layer });
+    commitPendingChanges(upsertDraftChange(pendingChanges, change));
+    setSelectedSensorLayerIndex(layerIndex);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const deleteSensorBindingDraft = (layerIndex) => {
+    const layer = document.layers.find((l) => l.id === layerIndex);
+    const sb = layer?.sensorBindings[0];
+    if (!layer || !sb) return;
+    const change = buildSensorBindingRemoveDraftChange({ source: keymapSource, layer, sensorBinding: sb });
     commitPendingChanges(upsertDraftChange(pendingChanges, change));
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
@@ -1328,8 +1360,11 @@ function App() {
           onRemoveTrackballDraft={removeTrackballDraft}
           sensorDrafts={sensorDrafts}
           sensorLayersWithBindings={sensorLayersWithBindings}
+          sensorLayersWithoutBindings={sensorLayersWithoutBindings}
           selectedSensorLayerIndex={selectedSensorLayerIndex}
+          sensorInsertLayerIndex={effectiveSensorInsertLayerIndex}
           onSelectSensorLayer={setSelectedSensorLayerIndex}
+          onSelectSensorInsertLayer={setSensorInsertLayerIndex}
           onSensorDraftChange={(layerIndex, field, value) => {
             setSensorDrafts((prev) => ({ ...prev, [layerIndex]: { ...prev[layerIndex], [field]: value } }));
             setSaveStatus(EMPTY_SAVE_STATUS);
@@ -1346,6 +1381,8 @@ function App() {
           }}
           onAddSensorDraft={addSensorDraft}
           onRemoveSensorDraft={removeSensorDraft}
+          onAddSensorLayerDraft={addSensorLayerDraft}
+          onDeleteSensorBindingDraft={deleteSensorBindingDraft}
         />
       </section>
     </div>
@@ -1946,14 +1983,19 @@ function PanelContent({
   onRemoveTrackballDraft,
   sensorDrafts,
   sensorLayersWithBindings,
+  sensorLayersWithoutBindings,
   selectedSensorLayerIndex,
+  sensorInsertLayerIndex,
   onSelectSensorLayer,
+  onSelectSensorInsertLayer,
   onSensorDraftChange,
   onSensorPickInc,
   onSensorPickDec,
   onSensorSwap,
   onAddSensorDraft,
   onRemoveSensorDraft,
+  onAddSensorLayerDraft,
+  onDeleteSensorBindingDraft,
 }) {
   if (tab === "Bindings") {
     return (
@@ -2033,7 +2075,7 @@ function PanelContent({
       : false;
     return (
       <div className="splitPanel">
-        <div className="tableSection">
+        <div className="tableSection sensorTableSection">
           <Table
             columns={["Layer", "Inc", "Dec"]}
             rows={sensorLayersWithBindings}
@@ -2049,6 +2091,24 @@ function PanelContent({
               </tr>
             )}
           />
+          <div className="sensorAddSection">
+            <label className="fieldLabel" htmlFor="sensor-add-layer">Add sensor-binding</label>
+            <div className="fieldRow">
+              <select
+                id="sensor-add-layer"
+                value={sensorInsertLayerIndex}
+                onChange={(event) => onSelectSensorInsertLayer(event.target.value)}
+                disabled={!sensorLayersWithoutBindings.length}
+              >
+                {sensorLayersWithoutBindings.map((layer) => (
+                  <option key={layer.id} value={layer.id}>{layer.name}</option>
+                ))}
+              </select>
+              <button type="button" disabled={!sensorLayersWithoutBindings.length} onClick={onAddSensorLayerDraft}>
+                Add layer
+              </button>
+            </div>
+          </div>
         </div>
         {selectedSensorLayer && sensorDraft ? (
           <SensorDetailPanel
@@ -2061,6 +2121,7 @@ function PanelContent({
             onSwap={() => onSensorSwap(selectedSensorLayerIndex)}
             onAddDraft={() => onAddSensorDraft(selectedSensorLayerIndex)}
             onRemoveDraft={() => onRemoveSensorDraft(selectedSensorLayerIndex)}
+            onDeleteBinding={() => onDeleteSensorBindingDraft(selectedSensorLayerIndex)}
           />
         ) : (
           <div className="detailPlaceholder">← レイヤーを選択して編集</div>
@@ -2445,9 +2506,10 @@ function shorten(value, max) {
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
-function SensorDetailPanel({ layer, draft, pending, changed, onPickInc, onPickDec, onSwap, onAddDraft, onRemoveDraft }) {
+function SensorDetailPanel({ layer, draft, pending, changed, onPickInc, onPickDec, onSwap, onAddDraft, onRemoveDraft, onDeleteBinding }) {
   const sb = layer.sensorBindings[0];
   const previewRaw = `&inc_dec_kp ${draft.incKey || "?"} ${draft.decKey || "?"}`;
+  const pendingRemove = pending?.kind === "sensor-binding-remove";
   return (
     <section className="sensorDetailPanel" aria-label="sensor binding editor">
       <div className="editorHeader">
@@ -2485,6 +2547,9 @@ function SensorDetailPanel({ layer, draft, pending, changed, onPickInc, onPickDe
         </button>
         <button type="button" disabled={!pending && !changed} onClick={onRemoveDraft}>
           Remove draft
+        </button>
+        <button type="button" disabled={pendingRemove} onClick={onDeleteBinding}>
+          Remove sensor-binding
         </button>
       </div>
       <div className="fieldLabel">保存済み: <code>{sb.raw}</code></div>

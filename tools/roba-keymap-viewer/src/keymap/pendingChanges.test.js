@@ -10,6 +10,8 @@ import {
   buildTrackballAutomouseDraftChange,
   buildTrackballScrollLayersDraftChange,
   buildSensorBindingDraftChange,
+  buildSensorBindingInsertDraftChange,
+  buildSensorBindingRemoveDraftChange,
   buildPendingChangesState,
   removeDraftChange,
   upsertDraftChange,
@@ -572,5 +574,39 @@ describe("sensor-binding pending changes", () => {
     const state = buildPendingChangesState(source, [change], parsed.layers);
     assert.equal(state.valid, true);
     assert.ok(state.nextSource.includes("&inc_dec_kp LEFT RIGHT"));
+  });
+
+  it("buildSensorBindingInsertDraftChange inserts a property into a layer without sensor-bindings", () => {
+    const source = `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+    };
+  };
+};`;
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const change = buildSensorBindingInsertDraftChange({ source, layer, incKey: "LEFT", decKey: "RIGHT" });
+    assert.equal(change.kind, "sensor-binding-insert");
+    assert.equal(change.currentRaw, "");
+    assert.ok(change.nextRaw.includes("sensor-bindings = <&inc_dec_kp LEFT RIGHT>;"));
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+    assert.equal(parseKeymap(state.nextSource).layers[0].sensorBindings[0].incKey, "LEFT");
+  });
+
+  it("buildSensorBindingRemoveDraftChange removes the whole sensor-bindings property line", () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingRemoveDraftChange({ source, layer, sensorBinding: sb });
+    assert.equal(change.kind, "sensor-binding-remove");
+    assert.equal(change.nextRaw, "");
+    assert.ok(change.currentRaw.startsWith("sensor-bindings = <&inc_dec_kp"));
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+    assert.equal(parseKeymap(state.nextSource).layers[0].sensorBindings.length, 0);
   });
 });

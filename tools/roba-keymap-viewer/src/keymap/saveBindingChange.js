@@ -225,6 +225,7 @@ export function buildSaveDiagnostics(beforeParsed, afterParsed, expectedDeltas =
   const afterLayerBindingCounts = afterParsed.layers.map((layer) => layer.bindings.length);
   const beforeSensorBindingCount = countSensorBindings(beforeParsed);
   const afterSensorBindingCount = countSensorBindings(afterParsed);
+  const expectedSensorBindingDelta = expectedDeltas.sensorBindingDelta || 0;
 
   const beforeUniqueLayerNames = new Set(beforeParsed.layers.map((layer) => layer.name)).size;
   const afterUniqueLayerNames = new Set(afterParsed.layers.map((layer) => layer.name)).size;
@@ -265,7 +266,7 @@ export function buildSaveDiagnostics(beforeParsed, afterParsed, expectedDeltas =
       label: "Sensor binding count",
       before: beforeSensorBindingCount,
       after: afterSensorBindingCount,
-      ok: beforeSensorBindingCount === afterSensorBindingCount,
+      ok: afterSensorBindingCount === beforeSensorBindingCount + expectedSensorBindingDelta,
     },
   ];
 }
@@ -442,6 +443,17 @@ function validateSourceChange(source, change) {
       throw new Error("sensor-binding source range does not contain a valid &inc_dec_kp expression.");
     }
     validateSensorBindingPreserved(source, change);
+  } else if (change.kind === "sensor-binding-insert") {
+    if (change.range.start !== change.range.end) throw new Error("sensor-binding-insert must be a zero-length range.");
+    if (change.currentRaw !== "") throw new Error("sensor-binding-insert must have empty currentRaw.");
+    validateSensorBindingInsertionContent(change.nextRaw);
+    validateSensorBindingInserted(source, change);
+  } else if (change.kind === "sensor-binding-remove") {
+    if (change.nextRaw !== "") throw new Error("sensor-binding-remove must have empty nextRaw.");
+    if (!/sensor-bindings\s*=/.test(source.slice(change.range.start, change.range.end))) {
+      throw new Error("sensor-binding-remove range does not contain a sensor-bindings property.");
+    }
+    validateSensorBindingRemoved(source, change);
   } else {
     throw new Error("Unsupported pending change kind.");
   }
@@ -451,6 +463,8 @@ function getExpectedDeltas(changes) {
   return {
     comboDelta: changes.filter((change) => change.kind === "combo-node-insert").length,
     macroDelta: changes.filter((change) => change.kind === "macro-node-insert").length,
+    sensorBindingDelta: changes.filter((change) => change.kind === "sensor-binding-insert").length -
+      changes.filter((change) => change.kind === "sensor-binding-remove").length,
   };
 }
 
@@ -624,6 +638,43 @@ function validateSensorBindingPreserved(source, change) {
   }
   if (!/^&inc_dec_kp \S+ \S+$/.test(afterLayer.sensorBindings[0].raw.trim())) {
     throw new Error("sensor-binding: replacement did not produce a valid &inc_dec_kp expression.");
+  }
+}
+
+function validateSensorBindingInserted(source, change) {
+  const beforeParsed = parseKeymap(source);
+  const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+  const afterParsed = parseKeymap(nextSource);
+  const beforeLayer = beforeParsed.layers[change.layerIndex];
+  const afterLayer = afterParsed.layers[change.layerIndex];
+  if (!beforeLayer || !afterLayer) throw new Error("sensor-binding-insert target layer is missing.");
+  if (beforeLayer.sensorBindings.length) {
+    throw new Error("sensor-binding-insert target layer already has sensor-bindings.");
+  }
+  if (afterLayer.sensorBindings.length !== 1 || afterLayer.sensorBindings[0].behavior !== "&inc_dec_kp") {
+    throw new Error("sensor-binding-insert did not add a valid &inc_dec_kp binding.");
+  }
+}
+
+function validateSensorBindingRemoved(source, change) {
+  const beforeParsed = parseKeymap(source);
+  const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+  const afterParsed = parseKeymap(nextSource);
+  const beforeLayer = beforeParsed.layers[change.layerIndex];
+  const afterLayer = afterParsed.layers[change.layerIndex];
+  if (!beforeLayer || !afterLayer) throw new Error("sensor-binding-remove target layer is missing.");
+  if (!beforeLayer.sensorBindings.length) {
+    throw new Error("sensor-binding-remove target layer has no sensor-bindings.");
+  }
+  if (afterLayer.sensorBindings.length) {
+    throw new Error("sensor-binding-remove did not remove sensor-bindings from the target layer.");
+  }
+}
+
+function validateSensorBindingInsertionContent(nextRaw) {
+  const match = String(nextRaw || "").match(/sensor-bindings\s*=\s*<([^<>;\r\n]+)>;\r?\n$/);
+  if (!match || !/^&inc_dec_kp \S+ \S+$/.test(match[1].trim())) {
+    throw new Error("sensor-binding-insert content is invalid.");
   }
 }
 

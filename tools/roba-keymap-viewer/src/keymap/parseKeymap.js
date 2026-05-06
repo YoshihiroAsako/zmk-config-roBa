@@ -357,6 +357,14 @@ export function parseKeymap(source) {
       bindings: bindingEntries.map((entry) => entry.raw),
       bindingEntries,
       sensorBindings: parseSensorBindings(layer.body, layer.bodyStart),
+      sourceRange: {
+        start: layer.rawStart,
+        end: layer.rawEnd,
+      },
+      bodyRange: {
+        start: layer.bodyStart,
+        end: layer.bodyEnd,
+      },
       raw: layer.raw,
     };
   });

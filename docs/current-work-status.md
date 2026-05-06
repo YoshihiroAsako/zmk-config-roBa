@@ -36,12 +36,26 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
 - 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
-- Task B（エンコーダー回転 sensor-bindings 編集）まで実装済み。181 tests / 26 suites 全パス。`npm run build` 成功。
-- **次**: ブラウザ手動確認 → commit/push。
+- Task E（sensor-bindings のレイヤー追加・削除 UI）まで実装・検証・push 済み。185 tests / 26 suites 全パス。`npm run build` 成功。
+- **次候補**: Task D（Consumer code カタログ拡張）。
 
 ## 最新チェックポイント
 
-### 2026-05-07: Task B 実装完了・手動ブラウザ確認待ち（エンコーダー sensor-bindings 編集）
+### 2026-05-07: Task E 実装・検証・push 済み（sensor-bindings のレイヤー追加・削除 UI）
+
+実装済み:
+
+- **layer source range 追加**: `parseKeymap.js` の layer に `sourceRange` / `bodyRange` を追加し、layer ブロック内へ property を挿入できるようにした。
+- **pending change 追加**: `pendingChanges.js` に `buildSensorBindingInsertDraftChange()` / `buildSensorBindingRemoveDraftChange()` を追加。`sensor-binding-insert` / `sensor-binding-remove` kind を validation と preview diff に対応。
+- **保存側 validation 追加**: `saveBindingChange.js` に insert/remove の検証を追加。`buildSaveDiagnostics()` は sensor-binding 件数の +1/-1 を明示的に許可するようになった。
+- **Sensors タブ UI 追加**: 左ペイン下部に `Add sensor-binding` の layer selector と `Add layer` ボタンを追加。右ペインに `Remove sensor-binding` ボタンを追加。
+- **CSS 追加**: `sensorTableSection` / `sensorAddSection` / `sensorDetailPanel` / `fieldRow` / `fieldValue` を追加し、Sensors タブの追加フォームと detail pane を整えた。
+- **Save all payload 修正**: ブラウザ確認で `sensor-binding-insert target layer is missing.` が出たため、`Save all` の送信 payload に `layerIndex` を含めるよう修正。
+- **テスト追加**: `pendingChanges.test.js` に insert/remove preview ケース、`saveBindingChange.test.js` に insert/remove 保存ケースを追加。
+- **検証**: 185 tests / 26 suites 全パス。`npm run build` 成功。ユーザー側ブラウザで追加保存の成功を確認済み。
+- **commit/push**: `main` に push 済み。
+
+### 2026-05-07: Task B 実装・検証・push 済み（エンコーダー sensor-bindings 編集）
 
 実装済み:
 
@@ -54,7 +68,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **`App.jsx` Sensors タブ UI**: split panel 形式へ再構成。左ペインに sensor-bindings を持つ layer 一覧（Inc/Dec 表示）。右ペインに `SensorDetailPanel`（Pick ボタン・Swap ボタン・Preview・Add/Remove draft）。
 - **`sensorDrafts` state / handlers**: `addSensorDraft` / `removeSensorDraft` 追加。reload/save/restore 時に `setSensorDrafts({})` でリセット。
 - **テスト追加**: `parseKeymap.test.js` に 3 ケース、`pendingChanges.test.js` に 5 ケース、`saveBindingChange.test.js` に 4 ケース追加。181 tests / 26 suites 全パス。`npm run build` 成功。
-- **commit/push**: 未実施（ブラウザ確認待ち）。
+- **commit/push**: `main` に push 済み。
 
 ### 2026-05-07: Task B 計画確定（エンコーダー sensor-bindings 編集）
 
@@ -323,9 +337,9 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - 168 tests / 24 suites 全パス。push 済み。ブラウザ確認は手動で実施すること。
 
-#### ~~B. エンコーダー回転（`sensor-bindings`）編集~~（実装済み・ブラウザ確認待ち）
+#### ~~B. エンコーダー回転（`sensor-bindings`）編集~~（完了）
 
-- 181 tests / 26 suites 全パス。`npm run build` 成功。手動ブラウザ確認後に commit/push。
+- 181 tests / 26 suites 全パス。`npm run build` 成功。push 済み。
 
 #### D. Consumer code カタログ拡張（候補）
 
@@ -337,15 +351,13 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - `structuredBinding.js` / `App.jsx` を更新。164 tests / 24 suites 全パス。push 済み。
 
-#### E. sensor-bindings のレイヤー追加・削除 UI（ユーザー要望・未着手）
+#### ~~E. sensor-bindings のレイヤー追加・削除 UI~~（完了）
 
 - **目的**: Sensors タブから、任意のレイヤーに `sensor-bindings = <&inc_dec_kp X Y>;` を追加したり、既存の sensor-bindings を削除できるようにする。
-- **設計方針（草案）**:
-  - **追加**: 左ペインの下部に "Add layer" ボタンを設け、sensor-bindings を持たないレイヤーをドロップダウンで選択 → 初期値 `&inc_dec_kp PG_UP PAGE_DOWN` で draft を作成。
-  - **削除**: 右ペインの `SensorDetailPanel` に "Remove sensor-binding" ボタンを追加。対象レイヤーの `sensor-bindings = <...>;` 行全体を削除する pending change を生成。
-  - **実装種別**: 追加は `sensor-binding-insert` kind、削除は `sensor-binding-remove` kind として `pendingChanges.js` / `saveBindingChange.js` に追加。
-  - **スコープ**: `&inc_dec_kp X Y` 形式のみ。追加時は keymap の対象レイヤーブロック内に `sensor-bindings` プロパティが存在しないことを確認してから挿入する。
-- **詳細計画**: 着手時に設計詳細を詰める。
+- **実装**: 左ペイン下部の layer selector + `Add layer` で、sensor-bindings 未設定 layer に `&inc_dec_kp PG_UP PAGE_DOWN` を挿入する pending change を作る。右ペインの `Remove sensor-binding` で対象 property 行全体を削除する pending change を作る。
+- **実装種別**: 追加は `sensor-binding-insert` kind、削除は `sensor-binding-remove` kind。
+- **スコープ**: `&inc_dec_kp X Y` 形式のみ。
+- **検証**: 185 tests / 26 suites 全パス。`npm run build` 成功。ユーザー側ブラウザ確認済み。push 済み。
 
 #### F. `&inc_dec_cp` behavior 対応（候補・D の後）
 
@@ -364,9 +376,9 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 1. ~~**C**（完了）~~
 2. ~~**A**（完了）~~
-3. ~~**B**（完了・ブラウザ確認待ち）~~
-4. **E**（sensor-bindings のレイヤー追加・削除 UI）← 次
-5. **D**（Consumer code カタログ拡張）
+3. ~~**B**（完了）~~
+4. ~~**E**（sensor-bindings のレイヤー追加・削除 UI）~~（完了）
+5. **D**（Consumer code カタログ拡張）← 次候補
 6. **F**（`&inc_dec_cp` 対応）
 7. **G**（`&msc` 対応）
 

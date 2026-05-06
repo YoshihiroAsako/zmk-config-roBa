@@ -714,6 +714,14 @@ describe("saveBindingChanges sensor-binding", () => {
     };
   };
 };`;
+  const makeLayerWithoutSensorSource = () => `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+    };
+  };
+};`;
 
   function makeSensorChange(source, incKey, decKey) {
     const parsed = parseKeymap(source);
@@ -781,6 +789,54 @@ describe("saveBindingChanges sensor-binding", () => {
         () => saveBindingChanges({ repoRoot: tempRoot, changes: [badChange] }),
         /source range does not contain/,
       );
+    });
+  });
+
+  it("saves sensor-binding insertion successfully", async () => {
+    const source = makeLayerWithoutSensorSource();
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const insertionPoint = source.lastIndexOf("    };");
+    const change = {
+      id: `layer-${layer.id}-sensor-binding`,
+      kind: "sensor-binding-insert",
+      label: `${layer.name} sensor-binding`,
+      layerIndex: layer.id,
+      range: { start: insertionPoint, end: insertionPoint },
+      currentRaw: "",
+      nextRaw: "      sensor-bindings = <&inc_dec_kp PG_UP PAGE_DOWN>;\n",
+    };
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({ repoRoot: tempRoot, changes: [change] });
+      assert.ok(result.ok, result.message);
+      const saved = await readFile(path.join(tempRoot, "config", "roBa.keymap"), "utf8");
+      const sb = parseKeymap(saved).layers[0].sensorBindings[0];
+      assert.equal(sb.incKey, "PG_UP");
+      assert.equal(sb.decKey, "PAGE_DOWN");
+    });
+  });
+
+  it("saves sensor-binding removal successfully", async () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const lineStart = source.lastIndexOf("\n", sb.sourceRange.start) + 1;
+    const lineEnd = source.indexOf("\n", source.indexOf(";", sb.sourceRange.end)) + 1;
+    const change = {
+      id: `layer-${layer.id}-sensor-binding`,
+      kind: "sensor-binding-remove",
+      label: `${layer.name} sensor-binding`,
+      layerIndex: layer.id,
+      range: { start: lineStart, end: lineEnd },
+      currentRaw: source.slice(lineStart, lineEnd).trim(),
+      nextRaw: "",
+    };
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({ repoRoot: tempRoot, changes: [change] });
+      assert.ok(result.ok, result.message);
+      const saved = await readFile(path.join(tempRoot, "config", "roBa.keymap"), "utf8");
+      assert.equal(parseKeymap(saved).layers[0].sensorBindings.length, 0);
     });
   });
 });

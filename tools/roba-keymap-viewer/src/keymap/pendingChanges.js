@@ -143,6 +143,37 @@ export function buildSensorBindingDraftChange({ layer, sensorBinding, incKey, de
   };
 }
 
+export function buildSensorBindingInsertDraftChange({ source, layer, incKey = "PG_UP", decKey = "PAGE_DOWN" }) {
+  if (!layer?.bodyRange) throw new Error("Cannot insert sensor-binding: layer body range unavailable.");
+  if (layer.sensorBindings.length) throw new Error("Cannot insert sensor-binding: layer already has sensor-bindings.");
+  const nextValue = `&inc_dec_kp ${incKey} ${decKey}`;
+  validateSensorBindingValue(nextValue);
+  const insertion = buildLayerPropertyInsertion(source, layer, "sensor-bindings", nextValue);
+  return {
+    id: `layer-${layer.id}-sensor-binding`,
+    kind: "sensor-binding-insert",
+    label: `${layer.name} sensor-binding`,
+    layerIndex: layer.id,
+    range: insertion.range,
+    currentRaw: "",
+    nextRaw: insertion.after,
+  };
+}
+
+export function buildSensorBindingRemoveDraftChange({ source, layer, sensorBinding }) {
+  if (!sensorBinding?.sourceRange) throw new Error("Cannot remove sensor-binding: source range unavailable.");
+  const range = linePropertyRange(source, sensorBinding.sourceRange, "sensor-bindings");
+  return {
+    id: `layer-${layer.id}-sensor-binding`,
+    kind: "sensor-binding-remove",
+    label: `${layer.name} sensor-binding`,
+    layerIndex: layer.id,
+    range,
+    currentRaw: source.slice(range.start, range.end).trim(),
+    nextRaw: "",
+  };
+}
+
 export function buildLayerRenameDraftChange({ layerIndex, currentName, nextName, nameRange }) {
   return {
     id: `layer-${layerIndex}-rename`,
@@ -395,6 +426,25 @@ function validatePendingChange(source, change, { layerCount = 7, keyCount = 43 }
     validateScrollLayersValue(change.nextRaw, layerCount);
   } else if (change.kind === "sensor-binding") {
     validateSensorBindingValue(change.nextRaw);
+  } else if (change.kind === "sensor-binding-insert") {
+    if (change.range.start !== change.range.end) throw new Error(`${change.label}: sensor-binding-insert must be a zero-length range.`);
+    if (change.currentRaw !== "") throw new Error(`${change.label}: sensor-binding-insert must have empty currentRaw.`);
+    validateSensorBindingInsertionContent(change.nextRaw);
+    const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+    const beforeParsed = parseKeymap(source);
+    const afterParsed = parseKeymap(nextSource);
+    const beforeLayer = beforeParsed.layers[change.layerIndex];
+    const afterLayer = afterParsed.layers[change.layerIndex];
+    if (!beforeLayer || !afterLayer) throw new Error(`${change.label}: target layer is missing.`);
+    if (beforeLayer.sensorBindings.length) throw new Error(`${change.label}: target layer already has sensor-bindings.`);
+    if (afterLayer.sensorBindings.length !== 1 || afterLayer.sensorBindings[0].behavior !== "&inc_dec_kp") {
+      throw new Error(`${change.label}: sensor-binding-insert must add one &inc_dec_kp binding.`);
+    }
+  } else if (change.kind === "sensor-binding-remove") {
+    if (change.nextRaw !== "") throw new Error(`${change.label}: sensor-binding-remove must have empty nextRaw.`);
+    if (!/sensor-bindings\s*=/.test(source.slice(change.range.start, change.range.end))) {
+      throw new Error(`${change.label}: sensor-binding-remove range does not contain a sensor-bindings property.`);
+    }
   }
 }
 
@@ -552,6 +602,51 @@ function validateSensorBindingValue(value) {
   if (!/^&inc_dec_kp \S+ \S+$/.test(trimmed)) {
     throw new Error("sensor-binding must be &inc_dec_kp followed by two keycode tokens.");
   }
+}
+
+function validateSensorBindingInsertionContent(nextRaw) {
+  const match = String(nextRaw || "").match(/sensor-bindings\s*=\s*<([^<>;\r\n]+)>;\r?\n$/);
+  if (!match) throw new Error("sensor-binding-insert content is invalid.");
+  validateSensorBindingValue(match[1].trim());
+}
+
+function buildLayerPropertyInsertion(source, layer, propertyName, value) {
+  const closingLineStart = lineStart(source, layer.bodyRange.end);
+  const referencePosition = layer.bindingEntries?.[0]?.sourceRange?.start ?? layer.bodyRange.start;
+  const indent = lineIndent(source, referencePosition) || "      ";
+  const newline = source.includes("\r\n") ? "\r\n" : "\n";
+  return {
+    range: { start: closingLineStart, end: closingLineStart },
+    after: `${indent}${propertyName} = <${value}>;${newline}`,
+  };
+}
+
+function linePropertyRange(source, valueRange, propertyName) {
+  const start = lineStart(source, valueRange.start);
+  const semicolon = source.indexOf(";", valueRange.end);
+  if (semicolon < 0) {
+    throw new Error(`${propertyName} property line is missing a terminating semicolon.`);
+  }
+  let end = semicolon + 1;
+  while (end < source.length && (source[end] === "\r" || source[end] === "\n")) {
+    end += 1;
+    if (source[end - 1] === "\n") break;
+  }
+  return { start, end };
+}
+
+function lineStart(source, position) {
+  const newline = source.lastIndexOf("\n", Math.max(position - 1, 0));
+  return newline < 0 ? 0 : newline + 1;
+}
+
+function lineIndent(source, position) {
+  const start = lineStart(source, position);
+  let cursor = start;
+  while (cursor < position && (source[cursor] === " " || source[cursor] === "\t")) {
+    cursor += 1;
+  }
+  return source.slice(start, cursor);
 }
 
 function normalizeSpace(value) {
