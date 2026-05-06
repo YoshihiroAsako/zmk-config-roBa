@@ -488,12 +488,13 @@ pre {
 
 .comboPickerRow {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   min-width: 0;
 }
 
 .comboPickerRow input {
-  flex: 1;
+  flex: 1 1 150px;
   min-width: 0;
   width: auto;
 }
@@ -516,6 +517,14 @@ pre {
   background: #f0fbfc;
   color: #0d5963;
   cursor: pointer;
+}
+
+.comboPickerRow .pickerInlineBtn.captureActive:not(:disabled) {
+  border-color: #0d5963;
+  background: #0d5963;
+  color: #ffffff;
+  font-weight: 750;
+  box-shadow: 0 0 0 2px rgba(13, 89, 99, 0.18);
 }
 
 .disabledBox,

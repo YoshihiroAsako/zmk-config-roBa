@@ -8,6 +8,7 @@ import { parseKeymap } from "./parseKeymap.js";
 import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
 import { buildNewComboDraftChange } from "./comboInsert.js";
 import { buildNewMacroDraftChange } from "./macroInsert.js";
+import { buildMacroBindingsChange } from "./macroPreview.js";
 import { buildSaveDiagnostics, replaceKeymapChanges, saveBindingChange, saveBindingChanges } from "./saveBindingChange.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -524,6 +525,38 @@ describe("save binding change helper", () => {
       assert.deepEqual(inserted.bindings, ["&kp A"]);
       assert.equal(inserted.waitMs, 10);
       assert.equal(inserted.tapMs, 20);
+      assert.equal(result.diagnostics.every((item) => item.ok), true);
+    });
+  });
+
+  it("backs up once and saves an existing macro binding row addition", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const macro = parsed.macros.find((item) => item.name === "to_layer_0");
+    const edit = buildMacroBindingsChange(source, macro, [...macro.bindings, "&kp A"]);
+
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({
+        repoRoot: tempRoot,
+        changes: [
+          {
+            kind: edit.kind,
+            macroName: macro.name,
+            range: edit.range,
+            currentRaw: source.slice(edit.range.start, edit.range.end).trim(),
+            nextRaw: edit.after,
+          },
+        ],
+        now: new Date(2026, 4, 6, 11, 0, 0),
+      });
+      const savedSource = await readTempKeymap(tempRoot);
+      const savedParsed = parseKeymap(savedSource);
+      const savedMacro = savedParsed.macros.find((item) => item.name === "to_layer_0");
+
+      assert.equal(result.ok, true);
+      assert.equal(result.backupPath, "config/.roBa.keymap.bak/20260506-110000.roBa.keymap");
+      assert.deepEqual(savedMacro.bindings, [...macro.bindings, "&kp A"]);
+      assert.equal(savedParsed.macros.length, parsed.macros.length);
       assert.equal(result.diagnostics.every((item) => item.ok), true);
     });
   });

@@ -263,6 +263,17 @@ function validateSourceChange(source, change) {
     if (!isEditableBindingExpression(change.currentRaw) || !isEditableBindingExpression(change.nextRaw)) {
       throw new Error(`${change.kind} replacement is not supported in Phase 2.`);
     }
+  } else if (change.kind === "macro-bindings-replace") {
+    validateMacroBindingsReplacement(change.currentRaw, change.nextRaw);
+    const beforeParsed = parseKeymap(source);
+    const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+    const afterParsed = parseKeymap(nextSource);
+    if (afterParsed.macros.length !== beforeParsed.macros.length) {
+      throw new Error("macro-bindings-replace must keep macro count stable.");
+    }
+    if (!afterParsed.macros.some((macro) => macro.name === change.macroName)) {
+      throw new Error("macro-bindings-replace target macro is missing after replacement.");
+    }
   } else if (change.kind === "combo-positions") {
     validateComboPositions(change.nextRaw);
     if (!/^[\d\s]+$/.test(source.slice(change.range.start, change.range.end))) {
@@ -471,4 +482,26 @@ function validateLayerName(name) {
   if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) {
     throw new Error("Layer name must start with a letter or underscore and contain only letters, digits, underscore, or hyphen.");
   }
+}
+
+function validateMacroBindingsReplacement(currentRaw, nextRaw) {
+  const currentEntries = splitBindingExpressions(currentRaw);
+  const nextEntries = splitBindingExpressions(nextRaw);
+  if (!nextEntries.length) throw new Error("Macro bindings must include at least one binding.");
+  if (nextEntries.join(" ") !== String(nextRaw || "").trim().replace(/\s+/g, " ")) {
+    throw new Error("Macro bindings must be a single-space-separated list.");
+  }
+  for (let index = 0; index < nextEntries.length; index += 1) {
+    const entry = nextEntries[index];
+    if (isEditableBindingExpression(entry)) continue;
+    if (entry === currentEntries[index]) continue;
+    throw new Error("macro-bindings-replace contains an unsupported changed binding.");
+  }
+}
+
+function splitBindingExpressions(raw) {
+  return String(raw || "")
+    .trim()
+    .match(/&[^&]+(?=\s*&|$)/g)
+    ?.map((entry) => entry.trim().replace(/\s+/g, " ")) || [];
 }

@@ -19,12 +19,13 @@ export function buildMacroPreviewState(source, macro, draft = {}) {
   }
 
   const bindingDrafts = draft.bindingDrafts || {};
+  const draftBindings = normalizeDraftBindings(bindingDrafts, macro.bindings, draft.fullBindingList);
   const waitCurrent = macro.waitMsRange ? String(macro.waitMs) : "";
   const tapCurrent = macro.tapMsRange ? String(macro.tapMs) : "";
   const waitMsRaw = draft.waitMsRaw ?? waitCurrent;
   const tapMsRaw = draft.tapMsRaw ?? tapCurrent;
 
-  for (const value of [...Object.values(bindingDrafts), waitMsRaw, tapMsRaw]) {
+  for (const value of [...draftBindings, waitMsRaw, tapMsRaw]) {
     if (typeof value === "string" && value !== value.trim()) {
       return emptyMacroState(source, "Macro drafts must not start or end with spaces.", editableIndices);
     }
@@ -34,20 +35,26 @@ export function buildMacroPreviewState(source, macro, draft = {}) {
     const replacements = [];
     const editableSet = new Set(editableIndices);
 
-    for (const [indexStr, nextRawValue] of Object.entries(bindingDrafts)) {
-      const index = Number(indexStr);
-      const entry = macro.bindingEntries?.[index];
-      if (!entry || nextRawValue === entry.raw) continue;
-      if (!editableSet.has(index)) {
-        throw new Error(`Macro binding ${index} is outside the Phase 2 edit set.`);
+    const bindingsChanged = draftBindings.join(" ") !== macro.bindings.join(" ");
+    if (bindingsChanged && draftBindings.length !== macro.bindings.length) {
+      const change = buildMacroBindingsChange(source, macro, draftBindings);
+      replacements.push(change);
+    } else {
+      for (const [indexStr, nextRawValue] of Object.entries(bindingDrafts)) {
+        const index = Number(indexStr);
+        const entry = macro.bindingEntries?.[index];
+        if (!entry || nextRawValue === entry.raw) continue;
+        if (!editableSet.has(index)) {
+          throw new Error(`Macro binding ${index} is outside the Phase 2 edit set.`);
+        }
+        replaceBinding(source, entry.sourceRange, nextRawValue);
+        replacements.push({
+          kind: "binding",
+          label: `Binding ${index}`,
+          range: entry.sourceRange,
+          after: nextRawValue,
+        });
       }
-      replaceBinding(source, entry.sourceRange, nextRawValue);
-      replacements.push({
-        kind: "binding",
-        label: `Binding ${index}`,
-        range: entry.sourceRange,
-        after: nextRawValue,
-      });
     }
 
     if (waitMsRaw !== waitCurrent) {
@@ -68,7 +75,9 @@ export function buildMacroPreviewState(source, macro, draft = {}) {
     const layerStable = beforeParsed.layers.length === reparsed.layers.length &&
       beforeParsed.layers.every((layer, index) => layer.bindings.length === reparsed.layers[index]?.bindings.length);
     const bindingCountStable = updatedMacro
-      ? updatedMacro.bindings.length === macro.bindings.length
+      ? bindingsChanged && draftBindings.length !== macro.bindings.length
+        ? updatedMacro.bindings.length === draftBindings.length
+        : updatedMacro.bindings.length === macro.bindings.length
       : false;
     const valid = macroStable && layerStable && bindingCountStable;
     const changed = replacements.length > 0;
@@ -114,6 +123,20 @@ export function buildWaitMsChange(source, macro, raw) {
 
 export function buildTapMsChange(source, macro, raw) {
   return buildMsPropertyChange(source, macro, raw, "tap-ms", macro.tapMsRange);
+}
+
+export function buildMacroBindingsChange(source, macro, draftBindings) {
+  if (!macro.bindingsRange) {
+    throw new Error("Cannot edit macro bindings: bindings range unavailable.");
+  }
+  const nextBindings = normalizeDraftBindings(draftBindings);
+  validateMacroBindingList(macro.bindings, nextBindings);
+  return {
+    kind: "macro-bindings-replace",
+    label: "Bindings",
+    range: macro.bindingsRange,
+    after: nextBindings.join(" "),
+  };
 }
 
 function buildMsPropertyChange(source, macro, raw, propertyName, existingRange) {
@@ -223,5 +246,40 @@ function validateMsValue(raw, propertyName) {
   const limits = PROPERTY_LIMITS[propertyName];
   if (value < limits.min || value > limits.max) {
     throw new Error(`${propertyName} must be between ${limits.min} and ${limits.max}.`);
+  }
+}
+
+function normalizeDraftBindings(bindingDrafts, currentBindings = [], fullBindingList = false) {
+  if (Array.isArray(bindingDrafts)) {
+    return bindingDrafts.map((value) => String(value ?? ""));
+  }
+  const entries = Object.entries(bindingDrafts || {})
+    .map(([key, value]) => [Number(key), String(value ?? "")])
+    .filter(([key]) => Number.isInteger(key) && key >= 0)
+    .sort(([a], [b]) => a - b);
+  if (!entries.length) return [...currentBindings];
+
+  if (fullBindingList) return entries.map(([, value]) => value);
+
+  const next = [...currentBindings];
+  for (const [key, value] of entries) {
+    next[key] = value;
+  }
+  return next;
+}
+
+function validateMacroBindingList(currentBindings, nextBindings) {
+  if (!nextBindings.length) {
+    throw new Error("Macro bindings must include at least one binding.");
+  }
+
+  for (let index = 0; index < nextBindings.length; index += 1) {
+    const nextRaw = nextBindings[index];
+    if (!nextRaw || nextRaw !== nextRaw.trim()) {
+      throw new Error("Macro binding rows must be trimmed and non-empty.");
+    }
+    if (isEditableBindingExpression(nextRaw)) continue;
+    if (nextRaw === currentBindings[index]) continue;
+    throw new Error(`Macro binding ${index} is outside the Phase 2 edit set.`);
   }
 }

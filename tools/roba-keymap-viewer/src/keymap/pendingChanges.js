@@ -3,7 +3,7 @@ import { buildContextDiff } from "./editorPreview.js";
 import { buildLayersChange, buildLineInsertionDiff, buildLineRemovalDiff, buildTimeoutMsChange } from "./comboPreview.js";
 import { buildNewComboDraftChange } from "./comboInsert.js";
 import { buildNewMacroDraftChange } from "./macroInsert.js";
-import { buildTapMsChange, buildWaitMsChange } from "./macroPreview.js";
+import { buildMacroBindingsChange, buildTapMsChange, buildWaitMsChange } from "./macroPreview.js";
 
 export function getDraftId(layerIndex, position) {
   return `layer-${layerIndex}-pos-${position}`;
@@ -105,23 +105,37 @@ export function buildLayerRenameDraftChange({ layerIndex, currentName, nextName,
   };
 }
 
-export function buildMacroDraftChanges({ source, macro, bindingDrafts, waitMsRaw, tapMsRaw }) {
+export function buildMacroDraftChanges({ source, macro, bindingDrafts, fullBindingList, waitMsRaw, tapMsRaw }) {
   const changes = [];
   if (bindingDrafts) {
-    for (const [indexStr, nextRaw] of Object.entries(bindingDrafts)) {
-      const index = Number(indexStr);
-      const entry = macro.bindingEntries?.[index];
-      if (!entry || nextRaw === entry.raw) continue;
+    const draftBindings = normalizeMacroDraftBindings(bindingDrafts, macro.bindings, fullBindingList);
+    if (draftBindings.join(" ") !== macro.bindings.join(" ") && draftBindings.length !== macro.bindings.length) {
+      const edit = buildMacroBindingsChange(source, macro, draftBindings);
       changes.push({
-        id: `macro-${macro.name}-binding-${index}`,
-        kind: "macro-binding",
-        label: `${macro.name} binding ${index}`,
+        id: `macro-${macro.name}-bindings`,
+        kind: edit.kind,
+        label: `${macro.name} bindings`,
         macroName: macro.name,
-        macroBindingIndex: index,
-        range: entry.sourceRange,
-        currentRaw: entry.raw,
-        nextRaw,
+        range: edit.range,
+        currentRaw: source.slice(edit.range.start, edit.range.end).trim(),
+        nextRaw: edit.after,
       });
+    } else {
+      for (const [indexStr, nextRaw] of Object.entries(bindingDrafts)) {
+        const index = Number(indexStr);
+        const entry = macro.bindingEntries?.[index];
+        if (!entry || nextRaw === entry.raw) continue;
+        changes.push({
+          id: `macro-${macro.name}-binding-${index}`,
+          kind: "macro-binding",
+          label: `${macro.name} binding ${index}`,
+          macroName: macro.name,
+          macroBindingIndex: index,
+          range: entry.sourceRange,
+          currentRaw: entry.raw,
+          nextRaw,
+        });
+      }
     }
   }
 
@@ -272,6 +286,8 @@ function validatePendingChange(source, change) {
     if (!isEditableBindingExpression(change.nextRaw)) {
       throw new Error(`${change.label} replacement is not supported in Phase 2.`);
     }
+  } else if (change.kind === "macro-bindings-replace") {
+    validateMacroBindingsValue(change.currentRaw, change.nextRaw);
   } else if (change.kind === "combo-positions") {
     validateComboPositions(change.nextRaw);
   } else if (change.kind === "layers-replace") {
@@ -391,6 +407,44 @@ function validateLayerName(name) {
   if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) {
     throw new Error("Layer name must start with a letter or underscore and contain only letters, digits, underscore, or hyphen.");
   }
+}
+
+function validateMacroBindingsValue(currentRaw, nextRaw) {
+  const currentEntries = splitBindingExpressions(currentRaw);
+  const nextEntries = splitBindingExpressions(nextRaw);
+  if (!nextEntries.length) throw new Error("Macro bindings must include at least one binding.");
+  if (nextEntries.join(" ") !== String(nextRaw || "").trim().replace(/\s+/g, " ")) {
+    throw new Error("Macro bindings must be a single-space-separated list.");
+  }
+  for (let index = 0; index < nextEntries.length; index += 1) {
+    const entry = nextEntries[index];
+    if (isEditableBindingExpression(entry)) continue;
+    if (entry === currentEntries[index]) continue;
+    throw new Error("Macro bindings contain an unsupported changed binding.");
+  }
+}
+
+function splitBindingExpressions(raw) {
+  return String(raw || "")
+    .trim()
+    .match(/&[^&]+(?=\s*&|$)/g)
+    ?.map((entry) => entry.trim().replace(/\s+/g, " ")) || [];
+}
+
+function normalizeMacroDraftBindings(bindingDrafts, currentBindings = [], fullBindingList = false) {
+  const entries = Object.entries(bindingDrafts || {})
+    .map(([key, value]) => [Number(key), String(value ?? "")])
+    .filter(([key]) => Number.isInteger(key) && key >= 0)
+    .sort(([a], [b]) => a - b);
+  if (!entries.length) return [...currentBindings];
+
+  if (fullBindingList) return entries.map(([, value]) => value);
+
+  const next = [...currentBindings];
+  for (const [key, value] of entries) {
+    next[key] = value;
+  }
+  return next;
 }
 
 function normalizeSpace(value) {

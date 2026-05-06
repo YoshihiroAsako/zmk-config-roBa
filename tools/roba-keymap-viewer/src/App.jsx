@@ -78,6 +78,7 @@ function App() {
   const [selectedMacroName, setSelectedMacroName] = useState("");
   const [macroDraft, setMacroDraft] = useState({
     bindingDrafts: {},
+    fullBindingList: true,
     waitMsRaw: "",
     tapMsRaw: "",
   });
@@ -86,6 +87,7 @@ function App() {
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
+  const [captureContext, setCaptureContext] = useState({ type: "binding" });
   const [pickerContext, setPickerContext] = useState(null);
 
   const layerNames = document.layers.map((layer) => layer.name);
@@ -115,6 +117,7 @@ function App() {
   const selectedMacro = isAddingMacro ? null : document.macros.find((macro) => macro.name === selectedMacroName);
   const selectedMacroDraftIds = selectedMacro
     ? [
+        `macro-${selectedMacro.name}-bindings`,
         ...(selectedMacro.bindingEntries || []).map((_, index) => `macro-${selectedMacro.name}-binding-${index}`),
         `macro-${selectedMacro.name}-wait-ms`,
         `macro-${selectedMacro.name}-tap-ms`,
@@ -191,6 +194,7 @@ function App() {
       bindingDrafts: Object.fromEntries(
         (selectedMacro?.bindingEntries || []).map((entry, index) => [index, entry.raw]),
       ),
+      fullBindingList: true,
       waitMsRaw: selectedMacro?.waitMsRange ? String(selectedMacro.waitMs) : "",
       tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
     });
@@ -234,19 +238,33 @@ function App() {
 
       // supported binding
       event.preventDefault();
-      if (!editorState.canEdit) {
-        setCaptureStatus("このキーは編集できません");
-        return;
+      const target = captureContext || { type: "binding" };
+      if (target.type === "binding") {
+        if (!editorState.canEdit) {
+          setCaptureStatus("このキーは編集できません");
+          return;
+        }
+        setDraftBinding(result.binding);
+        setActiveTab("Preview");
+      } else if (target.type === "combo") {
+        setComboDraft((prev) => ({ ...prev, bindingRaw: result.binding }));
+      } else if (target.type === "new-combo") {
+        setNewComboDraft((prev) => ({ ...prev, bindingRaw: result.binding }));
+      } else if (target.type === "macro") {
+        setMacroDraft((prev) => ({
+          ...prev,
+          bindingDrafts: { ...prev.bindingDrafts, [target.index]: result.binding },
+        }));
+      } else if (target.type === "new-macro") {
+        setNewMacroDraft((prev) => ({ ...prev, bindingsRaw: result.binding }));
       }
-      setDraftBinding(result.binding);
       setCaptureStatus(`入力: ${result.binding}`);
       setSaveStatus(EMPTY_SAVE_STATUS);
-      setActiveTab("Preview");
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [captureMode, editorState.canEdit]);
+  }, [captureMode, captureContext, editorState.canEdit]);
 
   const layerRenameDraftId = `layer-${activeLayer}-rename`;
   const layerRenamePending = pendingChanges.find((change) => change.id === layerRenameDraftId);
@@ -399,6 +417,7 @@ function App() {
           sourcePath: "config/roBa.keymap",
           changes: pendingChanges.map((change) => ({
             kind: change.kind,
+            macroName: change.macroName,
             range: change.range,
             currentRaw: change.currentRaw,
             nextRaw: change.nextRaw,
@@ -587,6 +606,7 @@ function App() {
       source: keymapSource,
       macro: selectedMacro,
       bindingDrafts: macroDraft.bindingDrafts,
+      fullBindingList: macroDraft.fullBindingList,
       waitMsRaw: macroDraft.waitMsRaw,
       tapMsRaw: macroDraft.tapMsRaw,
     });
@@ -601,6 +621,7 @@ function App() {
       bindingDrafts: Object.fromEntries(
         (selectedMacro?.bindingEntries || []).map((entry, index) => [index, entry.raw]),
       ),
+      fullBindingList: true,
       waitMsRaw: selectedMacro?.waitMsRange ? String(selectedMacro.waitMs) : "",
       tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
     });
@@ -772,6 +793,12 @@ function App() {
                 setSaveStatus(EMPTY_SAVE_STATUS);
               }}
               onPickBinding={() => setPickerContext({ type: "combo" })}
+              captureActive={captureMode && captureContext?.type === "combo"}
+              onCaptureBinding={() => {
+                setCaptureContext({ type: "combo" });
+                setCaptureMode(true);
+                setCaptureStatus(null);
+              }}
             />
           )}
           {activeTab === "Combos" && isAddingCombo && (
@@ -786,6 +813,12 @@ function App() {
                 setSaveStatus(EMPTY_SAVE_STATUS);
               }}
               onPickBinding={() => setPickerContext({ type: "new-combo" })}
+              captureActive={captureMode && captureContext?.type === "new-combo"}
+              onCaptureBinding={() => {
+                setCaptureContext({ type: "new-combo" });
+                setCaptureMode(true);
+                setCaptureStatus(null);
+              }}
             />
           )}
           {activeTab === "Macros" && selectedMacro && (
@@ -800,7 +833,35 @@ function App() {
                 setMacroDraft(nextDraft);
                 setSaveStatus(EMPTY_SAVE_STATUS);
               }}
+              onAddBindingRow={() => {
+                setMacroDraft((current) => {
+                  const bindings = macroDraftEntries(current.bindingDrafts);
+                  return {
+                    ...current,
+                    fullBindingList: true,
+                    bindingDrafts: Object.fromEntries([...bindings, "&kp A"].map((value, index) => [index, value])),
+                  };
+                });
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
+              onRemoveBindingRow={(index) => {
+                setMacroDraft((current) => {
+                  const bindings = macroDraftEntries(current.bindingDrafts).filter((_, rowIndex) => rowIndex !== index);
+                  return {
+                    ...current,
+                    fullBindingList: true,
+                    bindingDrafts: Object.fromEntries(bindings.map((value, rowIndex) => [rowIndex, value])),
+                  };
+                });
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
               onPickBinding={(index) => setPickerContext({ type: "macro", index })}
+              captureActiveIndex={captureMode && captureContext?.type === "macro" ? captureContext.index : null}
+              onCaptureBinding={(index) => {
+                setCaptureContext({ type: "macro", index });
+                setCaptureMode(true);
+                setCaptureStatus(null);
+              }}
             />
           )}
           {activeTab === "Macros" && isAddingMacro && (
@@ -815,6 +876,12 @@ function App() {
                 setSaveStatus(EMPTY_SAVE_STATUS);
               }}
               onPickBinding={() => setPickerContext({ type: "new-macro" })}
+              captureActive={captureMode && captureContext?.type === "new-macro"}
+              onCaptureBinding={() => {
+                setCaptureContext({ type: "new-macro" });
+                setCaptureMode(true);
+                setCaptureStatus(null);
+              }}
             />
           )}
           <div className={editorState.canEdit ? "editorBox" : "editorBox disabled"}>
@@ -842,7 +909,8 @@ function App() {
                 disabled={!editorState.canEdit}
                 className={captureMode ? "captureToggle active" : "captureToggle"}
                 onClick={() => {
-                  setCaptureMode((prev) => !prev);
+                  setCaptureContext({ type: "binding" });
+                  setCaptureMode((prev) => !(prev && (captureContext?.type || "binding") === "binding"));
                   setCaptureStatus(null);
                 }}
               >
@@ -970,7 +1038,18 @@ function App() {
   );
 }
 
-function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
+function ComboDetailPanel({
+  combo,
+  draft,
+  previewState,
+  pendingCount,
+  onAddDraft,
+  onRemoveDraft,
+  onDraftChange,
+  onPickBinding,
+  captureActive,
+  onCaptureBinding,
+}) {
   return (
     <section className="comboDetailPanel" aria-label="selected combo details">
       <div className="editorHeader">
@@ -1025,6 +1104,14 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
             >
               Pick
             </button>
+            <button
+              type="button"
+              disabled={!previewState.canEditBinding}
+              className={captureActive ? "pickerInlineBtn captureActive" : "pickerInlineBtn"}
+              onClick={onCaptureBinding}
+            >
+              {captureActive ? "Capture ON" : "Capture"}
+            </button>
           </div>
         </label>
         <label>
@@ -1076,7 +1163,17 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
   );
 }
 
-function NewComboDetailPanel({ draft, previewState, pending, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
+function NewComboDetailPanel({
+  draft,
+  previewState,
+  pending,
+  onAddDraft,
+  onRemoveDraft,
+  onDraftChange,
+  onPickBinding,
+  captureActive,
+  onCaptureBinding,
+}) {
   return (
     <section className="comboDetailPanel" aria-label="new combo details">
       <div className="editorHeader">
@@ -1102,6 +1199,13 @@ function NewComboDetailPanel({ draft, previewState, pending, onAddDraft, onRemov
             />
             <button type="button" className="pickerInlineBtn" onClick={onPickBinding}>
               Pick
+            </button>
+            <button
+              type="button"
+              className={captureActive ? "pickerInlineBtn captureActive" : "pickerInlineBtn"}
+              onClick={onCaptureBinding}
+            >
+              {captureActive ? "Capture ON" : "Capture"}
             </button>
           </div>
         </label>
@@ -1185,7 +1289,17 @@ function LayerRenameRow({ currentName, draft, pending, disabled, onChange, onAdd
   );
 }
 
-function NewMacroDetailPanel({ draft, previewState, pending, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
+function NewMacroDetailPanel({
+  draft,
+  previewState,
+  pending,
+  onAddDraft,
+  onRemoveDraft,
+  onDraftChange,
+  onPickBinding,
+  captureActive,
+  onCaptureBinding,
+}) {
   return (
     <section className="comboDetailPanel" aria-label="new macro details">
       <div className="editorHeader">
@@ -1211,6 +1325,13 @@ function NewMacroDetailPanel({ draft, previewState, pending, onAddDraft, onRemov
             />
             <button type="button" className="pickerInlineBtn" onClick={onPickBinding}>
               Pick
+            </button>
+            <button
+              type="button"
+              className={captureActive ? "pickerInlineBtn captureActive" : "pickerInlineBtn"}
+              onClick={onCaptureBinding}
+            >
+              {captureActive ? "Capture ON" : "Capture"}
             </button>
           </div>
         </label>
@@ -1264,9 +1385,30 @@ function NewMacroDetailPanel({ draft, previewState, pending, onAddDraft, onRemov
   );
 }
 
-function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
+function macroDraftEntries(bindingDrafts) {
+  return Object.entries(bindingDrafts || {})
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([, value]) => value);
+}
+
+function MacroDetailPanel({
+  macro,
+  draft,
+  previewState,
+  pendingCount,
+  onAddDraft,
+  onRemoveDraft,
+  onDraftChange,
+  onAddBindingRow,
+  onRemoveBindingRow,
+  onPickBinding,
+  captureActiveIndex,
+  onCaptureBinding,
+}) {
   const editableSet = new Set(previewState.editableIndices || []);
   const bindingDrafts = draft.bindingDrafts || {};
+  const bindingRows = macroDraftEntries(bindingDrafts);
+  const existingCount = macro.bindingEntries?.length || 0;
 
   return (
     <section className="comboDetailPanel" aria-label="selected macro details">
@@ -1301,9 +1443,10 @@ function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft
         </div>
       </dl>
       <div className={previewState.changed ? "comboPreviewBox active" : "comboPreviewBox"}>
-        {(macro.bindingEntries || []).map((entry, index) => {
-          const editable = editableSet.has(index);
-          const value = bindingDrafts[index] ?? entry.raw;
+        {bindingRows.map((value, index) => {
+          const editable = index >= existingCount || editableSet.has(index);
+          const removable = editable && bindingRows.length > 1;
+          const captureActive = captureActiveIndex === index;
           return (
             <label key={index}>
               <span>{`Binding ${index} draft${editable ? "" : " (read-only)"}`}</span>
@@ -1325,10 +1468,29 @@ function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft
                 >
                   Pick
                 </button>
+                <button
+                  type="button"
+                  disabled={!editable}
+                  className={captureActive ? "pickerInlineBtn captureActive" : "pickerInlineBtn"}
+                  onClick={() => onCaptureBinding(index)}
+                >
+                  {captureActive ? "Capture ON" : "Capture"}
+                </button>
+                <button
+                  type="button"
+                  disabled={!removable}
+                  className="pickerInlineBtn"
+                  onClick={() => onRemoveBindingRow(index)}
+                >
+                  Remove
+                </button>
               </div>
             </label>
           );
         })}
+        <button type="button" className="secondaryAction" onClick={onAddBindingRow}>
+          Add binding row
+        </button>
         <label>
           <span>wait-ms draft</span>
           <input

@@ -48,6 +48,49 @@ describe("macro preview state", () => {
     assert.equal(state.nextSource, source);
   });
 
+  it("previews adding an editable binding row to an existing macro", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const macro = parsed.macros.find((item) => item.name === "to_layer_0");
+    const state = buildMacroPreviewState(source, macro, {
+      fullBindingList: true,
+      bindingDrafts: {
+        0: macro.bindings[0],
+        1: macro.bindings[1],
+        2: macro.bindings[2],
+        3: "&kp A",
+      },
+    });
+
+    assert.equal(state.changed, true);
+    assert.equal(state.valid, true);
+    assert.match(state.contextDiff, /Bindings/);
+
+    const reparsed = parseKeymap(state.nextSource);
+    const updated = reparsed.macros.find((item) => item.name === "to_layer_0");
+    assert.deepEqual(updated.bindings, [...macro.bindings, "&kp A"]);
+  });
+
+  it("previews removing an editable binding row from an existing macro", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const macro = parsed.macros.find((item) => item.name === "to_layer_0");
+    const state = buildMacroPreviewState(source, macro, {
+      fullBindingList: true,
+      bindingDrafts: {
+        0: macro.bindings[0],
+        1: macro.bindings[1],
+      },
+    });
+
+    assert.equal(state.changed, true);
+    assert.equal(state.valid, true);
+
+    const reparsed = parseKeymap(state.nextSource);
+    const updated = reparsed.macros.find((item) => item.name === "to_layer_0");
+    assert.deepEqual(updated.bindings, macro.bindings.slice(0, 2));
+  });
+
   it("inserts wait-ms and tap-ms property lines when the macro has none", async () => {
     const source = await readRepoFile("config/roBa.keymap");
     const parsed = parseKeymap(source);
