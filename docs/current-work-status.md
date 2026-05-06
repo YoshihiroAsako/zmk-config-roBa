@@ -36,11 +36,22 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
 - 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
-- 次にやる場合は「次にやること > 次の候補（任意・未着手）」から選ぶ。優先度上位は外部変更検知付き Save all と Save 前バリデーション。
+- 現在、明示された主要実装候補は一通り完了。次にやる場合は「次にやること > その他、必要に応じて」から小さな UX 調整や追加確認を選ぶ。
 
 ## 最新チェックポイント
 
-### 2026-05-06: Undo/Redo + キーボードショートカット実装・検証済み（未 push）
+### 2026-05-06: バックアップ復元 UI 実装・検証済み（未 push）
+
+実装済み:
+
+- **バックアップ一覧 API 追加**: `GET /__roba/keymap-backups` で `config/.roBa.keymap.bak/*.roBa.keymap` の最近 10 件を返す。
+- **バックアップ復元 API 追加**: `POST /__roba/restore-keymap-backup` で指定バックアップを `config/roBa.keymap` へ復元する。復元前の現在ファイルも新しいバックアップとして退避する。
+- **Preview タブに Backups UI 追加**: バックアップ一覧、Refresh、Restore ボタンを表示。Restore 前に確認ダイアログを出し、pending changes がある場合は破棄されることも明示する。
+- **復元後処理**: keymap source / mtime を更新し、pending changes / undo / redo / 新規 combo・macro draft 状態をクリア。復元後に keymap-drawer 自動更新も呼ぶ。
+- **ドキュメント更新**: `docs/viewer-to-device-guide.md` の復元手順を手動 PowerShell から UI 復元へ更新。
+- **検証**: `npm test` は 142 tests / 21 suites 全パス。`npm run build` 成功。dev server は `http://127.0.0.1:5183/` で HTTP 200、`/__roba/keymap-backups` 応答確認済み。`agent-browser` CLI は PATH に無かったため実ブラウザ自動確認は未実施。
+
+### 2026-05-06: Undo/Redo + キーボードショートカット実装・検証・push 済み
 
 実装済み:
 
@@ -53,8 +64,9 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - `Ctrl+S` = Save all（常に有効、保存できない状態なら関数内でハンドル済み）
 - **PreviewPanel に Undo/Redo ボタン追加**: "Save all" / "Clear all" と並べて表示。`canUndo` / `canRedo` で無効化制御。tooltip で shortcut 表示。
 - **検証**: `npm test` は 139 tests / 20 suites 全パス。`npm run build` 成功。実ブラウザ確認: 未実施。
+- **commit/push**: `00a3cdf Undo/Redo と Ctrl+S キーボードショートカットを実装_20260506` として `main` にコミット済み。`main` と `origin/main` は一致済み。
 
-### 2026-05-06: Save 前バリデーション実装・検証済み（未 push）
+### 2026-05-06: Save 前バリデーション実装・検証・push 済み
 
 実装済み:
 
@@ -65,8 +77,9 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **App.jsx の呼び出し更新**: `{ keyCount: document.physicalLayout.length }` を渡すよう修正。
 - **テスト追加**: 4 ケース追加（`&lt N` out-of-range、`&mo N` out-of-range、最大有効インデックスで有効、combo-binding out-of-range）。
 - **検証**: `npm test` は 139 tests / 20 suites 全パス。`npm run build` 成功。実ブラウザ確認: 未実施。
+- **commit/push**: `da8918b save前バリデーションを実装_20260506` として `main` にコミット済み。`main` と `origin/main` は一致済み。
 
-### 2026-05-06: 外部変更検知付き Save all 実装・検証済み（未 push）
+### 2026-05-06: 外部変更検知付き Save all 実装・検証・push 済み
 
 実装済み:
 
@@ -76,6 +89,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **クライアント側 `keymapMtime` state 追加**: マウント時に初期 mtime を fetch。reload 時・save 成功時にも更新。
 - **`saveAllPendingChanges` に force フラグ対応**: `FILE_CHANGED` / `DRAWER_DIRTY` 時は `window.confirm` で確認し、確認後に force フラグを立てて再呼び出し。
 - **検証**: `npm test` は 135 tests / 20 suites 全パス。`npm run build` 成功。実ブラウザ確認: 未実施。
+- **commit/push**: `805ecbc save all の外部変更検知機能を実装_20260506` として `main` にコミット済み。`main` と `origin/main` は一致済み。
 
 ### 2026-05-06: Phase 5.5 実装・検証・push 済み
 
@@ -176,11 +190,11 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 1. ~~**外部変更検知付き Save all（安全性強化）** — 実装済み・push 済み~~
 2. ~~**Save 前バリデーション（推し）** — 実装済み・push 済み~~
-3. ~~**Undo / Redo（pending changes ベース）** — 実装済み・未 push~~
+3. ~~**Undo / Redo（pending changes ベース）** — 実装済み・push 済み~~
    - `undoStack` / `redoStack` + `commitPendingChanges` で pending 履歴管理。Ctrl+Z / Ctrl+Shift+Z ショートカット付き。
-4. ~~**キーボードショートカット** — 実装済み（Undo/Redo と同時）・未 push~~
+4. ~~**キーボードショートカット** — 実装済み（Undo/Redo と同時）・push 済み~~
    - `Ctrl+S` = Save all、`Ctrl+Z` = Undo、`Ctrl+Shift+Z` / `Ctrl+Y` = Redo。
-5. **バックアップ復元 UI**
+5. ~~**バックアップ復元 UI** — 実装済み・未 push~~
    - `Save all` 直前バックアップの最近 N 件を UI に列挙し、1 クリックで `config/roBa.keymap` を戻せるようにする。`docs/viewer-to-device-guide.md` 8 章の手動 PowerShell リカバリを UI で完結させる。
 
 その他、必要に応じて:

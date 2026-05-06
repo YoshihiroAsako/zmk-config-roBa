@@ -4,7 +4,12 @@ import { execFile } from "node:child_process";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { saveBindingChange, saveBindingChanges } from "./src/keymap/saveBindingChange.js";
+import {
+  listKeymapBackups,
+  restoreKeymapBackup,
+  saveBindingChange,
+  saveBindingChanges,
+} from "./src/keymap/saveBindingChange.js";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(__dirname, "../..");
@@ -83,6 +88,33 @@ export default defineConfig({
               repoRoot,
               sourcePath: body.sourcePath,
               changes: body.changes,
+            });
+            const [source, fileStat] = await Promise.all([readFile(keymapPath, "utf8"), stat(keymapPath)]);
+            sendJson(response, 200, { ...result, source, mtime: fileStat.mtimeMs });
+          } catch (error) {
+            sendJson(response, 400, { ok: false, message: error.message });
+          }
+        });
+
+        server.middlewares.use("/__roba/keymap-backups", async (request, response, next) => {
+          if (request.method !== "GET") return next();
+
+          try {
+            const backups = await listKeymapBackups({ repoRoot, limit: 10 });
+            sendJson(response, 200, { ok: true, backups });
+          } catch (error) {
+            sendJson(response, 500, { ok: false, message: error.message });
+          }
+        });
+
+        server.middlewares.use("/__roba/restore-keymap-backup", async (request, response, next) => {
+          if (request.method !== "POST") return next();
+
+          try {
+            const body = await readJsonBody(request);
+            const result = await restoreKeymapBackup({
+              repoRoot,
+              backupPath: body.backupPath,
             });
             const [source, fileStat] = await Promise.all([readFile(keymapPath, "utf8"), stat(keymapPath)]);
             sendJson(response, 200, { ...result, source, mtime: fileStat.mtimeMs });

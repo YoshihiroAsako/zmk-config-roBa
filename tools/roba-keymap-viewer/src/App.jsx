@@ -93,6 +93,7 @@ function App() {
   const [captureContext, setCaptureContext] = useState({ type: "binding" });
   const [pickerContext, setPickerContext] = useState(null);
   const [keymapMtime, setKeymapMtime] = useState(null);
+  const [keymapBackups, setKeymapBackups] = useState([]);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -170,12 +171,24 @@ function App() {
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
 
+  const loadKeymapBackups = async () => {
+    if (!saveEndpointAvailable) return;
+    try {
+      const response = await fetch("/__roba/keymap-backups");
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload.ok) setKeymapBackups(payload.backups || []);
+    } catch {
+      setKeymapBackups([]);
+    }
+  };
+
   useEffect(() => {
     if (!saveEndpointAvailable) return;
     fetch("/__roba/keymap-source")
       .then((r) => r.json())
       .then((payload) => { if (payload.ok) setKeymapMtime(payload.mtime ?? null); })
       .catch(() => {});
+    loadKeymapBackups();
   }, []);
 
   useEffect(() => {
@@ -320,6 +333,7 @@ function App() {
         message: "Loaded the latest config/roBa.keymap from disk.",
         backupPath: "",
       });
+      loadKeymapBackups();
     } catch (error) {
       setSaveStatus({
         tone: "error",
@@ -377,6 +391,7 @@ function App() {
       setActiveTab("Preview");
       const drawerMessage = await updateKeymapDrawerAfterSave();
       setSaveStatus((current) => ({ ...current, drawerMessage }));
+      loadKeymapBackups();
     } catch (error) {
       setSaveStatus({
         tone: "error",
@@ -478,10 +493,80 @@ function App() {
       setActiveTab("Preview");
       const drawerMessage = await updateKeymapDrawerAfterSave();
       setSaveStatus((current) => ({ ...current, drawerMessage }));
+      loadKeymapBackups();
     } catch (error) {
       setSaveStatus({
         tone: "error",
         title: "Save all failed",
+        message: error.message,
+        backupPath: "",
+        drawerMessage: "",
+      });
+    }
+  };
+
+  const restoreFromBackup = async (backup) => {
+    if (!saveEndpointAvailable) {
+      setSaveStatus({
+        tone: "error",
+        title: "Restore unavailable",
+        message: "Backup restore is available only on the local dev server.",
+        backupPath: "",
+        drawerMessage: "",
+      });
+      return;
+    }
+
+    const pendingNote = pendingChanges.length
+      ? `\n\n${pendingChanges.length} pending change(s) will be cleared.`
+      : "";
+    const confirmed = window.confirm(
+      `Restore config/roBa.keymap from this backup?\n\n${backup.path}${pendingNote}`,
+    );
+    if (!confirmed) return;
+
+    setSaveStatus({
+      tone: "saving",
+      title: "Restoring backup",
+      message: "Backing up the current keymap, then restoring the selected backup.",
+      backupPath: "",
+      drawerMessage: "",
+    });
+
+    try {
+      const response = await fetch("/__roba/restore-keymap-backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backupPath: backup.path }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || "Backup restore failed.");
+      }
+
+      setKeymapSource(payload.source);
+      setKeymapMtime(payload.mtime ?? null);
+      setDraftBinding(null);
+      setPendingChanges([]);
+      setUndoStack([]);
+      setRedoStack([]);
+      setIsAddingCombo(false);
+      setIsAddingMacro(false);
+      setSaveStatus({
+        tone: "ok",
+        title: "Restored backup",
+        message: `Restored ${payload.restoredPath}. Current file was backed up before restore.`,
+        backupPath: payload.backupPath,
+        drawerMessage: "Updating keymap-drawer...",
+      });
+      setActiveTab("Preview");
+      const drawerMessage = await updateKeymapDrawerAfterSave();
+      setSaveStatus((current) => ({ ...current, drawerMessage }));
+      loadKeymapBackups();
+    } catch (error) {
+      setSaveStatus({
+        tone: "error",
+        title: "Restore failed",
         message: error.message,
         backupPath: "",
         drawerMessage: "",
@@ -1099,6 +1184,7 @@ function App() {
           pendingChanges={pendingChanges}
           pendingState={pendingState}
           saveStatus={saveStatus}
+          backups={keymapBackups}
           selectedPosition={selectedPosition}
           selectedComboName={selectedComboName}
           selectedMacroName={selectedMacroName}
@@ -1110,6 +1196,8 @@ function App() {
           onRemovePendingChange={(id) => commitPendingChanges(removeDraftChange(pendingChanges, id))}
           onClearPendingChanges={clearPendingChanges}
           onSavePendingChanges={saveAllPendingChanges}
+          onRefreshBackups={loadKeymapBackups}
+          onRestoreBackup={restoreFromBackup}
           canUndo={undoStack.length > 0}
           canRedo={redoStack.length > 0}
           onUndo={undo}
@@ -1689,6 +1777,7 @@ function PanelContent({
   pendingChanges,
   pendingState,
   saveStatus,
+  backups,
   selectedPosition,
   selectedComboName,
   selectedMacroName,
@@ -1700,6 +1789,8 @@ function PanelContent({
   onRemovePendingChange,
   onClearPendingChanges,
   onSavePendingChanges,
+  onRefreshBackups,
+  onRestoreBackup,
   canUndo,
   canRedo,
   onUndo,
@@ -1817,10 +1908,13 @@ function PanelContent({
         pendingChanges={pendingChanges}
         pendingState={pendingState}
         saveStatus={saveStatus}
+        backups={backups}
         onSelectBinding={onSelectBinding}
         onRemovePendingChange={onRemovePendingChange}
         onClearPendingChanges={onClearPendingChanges}
         onSavePendingChanges={onSavePendingChanges}
+        onRefreshBackups={onRefreshBackups}
+        onRestoreBackup={onRestoreBackup}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={onUndo}
@@ -1929,10 +2023,13 @@ function PreviewPanel({
   pendingChanges,
   pendingState,
   saveStatus,
+  backups,
   onSelectBinding,
   onRemovePendingChange,
   onClearPendingChanges,
   onSavePendingChanges,
+  onRefreshBackups,
+  onRestoreBackup,
   canUndo,
   canRedo,
   onUndo,
@@ -1976,6 +2073,13 @@ function PreviewPanel({
             onSelect={onSelectBinding}
             onRemove={onRemovePendingChange}
           />
+          <BackupRestorePanel
+            backups={backups}
+            saveEndpointAvailable={saveEndpointAvailable}
+            restoreDisabled={saveStatus.tone === "saving"}
+            onRefresh={onRefreshBackups}
+            onRestore={onRestoreBackup}
+          />
           <h3>Context Diff</h3>
           <pre className="diffPreview">{contextDiff}</pre>
         </div>
@@ -2015,6 +2119,57 @@ function PendingChangesList({ changes, message, onSelect, onRemove }) {
   );
 }
 
+function BackupRestorePanel({
+  backups,
+  saveEndpointAvailable,
+  restoreDisabled,
+  onRefresh,
+  onRestore,
+}) {
+  return (
+    <section className="backupRestorePanel" aria-label="Keymap backups">
+      <div className="backupRestoreHeader">
+        <h3>Backups</h3>
+        <button
+          type="button"
+          disabled={!saveEndpointAvailable}
+          onClick={onRefresh}
+          title="Refresh backup list"
+        >
+          Refresh
+        </button>
+      </div>
+      {!saveEndpointAvailable && (
+        <div className="backupEmpty">Backup restore is available only on the local dev server.</div>
+      )}
+      {saveEndpointAvailable && !backups.length && (
+        <div className="backupEmpty">No backups yet. Save all creates the first backup.</div>
+      )}
+      {saveEndpointAvailable && backups.length > 0 && (
+        <div className="backupList">
+          {backups.map((backup) => (
+            <div className="backupItem" key={backup.path}>
+              <div className="backupMeta">
+                <strong>{formatBackupName(backup.name)}</strong>
+                <code>{backup.path}</code>
+                <span>{formatBackupTime(backup.mtime)} · {formatBytes(backup.size)}</span>
+              </div>
+              <button
+                type="button"
+                disabled={restoreDisabled}
+                onClick={() => onRestore(backup)}
+                title="Restore this backup"
+              >
+                Restore
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SaveStatusPanel({ status, compact = false }) {
   if (!status.message) return null;
 
@@ -2037,6 +2192,21 @@ function SaveStatusPanel({ status, compact = false }) {
       )}
     </div>
   );
+}
+
+function formatBackupName(name) {
+  return String(name || "").replace(/\.roBa\.keymap$/, "");
+}
+
+function formatBackupTime(mtime) {
+  if (!mtime) return "mtime unavailable";
+  return new Date(mtime).toLocaleString();
+}
+
+function formatBytes(size) {
+  if (!Number.isFinite(size)) return "size unknown";
+  if (size < 1024) return `${size} B`;
+  return `${(size / 1024).toFixed(1)} KB`;
 }
 
 function Table({ columns, rows, renderRow }) {

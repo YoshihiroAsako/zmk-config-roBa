@@ -863,7 +863,7 @@ td code {
 
 .diffGrid > div {
   display: grid;
-  grid-template-rows: auto minmax(42px, auto) auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(42px, auto) auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   border: 1px solid #d7e0ec;
@@ -975,6 +975,92 @@ td code {
   color: #65758b;
   font-size: 11px;
   font-weight: 750;
+}
+
+.backupRestorePanel {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  margin: 0 10px 8px;
+  padding: 8px;
+  border: 1px solid #d7e0ec;
+  border-radius: 7px;
+  background: #f8fbff;
+}
+
+.backupRestoreHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.backupRestoreHeader h3 {
+  padding: 0;
+}
+
+.backupRestoreHeader button,
+.backupItem button {
+  height: 26px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #52647b;
+  cursor: pointer;
+}
+
+.backupRestoreHeader button:disabled,
+.backupItem button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.backupList {
+  display: grid;
+  gap: 6px;
+  max-height: 132px;
+  overflow: auto;
+}
+
+.backupItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid #dfe6f0;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.backupMeta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.backupMeta strong,
+.backupMeta code,
+.backupMeta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backupMeta strong {
+  color: #263247;
+  font-size: 12px;
+}
+
+.backupMeta code {
+  color: #315b9b;
+  font-size: 11px;
+}
+
+.backupMeta span,
+.backupEmpty {
+  color: #65758b;
+  font-size: 11px;
 }
 
 .markdownPreview {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -9,7 +9,14 @@ import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
 import { buildNewComboDraftChange } from "./comboInsert.js";
 import { buildNewMacroDraftChange } from "./macroInsert.js";
 import { buildMacroBindingsChange } from "./macroPreview.js";
-import { buildSaveDiagnostics, replaceKeymapChanges, saveBindingChange, saveBindingChanges } from "./saveBindingChange.js";
+import {
+  buildSaveDiagnostics,
+  listKeymapBackups,
+  replaceKeymapChanges,
+  restoreKeymapBackup,
+  saveBindingChange,
+  saveBindingChanges,
+} from "./saveBindingChange.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");
@@ -558,6 +565,63 @@ describe("save binding change helper", () => {
       assert.deepEqual(savedMacro.bindings, [...macro.bindings, "&kp A"]);
       assert.equal(savedParsed.macros.length, parsed.macros.length);
       assert.equal(result.diagnostics.every((item) => item.ok), true);
+    });
+  });
+});
+
+describe("keymap backup restore helper", () => {
+  it("lists recent keymap backups newest first", async () => {
+    await withTempRepo("current keymap", async (tempRoot) => {
+      const backupDir = path.join(tempRoot, "config", ".roBa.keymap.bak");
+      await mkdir(backupDir, { recursive: true });
+      const olderPath = path.join(backupDir, "20260504-120000.roBa.keymap");
+      const newerPath = path.join(backupDir, "20260505-120000.roBa.keymap");
+      await writeFile(olderPath, "older", "utf8");
+      await writeFile(newerPath, "newer", "utf8");
+      await writeFile(path.join(backupDir, "notes.txt"), "skip me", "utf8");
+      await utimes(olderPath, new Date("2026-05-04T12:00:00Z"), new Date("2026-05-04T12:00:00Z"));
+      await utimes(newerPath, new Date("2026-05-05T12:00:00Z"), new Date("2026-05-05T12:00:00Z"));
+
+      const backups = await listKeymapBackups({ repoRoot: tempRoot, limit: 5 });
+
+      assert.deepEqual(backups.map((backup) => backup.path), [
+        "config/.roBa.keymap.bak/20260505-120000.roBa.keymap",
+        "config/.roBa.keymap.bak/20260504-120000.roBa.keymap",
+      ]);
+      assert.equal(backups[0].size, 5);
+    });
+  });
+
+  it("restores a backup and backs up the pre-restore source", async () => {
+    await withTempRepo("current keymap", async (tempRoot) => {
+      const backupDir = path.join(tempRoot, "config", ".roBa.keymap.bak");
+      await mkdir(backupDir, { recursive: true });
+      await writeFile(path.join(backupDir, "20260504-120000.roBa.keymap"), "restored keymap", "utf8");
+
+      const result = await restoreKeymapBackup({
+        repoRoot: tempRoot,
+        backupPath: "config/.roBa.keymap.bak/20260504-120000.roBa.keymap",
+        now: new Date(2026, 4, 6, 9, 30, 0),
+      });
+
+      assert.equal(result.ok, true);
+      assert.equal(result.restoredPath, "config/.roBa.keymap.bak/20260504-120000.roBa.keymap");
+      assert.equal(result.backupPath, "config/.roBa.keymap.bak/20260506-093000.roBa.keymap");
+      assert.equal(await readTempKeymap(tempRoot), "restored keymap");
+      assert.equal(await readFile(path.join(tempRoot, result.backupPath), "utf8"), "current keymap");
+    });
+  });
+
+  it("rejects backup paths outside the keymap backup directory", async () => {
+    await withTempRepo("current keymap", async (tempRoot) => {
+      await assert.rejects(
+        () => restoreKeymapBackup({
+          repoRoot: tempRoot,
+          backupPath: "../outside.roBa.keymap",
+        }),
+        /Backup path must point/,
+      );
+      assert.equal(await readTempKeymap(tempRoot), "current keymap");
     });
   });
 });

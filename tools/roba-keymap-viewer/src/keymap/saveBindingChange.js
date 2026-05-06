@@ -1,8 +1,9 @@
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isEditableBindingExpression, parseKeymap, replaceBinding, replaceBindings } from "./parseKeymap.js";
 
 const CANONICAL_SOURCE_PATH = "config/roBa.keymap";
+const BACKUP_DIR_PATH = "config/.roBa.keymap.bak";
 
 export async function saveBindingChange({
   repoRoot,
@@ -121,6 +122,76 @@ export async function saveBindingChanges({
   };
 }
 
+export async function listKeymapBackups({ repoRoot, limit = 10 }) {
+  const root = path.resolve(repoRoot);
+  const backupDir = path.join(root, ...BACKUP_DIR_PATH.split("/"));
+  assertInsideRepo(root, backupDir);
+
+  let entries;
+  try {
+    entries = await readdir(backupDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+
+  const backups = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".roBa.keymap")) continue;
+    const backupPath = path.join(backupDir, entry.name);
+    assertInsideRepo(root, backupPath);
+    const fileStat = await stat(backupPath);
+    backups.push({
+      name: entry.name,
+      path: toRepoRelativePath(root, backupPath),
+      size: fileStat.size,
+      mtime: fileStat.mtimeMs,
+    });
+  }
+
+  return backups
+    .sort((a, b) => b.mtime - a.mtime || b.name.localeCompare(a.name))
+    .slice(0, Math.max(0, limit));
+}
+
+export async function restoreKeymapBackup({
+  repoRoot,
+  backupPath,
+  now = new Date(),
+}) {
+  const root = path.resolve(repoRoot);
+  const sourceFile = path.resolve(root, ...CANONICAL_SOURCE_PATH.split("/"));
+  const resolvedBackupPath = resolveBackupPath(root, backupPath);
+  assertInsideRepo(root, sourceFile);
+
+  const [currentSource, backupSource] = await Promise.all([
+    readFile(sourceFile, "utf8"),
+    readFile(resolvedBackupPath, "utf8"),
+  ]);
+
+  const preRestoreBackupPath = await writeBackup(root, currentSource, now);
+  const tempPath = `${sourceFile}.${process.pid}.${Date.now()}.restore.tmp`;
+  try {
+    await writeFile(tempPath, backupSource, "utf8");
+    await rename(tempPath, sourceFile);
+  } catch (error) {
+    await removeTempFile(tempPath);
+    throw error;
+  }
+
+  const savedSource = await readFile(sourceFile, "utf8");
+  if (savedSource !== backupSource) {
+    throw new Error("Restored source verification failed.");
+  }
+
+  return {
+    ok: true,
+    message: "Restored config/roBa.keymap from backup.",
+    restoredPath: toRepoRelativePath(root, resolvedBackupPath),
+    backupPath: toRepoRelativePath(root, preRestoreBackupPath),
+  };
+}
+
 export function replaceKeymapChanges(source, changes) {
   const bindingChanges = changes.filter((change) => change.kind === "binding" || !change.kind);
   const sourceChanges = changes.filter((change) => change.kind && change.kind !== "binding");
@@ -211,7 +282,7 @@ function assertInsideRepo(root, target) {
 }
 
 async function writeBackup(root, source, now) {
-  const backupDir = path.join(root, "config", ".roBa.keymap.bak");
+  const backupDir = path.join(root, ...BACKUP_DIR_PATH.split("/"));
   await mkdir(backupDir, { recursive: true });
 
   for (let index = 0; index < 100; index += 1) {
@@ -226,6 +297,22 @@ async function writeBackup(root, source, now) {
   }
 
   throw new Error("Could not create a unique keymap backup.");
+}
+
+function resolveBackupPath(root, backupPath) {
+  const normalized = normalizeSourcePath(backupPath);
+  if (!normalized.startsWith(`${BACKUP_DIR_PATH}/`) || !normalized.endsWith(".roBa.keymap")) {
+    throw new Error("Backup path must point to config/.roBa.keymap.bak/*.roBa.keymap.");
+  }
+
+  const resolved = path.resolve(root, ...normalized.split("/"));
+  const backupDir = path.resolve(root, ...BACKUP_DIR_PATH.split("/"));
+  assertInsideRepo(root, resolved);
+  const relativeToBackupDir = path.relative(backupDir, resolved);
+  if (relativeToBackupDir.startsWith("..") || path.isAbsolute(relativeToBackupDir)) {
+    throw new Error("Resolved backup path is outside the backup directory.");
+  }
+  return resolved;
 }
 
 async function removeTempFile(tempPath) {
