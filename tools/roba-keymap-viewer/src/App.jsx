@@ -76,8 +76,12 @@ function App() {
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
   const selectedCombo = document.combos.find((combo) => combo.name === selectedComboName);
-  const comboHighlightPositions = activeTab === "Combos" && selectedCombo
-    ? new Set(selectedCombo.positions)
+  const comboDraftPositionSet = activeTab === "Combos" && selectedCombo
+    ? new Set(comboDraft.positionsRaw.trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0))
+    : new Set();
+  const comboHighlightPositions = comboDraftPositionSet;
+  const comboSavedOnlyPositions = activeTab === "Combos" && selectedCombo
+    ? new Set(selectedCombo.positions.filter((p) => !comboDraftPositionSet.has(p)))
     : new Set();
   const selectedBinding = currentLayer.bindings[selectedPosition] || "&trans";
   const selectedEntry = currentLayer.bindingEntries?.[selectedPosition];
@@ -471,6 +475,18 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const handleSvgKeyClick = (position) => {
+    if (activeTab === "Combos" && selectedCombo) {
+      const posSet = new Set(comboDraft.positionsRaw.trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0));
+      if (posSet.has(position)) posSet.delete(position);
+      else posSet.add(position);
+      setComboDraft((prev) => ({ ...prev, positionsRaw: [...posSet].sort((a, b) => a - b).join(" ") }));
+      setSaveStatus(EMPTY_SAVE_STATUS);
+    } else {
+      selectBinding(activeLayer, position);
+    }
+  };
+
   const addSelectedMacroDraft = () => {
     if (!selectedMacro || !macroPreviewState.changed || !macroPreviewState.valid) return;
     const changes = buildMacroDraftChanges({
@@ -565,7 +581,8 @@ function App() {
             layerNames={layerNames}
             selectedPosition={selectedPosition}
             highlightedPositions={comboHighlightPositions}
-            onSelect={(position) => selectBinding(activeLayer, position)}
+            savedOnlyPositions={comboSavedOnlyPositions}
+            onSelect={handleSvgKeyClick}
           />
         </section>
 
@@ -708,7 +725,7 @@ function App() {
               </button>
               <button
                 type="button"
-                disabled={!selectedPendingChange}
+                disabled={!selectedPendingChange && !editorState.changed}
                 onClick={removeSelectedDraft}
               >
                 Remove draft
@@ -850,7 +867,7 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
           </div>
         </label>
         <label>
-          <span>Positions draft</span>
+          <span>Positions draft (SVG のキーをクリックでトグル)</span>
           <input
             aria-label="Combo positions draft"
             value={draft.positionsRaw}
@@ -886,7 +903,7 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
           </button>
           <button
             type="button"
-            disabled={!pendingCount}
+            disabled={!pendingCount && !previewState.changed}
             onClick={onRemoveDraft}
           >
             Remove combo draft
@@ -920,7 +937,7 @@ function LayerRenameRow({ currentName, draft, pending, disabled, onChange, onAdd
         <button type="button" disabled={!canAdd} onClick={onAdd}>
           {pending ? "Update" : "Add"}
         </button>
-        <button type="button" disabled={!pending} onClick={onRemove}>
+        <button type="button" disabled={!pending && !changed} onClick={onRemove}>
           Remove
         </button>
       </div>
@@ -1023,7 +1040,7 @@ function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft
           </button>
           <button
             type="button"
-            disabled={!pendingCount}
+            disabled={!pendingCount && !previewState.changed}
             onClick={onRemoveDraft}
           >
             Remove macro draft
@@ -1035,7 +1052,7 @@ function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft
   );
 }
 
-function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlightedPositions, onSelect }) {
+function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlightedPositions, savedOnlyPositions, onSelect }) {
   const bounds = keys.reduce(
     (acc, key) => ({
       minX: Math.min(acc.minX, key.x),
@@ -1070,6 +1087,7 @@ function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlighted
             parsed={parsed}
             selected={selectedPosition === key.position}
             highlighted={highlightedPositions.has(key.position)}
+            savedOnly={savedOnlyPositions.has(key.position)}
             onSelect={onSelect}
           />
         );
@@ -1078,11 +1096,11 @@ function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlighted
   );
 }
 
-function KeyCap({ keyDef, parsed, selected, highlighted, onSelect }) {
+function KeyCap({ keyDef, parsed, selected, highlighted, savedOnly, onSelect }) {
   const x = keyDef.x * UNIT;
   const y = keyDef.y * UNIT;
   const rotate = keyDef.r ? ` rotate(${keyDef.r}, ${(keyDef.rx - keyDef.x) * UNIT}, ${(keyDef.ry - keyDef.y) * UNIT})` : "";
-  const className = ["keyCap", highlighted ? "comboHighlighted" : "", selected ? "selected" : "", keyDef.thumb ? "thumb" : "", parsed.kind].filter(Boolean).join(" ");
+  const className = ["keyCap", highlighted ? "comboHighlighted" : "", savedOnly ? "comboSavedOnly" : "", selected ? "selected" : "", keyDef.thumb ? "thumb" : "", parsed.kind].filter(Boolean).join(" ");
 
   return (
     <g className={className} transform={`translate(${x}, ${y})${rotate}`} onClick={() => onSelect(keyDef.position)}>

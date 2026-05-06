@@ -340,6 +340,13 @@ pre {
   stroke: #087f8c;
 }
 
+.keyCap.comboSavedOnly rect {
+  fill: #fdfaf0;
+  stroke: #d18b21;
+  stroke-width: 1.5px;
+  stroke-dasharray: 4 3;
+}
+
 .keyDisplay {
   fill: #202b3d;
   font-size: 11px;
