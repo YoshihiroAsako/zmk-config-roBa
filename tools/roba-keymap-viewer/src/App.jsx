@@ -2571,24 +2571,22 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
               aria-label="Structured picker keycode"
             />
           </label>
-          {draft.behavior === "&kp" && (
-            <div className="keypressModifierGroup" role="group" aria-label="Key Press modifiers">
-              {KEY_PRESS_MODIFIERS.map((modifier) => {
-                const active = (draft.keypressModifiers || []).includes(modifier.code);
-                return (
-                  <button
-                    type="button"
-                    key={modifier.code}
-                    className={active ? "active" : ""}
-                    aria-pressed={active}
-                    onClick={() => toggleKeypressModifier(modifier.code)}
-                  >
-                    {modifier.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <div className="keypressModifierGroup" role="group" aria-label="Tap keycode modifiers">
+            {KEY_PRESS_MODIFIERS.map((modifier) => {
+              const active = (draft.keypressModifiers || []).includes(modifier.code);
+              return (
+                <button
+                  type="button"
+                  key={modifier.code}
+                  className={active ? "active" : ""}
+                  aria-pressed={active}
+                  onClick={() => toggleKeypressModifier(modifier.code)}
+                >
+                  {modifier.label}
+                </button>
+              );
+            })}
+          </div>
           <div className="structuredPreview">
             <code>{structuredState.ok ? structuredState.binding : structuredState.message}</code>
             <button

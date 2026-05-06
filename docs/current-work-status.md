@@ -41,23 +41,24 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
-### 2026-05-07: 次回実装 3 件の現状確認・計画化（実装は新チャットで）
+### 2026-05-07: Task C 実装・検証・push 済み（LT/MT の tap keycode に KP modifier 引き継ぎ）
 
-ユーザーから 3 機能の実装可否について確認依頼。現状を viewer ソースで調査し、計画を「次にやること」セクションに追加した。
+実装済み:
 
-調査結果サマリ:
+- **`parseStructuredBinding` 拡張**: `&lt` / `&mt` の tap keycode を `parseKeypressValue` に通し、`keypressModifiers` を返すようにした。
+- **`buildStructuredBinding` 拡張**: `&lt` / `&mt` の tap keycode も `buildKeypressValue(keycode, keypressModifiers)` で modifier wrap するようにした。
+- **App.jsx の modifier toggle 表示**: `&kp` 限定の条件を外し、`&lt` / `&mt` でも modifier toggle（L Ctrl / L Shift など）を常時表示するようにした。
+- **テスト追加**: `structuredBinding.test.js` に modifier 付き build、parse、round-trip テストを追加。既存の `&lt` / `&mt` parse 期待値に `keypressModifiers: []` を追記。
+- **検証**: 164 tests / 24 suites 全パス。`npm run build` 成功。dev server HTTP 200 確認。ユーザーブラウザ確認済み。
+- **commit/push**: `main` に push 済み。
 
-- **マウスボタン MB1〜MB5 の Pick 選択**: 未実装。`&mkp` は `bindingDisplay.js:189` で MB1/MB2/MB3 のみ LMB/RMB/MMB 表示。`editability: "build-required"` で Pick 不可。MB4/MB5 はラベルもなし。`structuredBinding.js` の `STRUCTURED_BEHAVIORS` は `&kp` / `&lt` / `&mt` のみ。
-- **エンコーダー sensor-bindings 編集**: 未実装。`parseKeymap.js:341` で `sensorBindings` を読み取っているが、`App.jsx:1934` の Sensors タブは read-only。現在 `default_layer` は `&inc_dec_kp PG_UP PAGE_DOWN`（スクロール挙動）、`ARROW` は `&inc_dec_kp LC(PAGE_UP) LC(PAGE_DOWN)`。
-- **LT/MT の tap keycode に KP modifier 引き継ぎ**: 未実装。`structuredBinding.js:81` の `buildStructuredBinding` で `&lt` / `&mt` は `${keycode}` 単体生成。`parseStructuredBinding` でも `&lt N <kp>` の `<kp>` 内 modifier wrap を分解していない。
+### 2026-05-07: 次回実装 3 件の現状確認・計画化
 
 ユーザー確認済み（2026-05-07）:
 
 - A. Pick に `MKP` behavior を追加し MB1〜MB5 を選べるようにする。
-- B. 「KP15 のエンコーダー」はエンコーダー**回転**（`sensor-bindings`）の挙動変更を指す。スクロール以外（矢印キー、ボリューム等）も選べるようにする。
-- C. KP で modifier を選んだ状態で LT/MT に切り替えると、tap keycode が `LC(A)` のように modifier 付きになる挙動でよい（双方向で round-trip）。
-
-次回チャットでは「次にやること」→「新規実装タスク（2026-05-07 計画・未着手）」に従って実装する。
+- B. エンコーダー回転（`sensor-bindings`）の挙動を編集可能にする。
+- C. LT/MT の tap keycode に KP modifier 引き継ぎ → **実装完了**。
 
 ### 2026-05-07: Trackball layer settings 実装・検証・push 済み
 
@@ -312,23 +313,14 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **UI 仕様**: 各 layer に「Inc keycode」「Dec keycode」の Pick ボタン。今回は `&kp` 相当の keycode（modifier 含む）を選べれば十分。`&inc_dec_kp` 以外（例: `&inc_dec_cp`）への切替は MVP 外。
 - **テスト**: parse / pending change / save 各レイヤーで追加。
 
-#### C. LT/MT の tap keycode に KP modifier 引き継ぎ
+#### ~~C. LT/MT の tap keycode に KP modifier 引き継ぎ（完了）~~
 
-- **目的**: KP で `LC` / `LS` などの modifier toggle を選んだ状態で behavior を LT / MT に切り替えると、tap keycode が `LC(A)` のように modifier 付きになる。逆に LT / MT を開いたとき、tap keycode 中の `LC(A)` 等を modifier toggle として復元する。
-- **方針**:
-  - `buildStructuredBinding` で `&lt` / `&mt` のときも `buildKeypressValue(keycode, keypressModifiers)` を使う。
-  - `parseStructuredBinding` で `&lt N <kp-value>` / `&mt MOD <kp-value>` の `<kp-value>` を `parseKeypressValue` に通す。
-  - `KeycodePicker` で behavior 切替時に `keypressModifiers` を保持する（既に共通 state なら現状維持）。`&lt` / `&mt` 選択時にも modifier toggle UI を表示。
-- **対象ファイル**:
-  - `tools/roba-keymap-viewer/src/keymap/structuredBinding.js` と `.test.js`
-  - `tools/roba-keymap-viewer/src/keymap/bindingDisplay.js`（既存の display で `&lt 1 LC(A)` のような表示が崩れていないか確認）
-  - `tools/roba-keymap-viewer/src/App.jsx`（modifier toggle 表示の条件を `&kp` 限定から外す）
-- **互換性**: 既存 `&lt 1 SPACE` 等の単純な tap keycode は `keypressModifiers = []` として round-trip すること。
+- `structuredBinding.js` / `App.jsx` を更新。164 tests / 24 suites 全パス。push 済み。
 
 #### 実装順の推奨
 
-1. **C**（変更が局所的でテストしやすい）
-2. **A**（structured picker 拡張に慣れた状態で着手）
+1. ~~**C**（完了）~~
+2. **A**（structured picker 拡張に慣れた状態で着手）← 次はここ
 3. **B**（parse / save / UI と影響範囲が広いので最後）
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。

@@ -29,6 +29,17 @@ describe("structured binding helpers", () => {
       buildStructuredBinding({ behavior: "&mt", modifier: "LEFT_SHIFT", keycode: "SPACE" }, 7),
       "&mt LEFT_SHIFT SPACE",
     );
+    assert.equal(
+      buildStructuredBinding({ behavior: "&lt", layerIndex: 2, keycode: "A", keypressModifiers: ["LC"] }, 7),
+      "&lt 2 LC(A)",
+    );
+    assert.equal(
+      buildStructuredBinding(
+        { behavior: "&mt", modifier: "LEFT_SHIFT", keycode: "A", keypressModifiers: ["LC", "LS"] },
+        7,
+      ),
+      "&mt LEFT_SHIFT LC(LS(A))",
+    );
   });
 
   it("parses existing editable hold-tap bindings for the picker draft", () => {
@@ -58,13 +69,43 @@ describe("structured binding helpers", () => {
       layerIndex: 6,
       modifier: "LEFT_SHIFT",
       keycode: "ESCAPE",
+      keypressModifiers: [],
     });
     assert.deepEqual(parseStructuredBinding("&mt RIGHT_ALT INT_YEN", 7), {
       behavior: "&mt",
       layerIndex: 0,
       modifier: "RIGHT_ALT",
       keycode: "INT_YEN",
+      keypressModifiers: [],
     });
+    assert.deepEqual(parseStructuredBinding("&lt 1 LC(A)", 7), {
+      behavior: "&lt",
+      layerIndex: 1,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: ["LC"],
+    });
+    assert.deepEqual(parseStructuredBinding("&mt LEFT_SHIFT LC(LS(A))", 7), {
+      behavior: "&mt",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: ["LC", "LS"],
+    });
+  });
+
+  it("round-trips lt / mt bindings with key press modifiers", () => {
+    const ltBinding = "&lt 3 LC(LS(A))";
+    const ltDraft = parseStructuredBinding(ltBinding, 7);
+    assert.equal(buildStructuredBinding(ltDraft, 7), ltBinding);
+
+    const mtBinding = "&mt RIGHT_ALT LC(B)";
+    const mtDraft = parseStructuredBinding(mtBinding, 7);
+    assert.equal(buildStructuredBinding(mtDraft, 7), mtBinding);
+
+    const plainLt = "&lt 1 SPACE";
+    assert.deepEqual(parseStructuredBinding(plainLt, 7).keypressModifiers, []);
+    assert.equal(buildStructuredBinding(parseStructuredBinding(plainLt, 7), 7), plainLt);
   });
 
   it("rejects unsupported token characters before preview/save", () => {

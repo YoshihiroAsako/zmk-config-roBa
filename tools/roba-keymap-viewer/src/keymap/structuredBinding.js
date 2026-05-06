@@ -33,21 +33,25 @@ export function parseStructuredBinding(raw, layerCount = 0) {
   let match = /^&lt (\d+) (\S+)$/.exec(value);
   if (match) {
     const layer = Number(match[1]);
+    const parsedKeypress = parseKeypressValue(match[2]);
     return {
       behavior: "&lt",
       layerIndex: Number.isInteger(layer) ? clampLayer(layer, layerCount) : 0,
       modifier: HOLD_TAP_MODIFIERS[0].code,
-      keycode: match[2],
+      keycode: parsedKeypress.keycode,
+      keypressModifiers: parsedKeypress.modifiers,
     };
   }
 
   match = /^&mt (\S+) (\S+)$/.exec(value);
   if (match) {
+    const parsedKeypress = parseKeypressValue(match[2]);
     return {
       behavior: "&mt",
       layerIndex: 0,
       modifier: match[1],
-      keycode: match[2],
+      keycode: parsedKeypress.keycode,
+      keypressModifiers: parsedKeypress.modifiers,
     };
   }
 
@@ -87,11 +91,11 @@ export function buildStructuredBinding({ behavior, layerIndex, modifier, keycode
     if (layerIndex < 0 || (layerCount > 0 && layerIndex >= layerCount)) {
       throw new Error(`Layer index must be between 0 and ${Math.max(layerCount - 1, 0)}.`);
     }
-    return `&lt ${layerIndex} ${keycode}`;
+    return `&lt ${layerIndex} ${buildKeypressValue(keycode, keypressModifiers)}`;
   }
 
   validateToken(modifier, "Modifier");
-  return `&mt ${modifier} ${keycode}`;
+  return `&mt ${modifier} ${buildKeypressValue(keycode, keypressModifiers)}`;
 }
 
 export function validateStructuredBinding(draft, layerCount = 0) {
