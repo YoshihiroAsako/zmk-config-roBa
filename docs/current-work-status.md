@@ -37,20 +37,41 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
 - 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
 - ZMK Studio 風の `Key Press` 修飾キー選択 UI まで実装済み。次はブラウザ上の手動確認と commit/push 整理が候補。
+- 次回チャットでは「## 次にやること」の **新規実装タスク 3 件**（マウスボタン Pick / エンコーダー sensor-bindings 編集 / LT・MT への KP modifier 引き継ぎ）に着手する。
 
 ## 最新チェックポイント
 
-### 2026-05-06: Trackball layer settings 実装・検証済み（未 push）
+### 2026-05-07: 次回実装 3 件の現状確認・計画化（実装は新チャットで）
+
+ユーザーから 3 機能の実装可否について確認依頼。現状を viewer ソースで調査し、計画を「次にやること」セクションに追加した。
+
+調査結果サマリ:
+
+- **マウスボタン MB1〜MB5 の Pick 選択**: 未実装。`&mkp` は `bindingDisplay.js:189` で MB1/MB2/MB3 のみ LMB/RMB/MMB 表示。`editability: "build-required"` で Pick 不可。MB4/MB5 はラベルもなし。`structuredBinding.js` の `STRUCTURED_BEHAVIORS` は `&kp` / `&lt` / `&mt` のみ。
+- **エンコーダー sensor-bindings 編集**: 未実装。`parseKeymap.js:341` で `sensorBindings` を読み取っているが、`App.jsx:1934` の Sensors タブは read-only。現在 `default_layer` は `&inc_dec_kp PG_UP PAGE_DOWN`（スクロール挙動）、`ARROW` は `&inc_dec_kp LC(PAGE_UP) LC(PAGE_DOWN)`。
+- **LT/MT の tap keycode に KP modifier 引き継ぎ**: 未実装。`structuredBinding.js:81` の `buildStructuredBinding` で `&lt` / `&mt` は `${keycode}` 単体生成。`parseStructuredBinding` でも `&lt N <kp>` の `<kp>` 内 modifier wrap を分解していない。
+
+ユーザー確認済み（2026-05-07）:
+
+- A. Pick に `MKP` behavior を追加し MB1〜MB5 を選べるようにする。
+- B. 「KP15 のエンコーダー」はエンコーダー**回転**（`sensor-bindings`）の挙動変更を指す。スクロール以外（矢印キー、ボリューム等）も選べるようにする。
+- C. KP で modifier を選んだ状態で LT/MT に切り替えると、tap keycode が `LC(A)` のように modifier 付きになる挙動でよい（双方向で round-trip）。
+
+次回チャットでは「次にやること」→「新規実装タスク（2026-05-07 計画・未着手）」に従って実装する。
+
+### 2026-05-07: Trackball layer settings 実装・検証・push 済み
 
 実装済み:
 
 - **`parseTrackballSettings()` 追加**: `parseKeymap.js` に `maskComments()` と `parseTrackballSettings()` を追加。comment-aware scanner（`/* */` / `//` をスペースで mask して offset を維持）で `automouse-layer` / `scroll-layers` を抽出。`parseKeymap()` の戻り値に `trackballSettings` を追加。
 - **pending change 対応**: `pendingChanges.js` に `buildTrackballAutomouseDraftChange()` / `buildTrackballScrollLayersDraftChange()` builder を追加。`scroll-layers` は昇順正規化。`validatePendingChange()` に `trackball-automouse-layer` / `trackball-scroll-layers` の validation（範囲チェック・重複チェック）を追加。`upsertDraftChange` の既存 NoOp 判定で `currentRaw === nextRaw` はスキップ。
 - **server 側 validation 対応**: `saveBindingChange.js` に 2 kind の `validateSourceChange()` 分岐を追加。保存後に `trackballSettings` と対象 property が残存することを `validateTrackballSettingsPreserved()` で確認。
-- **Settings タブ UI 追加**: `App.jsx` に `Settings` タブを追加。`trackballDraft` state を追加し、source リロード / save / restore 後に初期化。`TrackballSettingsPanel` コンポーネントを追加。`automouse-layer` は select（`0` は disabled 表示）、`scroll-layers` は checkbox list で選択。
-- **テスト追加**: `parseKeymap.test.js` に 7 ケース、`pendingChanges.test.js` に 8 ケース、`saveBindingChange.test.js` に 4 ケース追加。
-- **検証**: `npm test` は 163 tests / 24 suites 全パス。`npm run build` 成功。dev server での手動確認は未実施（次のステップ）。
-- **未 push**: 未コミット差分あり。手動ブラウザ確認後に commit/push する。
+- **Settings タブ UI 追加**: `App.jsx` に `Settings` タブを追加。`trackballDraft` state を追加し、source リロード / save / restore 後に初期化。`TrackballSettingsPanel` コンポーネントを追加。`automouse-layer` は select（`0` は disabled 表示）、`scroll-layers` は checkbox list で選択。コンテンツ全体を `trackballSettingsScroll` でラップし、`.tableSection` の `1fr` 行で正しく表示されるようにした。
+- **CSS 追加**: `styles.css` に `label.scrollLayerCheckbox`（flex レイアウト、`display:grid` 上書き用に詳細度 0,1,1）、`.trackballSettingsScroll`、`.fieldLabel`、`.trackballDisabledHint`、`.comboPreviewBox select`、`.scrollLayerCheckboxList` を追加。
+- **Preview panel Context Diff 修正**: `.diffGrid > div` の最終行を `minmax(0,1fr)` → `minmax(100px,1fr)` に変更し、Context Diff が常に最低 100px 確保されるようにした。Pending Changes 行も `minmax(42px,auto)` → `minmax(80px,auto)` に拡大。
+- **テスト追加**: `parseKeymap.test.js` に 7 ケース、`pendingChanges.test.js` に 8 ケース、`saveBindingChange.test.js` に 4 ケース追加。全 163 tests / 24 suites パス。
+- **手動ブラウザ確認**: Settings タブの初期値・変更・diff・Save all・Reload・Undo を確認済み。Context Diff の視認性も改善確認済み。
+- **commit/push**: `main` に push 済み。
 
 ### 2026-05-06: Trackball layer settings 計画プロンプト追加
 
@@ -77,7 +98,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - `keymap-drawer` 再生成 skip は MVP 必須ではなく、実装直前に既存挙動維持と比較して決める扱いにした。
 - まだ実装はしていない。次は計画に沿って実装するか、追加レビューを行う。
 
-### 2026-05-06: Key Press 修飾キー選択 UI 実装・検証済み（未 push）
+### 2026-05-06: Key Press 修飾キー選択 UI 実装・検証・push 済み
 
 実装済み:
 
@@ -87,7 +108,6 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **表示補強**: `bindingDisplay.js` で nested Key Press modifier を `C+S+PSCRN` や `RC+RS+TAB` のように読める表示へ補強した。既存の Windows JIS 補正（例: `LS(INT_YEN)` → `|`）は維持。
 - **テスト追加**: `structuredBinding.test.js` に modifier 付き `&kp` の build / parse / round-trip、`parseKeymap.test.js` に modifier 付き表示テストを追加。
 - **検証**: `tools/roba-keymap-viewer/` で `npm test` は 144 tests / 21 suites 全パス。`npm run build` 成功。dev server は `http://127.0.0.1:5184/` で HTTP 200 確認済み。ユーザーによる実機確認も完了。
-- **ブラウザ自動確認**: `agent-browser` CLI は PATH に無かったため未実施。
 
 ### 2026-05-06: Key Press 修飾キー選択 UI の開発計画を追加（実装済み）
 
@@ -115,7 +135,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **検証**: `npm test` は 142 tests / 21 suites 全パス。`npm run build` 成功。dev server は `http://127.0.0.1:5183/` で HTTP 200、`/__roba/keymap-backups` 応答確認済み。`agent-browser` CLI は PATH に無かったため実ブラウザ自動確認は未実施。
 - **commit/push**: `d95b794 バックアップ復元UIを実装_20260506` として `main` にコミット済み。`main` と `origin/main` は一致済み。
 
-### 2026-05-06: Viewer 簡単起動・停止スクリプト実装・検証済み（未 push）
+### 2026-05-06: Viewer 簡単起動・停止スクリプト実装・検証・push 済み
 
 実装済み:
 
@@ -259,18 +279,65 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - ~~Macros タブに "New macro" ボタンを設け、`macros { }` ブロックに新しいノードを挿入する。~~
 - ~~既存マクロへの binding 行の追加/削除も含む。~~
 
+### ~~Trackball layer settings の手動ブラウザ確認（完了・push 済み）~~
+
+### 新規実装タスク（2026-05-07 計画・未着手）
+
+ユーザー確認済み（2026-05-07）。次回チャットではここから着手する。
+
+#### A. マウスボタン Pick（`&mkp` 対応）
+
+- **目的**: Pick Keycode から `&mkp MB1` 〜 `&mkp MB5`（左クリック / 右クリック / 中クリック / 戻る / 進む）を選べるようにする。
+- **方針**: 既存の構造化 picker に 4 番目の behavior `MKP`（Mouse Button Press）を追加する。`KP` / `LT` / `MT` と同じレベルで並べる。
+- **対象ファイル（想定）**:
+  - `tools/roba-keymap-viewer/src/keymap/structuredBinding.js`: `STRUCTURED_BEHAVIORS` に `&mkp` を追加。`STRUCTURED_BEHAVIOR_LABELS` に `{ short: "MKP", long: "Mouse Button Press" }` を追加。`MOUSE_BUTTONS = [{ code: "MB1", label: "Left (MB1)" }, ...MB5 まで]` を定義。`parseStructuredBinding` / `buildStructuredBinding` を `&mkp` に対応。
+  - `tools/roba-keymap-viewer/src/keymap/structuredBinding.test.js`: build / parse / round-trip テスト追加。
+  - `tools/roba-keymap-viewer/src/keymap/bindingDisplay.js`: 既存 `&mkp` 解析に MB4/MB5 ラベル（例: "Back" / "Forward"）を追加。
+  - `tools/roba-keymap-viewer/src/App.jsx`: `KeycodePicker` の behavior ボタンに `MKP` を追加し、選択時は keycode 入力欄ではなく MB1〜MB5 のラジオ/セレクトを表示。
+- **注意**: `&mkp` は keycode 検索ではなく 5 択固定。modifier toggle は不要。
+
+#### B. エンコーダー回転（`sensor-bindings`）編集
+
+- **目的**: 現在 read-only の Sensors タブで、各レイヤーの `sensor-bindings = <&inc_dec_kp ...>` を編集できるようにする。スクロール挙動（PG_UP/PG_DOWN）以外への変更（例: `LEFT_ARROW`/`RIGHT_ARROW`、ボリューム、トラック移動など）を可能にする。
+- **対象**: `default_layer` と `ARROW` の `sensor-bindings` のみ。今は `&inc_dec_kp X Y` 形式のみ対応で十分。
+- **データモデル方針（要設計レビュー）**:
+  - parseKeymap で各 layer の `sensor-bindings` を `{ behavior: "&inc_dec_kp", incKey, decKey, sourceRange }` 形式で保持。
+  - pending change kind: `sensor-binding` を新設。layer index と new raw を持つ。
+  - source-range 編集で `sensor-bindings = <...>` の中身だけ書き換える。
+- **対象ファイル（想定）**:
+  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.js`: `sensor-bindings` の source range も保持するよう拡張。
+  - `tools/roba-keymap-viewer/src/keymap/pendingChanges.js`: `sensor-binding` builder と validation 追加。
+  - `tools/roba-keymap-viewer/src/server/saveBindingChange.js`: 保存後に sensor-bindings が残存・パース可能か検証。
+  - `tools/roba-keymap-viewer/src/App.jsx`: Sensors タブを編集 UI に拡張。各 layer の inc / dec keycode を Pick で選択可能に。
+- **UI 仕様**: 各 layer に「Inc keycode」「Dec keycode」の Pick ボタン。今回は `&kp` 相当の keycode（modifier 含む）を選べれば十分。`&inc_dec_kp` 以外（例: `&inc_dec_cp`）への切替は MVP 外。
+- **テスト**: parse / pending change / save 各レイヤーで追加。
+
+#### C. LT/MT の tap keycode に KP modifier 引き継ぎ
+
+- **目的**: KP で `LC` / `LS` などの modifier toggle を選んだ状態で behavior を LT / MT に切り替えると、tap keycode が `LC(A)` のように modifier 付きになる。逆に LT / MT を開いたとき、tap keycode 中の `LC(A)` 等を modifier toggle として復元する。
+- **方針**:
+  - `buildStructuredBinding` で `&lt` / `&mt` のときも `buildKeypressValue(keycode, keypressModifiers)` を使う。
+  - `parseStructuredBinding` で `&lt N <kp-value>` / `&mt MOD <kp-value>` の `<kp-value>` を `parseKeypressValue` に通す。
+  - `KeycodePicker` で behavior 切替時に `keypressModifiers` を保持する（既に共通 state なら現状維持）。`&lt` / `&mt` 選択時にも modifier toggle UI を表示。
+- **対象ファイル**:
+  - `tools/roba-keymap-viewer/src/keymap/structuredBinding.js` と `.test.js`
+  - `tools/roba-keymap-viewer/src/keymap/bindingDisplay.js`（既存の display で `&lt 1 LC(A)` のような表示が崩れていないか確認）
+  - `tools/roba-keymap-viewer/src/App.jsx`（modifier toggle 表示の条件を `&kp` 限定から外す）
+- **互換性**: 既存 `&lt 1 SPACE` 等の単純な tap keycode は `keypressModifiers = []` として round-trip すること。
+
+#### 実装順の推奨
+
+1. **C**（変更が局所的でテストしやすい）
+2. **A**（structured picker 拡張に慣れた状態で着手）
+3. **B**（parse / save / UI と影響範囲が広いので最後）
+
+各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。
+
 ### 次の候補（任意・未着手）
 
-1. **Trackball layer settings の手動ブラウザ確認**
-   - dev server を起動して `Settings` タブを開き、`automouse-layer` select と `scroll-layers` checkbox list を操作する。
-   - Preview に diff が出て `Save all` で保存できることを確認する。
-   - Reload 後に UI に保存後の値が反映されることを確認する。
-   - 問題なければ未 push 差分を整理して commit/push する。
-
-2. **Key Press 修飾キー選択 UI の手動ブラウザ確認**
-   - dev server は `http://127.0.0.1:5184/` で起動確認済み（前回実装時）。
+1. **Key Press 修飾キー選択 UI の追加動作確認（任意）**
    - `Pick` から `KP` を選び、modifier toggle と keycode 検索で `&kp LS(PSCRN)` や `&kp LC(LS(TAB))` が作れることを確認する。
-   - 問題なければ未 push 差分を整理して commit/push する。
+   - 主要操作は実装時に確認済み。追加で気になる操作があれば実施する。
 
 2. ~~**外部変更検知付き Save all（安全性強化）** — 実装済み・push 済み~~
 3. ~~**Save 前バリデーション（推し）** — 実装済み・push 済み~~
