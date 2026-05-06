@@ -34,11 +34,12 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - `config/roBa.keymap` を正本として読み取る。
 - `config/roBa.json` を物理レイアウトの主な参照元として使う。
 - ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
-- 初期段階は read-only。`.keymap` 直接編集や保存は Phase 2 以降。
+- 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
+- 現在は Phase 5.5 まで完了。次は任意の UX 改善、または次フェーズの設計検討。
 
 ## 最新チェックポイント
 
-### 2026-05-06: 再開後の検証更新
+### 2026-05-06: Phase 5.5 実装・検証・push 済み
 
 - **検証**: `tools/roba-keymap-viewer/` で `npm test` は 135 tests / 20 suites 全パス。`npm run build` 成功。
 - **dev server**: `http://127.0.0.1:5182/` で HTTP 200 を確認済み。
@@ -46,6 +47,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **Save all 修正・実ブラウザ確認済み**: 既存 macro binding 行追加・削除の `Save all` が `macro-bindings-replace target macro is missing after replacement.` で失敗したため、`App.jsx` の保存 payload に `macroName` を含めるよう修正。`npm test` / `npm run build` は再度成功。ユーザー側ブラウザで再試行し、エラーなしで保存成功を確認済み。
 - **Phase 5.5 Capture 拡張・実ブラウザ確認済み**: 確認用に `config/roBa.keymap` へ入った macro binding 追加差分を戻した。Combo / New combo / 既存 Macro binding 行 / New macro の binding draft に `Capture` ボタンを追加し、Capture 入力を該当 draft へ反映するようにした。`npm test` / `npm run build` は成功。ユーザー側ブラウザで確認済み。
 - **Phase 5.5 UI 調整・実ブラウザ確認済み**: Combo / Macro の個別 `Capture` ボタンが active 時に `Capture ON` 表示と強調色になるようにした。Macro binding 行で入力欄がボタンに押しつぶされないよう、binding 行を折り返し可能にして入力欄の最小幅を確保した。`npm test` / `npm run build` は成功。ユーザー側ブラウザで問題なし確認済み。
+- **commit/push**: `28445f1 phase 5.5 implementation_20260505` として `main` にコミット済み。`main` と `origin/main` は一致、作業ツリーはクリーン。
 
 ### 2026-05-06: Phase 5 既存 macro binding 行追加/削除 MVP 実装・検証済み
 
@@ -125,14 +127,17 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
   - ビヘイビア選択（`&kp` / `&lt` / `&mt` など）→ パラメータ入力（レイヤー番号 or モディファイア ＋ キーコード）
 - Combo / Macro での利用ニーズも踏まえて設計する。
 
-### Phase 5: 新規コンボ・マクロ追加（進行中）
+### Phase 5: 新規コンボ・マクロ追加（完了）
 
 - ~~Combos タブに "New combo" ボタンを設け、`.keymap` の `combos { }` ブロックに新しいノードを挿入する。~~
 - ~~Macros タブに "New macro" ボタンを設け、`macros { }` ブロックに新しいノードを挿入する。~~
 - ~~既存マクロへの binding 行の追加/削除も含む。~~
-- 次の候補:
-  - New combo / New macro UI の保存までの手動ブラウザ確認（必要なら）。
-  - macro binding 行追加/削除の UX 微調整（必要なら、行の並べ替えや undo 表示など）。
+
+### 次の候補（任意）
+
+- New combo / New macro の保存フローを、必要に応じて追加で手動ブラウザ確認する。
+- Macro binding 行追加/削除の UX を必要に応じて微調整する（例: 行の並べ替え、undo 表示）。
+- 次フェーズを始める場合は、先に目的と編集範囲を `docs/current-work-status.md` に短く追記する。
 
 ## 現在の注意点
 
