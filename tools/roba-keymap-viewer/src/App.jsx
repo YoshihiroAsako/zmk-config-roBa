@@ -71,7 +71,7 @@ function App() {
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerContext, setPickerContext] = useState(null);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -629,6 +629,7 @@ function App() {
                 setComboDraft(nextDraft);
                 setSaveStatus(EMPTY_SAVE_STATUS);
               }}
+              onPickBinding={() => setPickerContext({ type: "combo" })}
             />
           )}
           {activeTab === "Macros" && selectedMacro && (
@@ -643,6 +644,7 @@ function App() {
                 setMacroDraft(nextDraft);
                 setSaveStatus(EMPTY_SAVE_STATUS);
               }}
+              onPickBinding={(index) => setPickerContext({ type: "macro", index })}
             />
           )}
           <div className={editorState.canEdit ? "editorBox" : "editorBox disabled"}>
@@ -683,7 +685,7 @@ function App() {
                 onClick={() => {
                   setCaptureMode(false);
                   setCaptureStatus(null);
-                  setPickerOpen(true);
+                  setPickerContext({ type: "binding" });
                 }}
               >
                 Pick keycode
@@ -723,15 +725,24 @@ function App() {
         </aside>
       </main>
 
-      {pickerOpen && editorState.canEdit && (
+      {pickerContext && (
         <KeycodePicker
           onSelect={(binding) => {
-            setDraftBinding(binding);
+            if (pickerContext.type === "binding") {
+              setDraftBinding(binding);
+              setActiveTab("Preview");
+            } else if (pickerContext.type === "combo") {
+              setComboDraft((prev) => ({ ...prev, bindingRaw: binding }));
+            } else if (pickerContext.type === "macro") {
+              setMacroDraft((prev) => ({
+                ...prev,
+                bindingDrafts: { ...prev.bindingDrafts, [pickerContext.index]: binding },
+              }));
+            }
             setSaveStatus(EMPTY_SAVE_STATUS);
-            setPickerOpen(false);
-            setActiveTab("Preview");
+            setPickerContext(null);
           }}
-          onClose={() => setPickerOpen(false)}
+          onClose={() => setPickerContext(null)}
         />
       )}
 
@@ -781,7 +792,7 @@ function App() {
   );
 }
 
-function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange }) {
+function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
   return (
     <section className="comboDetailPanel" aria-label="selected combo details">
       <div className="editorHeader">
@@ -821,12 +832,22 @@ function ComboDetailPanel({ combo, draft, previewState, pendingCount, onAddDraft
       <div className={previewState.changed ? "comboPreviewBox active" : "comboPreviewBox"}>
         <label>
           <span>Binding draft</span>
-          <input
-            aria-label="Combo binding draft"
-            disabled={!previewState.canEditBinding}
-            value={draft.bindingRaw}
-            onChange={(event) => onDraftChange({ ...draft, bindingRaw: event.target.value })}
-          />
+          <div className="comboPickerRow">
+            <input
+              aria-label="Combo binding draft"
+              disabled={!previewState.canEditBinding}
+              value={draft.bindingRaw}
+              onChange={(event) => onDraftChange({ ...draft, bindingRaw: event.target.value })}
+            />
+            <button
+              type="button"
+              disabled={!previewState.canEditBinding}
+              className="pickerInlineBtn"
+              onClick={onPickBinding}
+            >
+              Pick
+            </button>
+          </div>
         </label>
         <label>
           <span>Positions draft</span>
@@ -908,7 +929,7 @@ function LayerRenameRow({ currentName, draft, pending, disabled, onChange, onAdd
   );
 }
 
-function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange }) {
+function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
   const editableSet = new Set(previewState.editableIndices || []);
   const bindingDrafts = draft.bindingDrafts || {};
 
@@ -951,15 +972,25 @@ function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft
           return (
             <label key={index}>
               <span>{`Binding ${index} draft${editable ? "" : " (read-only)"}`}</span>
-              <input
-                aria-label={`Macro binding ${index} draft`}
-                disabled={!editable}
-                value={value}
-                onChange={(event) => onDraftChange({
-                  ...draft,
-                  bindingDrafts: { ...bindingDrafts, [index]: event.target.value },
-                })}
-              />
+              <div className="comboPickerRow">
+                <input
+                  aria-label={`Macro binding ${index} draft`}
+                  disabled={!editable}
+                  value={value}
+                  onChange={(event) => onDraftChange({
+                    ...draft,
+                    bindingDrafts: { ...bindingDrafts, [index]: event.target.value },
+                  })}
+                />
+                <button
+                  type="button"
+                  disabled={!editable}
+                  className="pickerInlineBtn"
+                  onClick={() => onPickBinding(index)}
+                >
+                  Pick
+                </button>
+              </div>
             </label>
           );
         })}

@@ -479,6 +479,38 @@ pre {
   cursor: pointer;
 }
 
+.comboPickerRow {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.comboPickerRow input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.comboPickerRow .pickerInlineBtn {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+  background: #eef2f7;
+  color: #7d8da3;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.comboPickerRow .pickerInlineBtn:not(:disabled) {
+  border-color: #087f8c;
+  background: #f0fbfc;
+  color: #0d5963;
+  cursor: pointer;
+}
+
 .disabledBox,
 .editorBox {
   display: grid;

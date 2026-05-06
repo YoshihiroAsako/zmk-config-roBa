@@ -38,15 +38,15 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
-### 2026-05-06: Keycode Picker 実装・ブラウザ確認・コミット済み
+### 2026-05-06: Step 2 完了・テスト済み（コミット未）
 
-実装・確認済み:
+実装済み（Step 2 相当）:
 
-- **`src/keymap/keycodeCatalog.js`**: 8 カテゴリ約 90 エントリの curated list + `searchCatalog(query, category)`。
-- **`src/keymap/keycodeCatalog.test.js`**: 26 tests / 2 suites（`node:test` 形式）。
-- **`App.jsx`**: `pickerOpen` state、`Pick keycode` ボタン（captureMode を OFF にして開く）、`KeycodePicker` モーダルコンポーネント。選択後は `&kp CODE` を draft に set し Preview タブへ遷移。
-- **`styles.css`**: picker 用スタイル追加。
-- **テスト**: 121 tests / 17 suites 全パス。ブラウザ確認済み。コミット・push 済み。
+- **pickerContext への変換**: `pickerOpen` (boolean) を `pickerContext` (null | `{ type, index? }`) に変更。`type` は `"binding"` / `"combo"` / `"macro"` の 3 種。
+- **Combo Binding への picker 展開**: `ComboDetailPanel` の Binding draft 行に "Pick" ボタンを追加。クリックで `KeycodePicker` モーダルが開き、選択値が `comboDraft.bindingRaw` にセットされる。`previewState.canEditBinding` が false のときは無効化。
+- **Macro Binding への picker 展開**: `MacroDetailPanel` の各編集可能 Binding 行に "Pick" ボタンを追加。インデックスを `pickerContext.index` として保持し、選択値が `macroDraft.bindingDrafts[index]` にセットされる。
+- **CSS 追加**: `.comboPickerRow`（flex レイアウト）と `.pickerInlineBtn`（teal スタイル）を追加。
+- **テスト**: 121 tests / 17 suites 全パス。ブラウザ確認待ち。
 
 ### 過去の主な実装済み機能（概要）
 
@@ -57,57 +57,35 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - Combo / Macro / Layer rename 編集 + Save all 統合
 - keymap-drawer 自動更新（probe-first pattern）
 - Key Capture MVP（`captureKeyToBinding`、keydown useEffect、Capture トグル UI）
-- Keycode Picker（`keycodeCatalog.js`、検索・カテゴリ絞り込み、`KeycodePicker` モーダル）
-
-### 2026-05-06: Layer rename + keymap-drawer 自動更新 完了・実生成確認済み
-
-実装・確認済み機能:
-
-- **Layer rename**: commit `b3c426d` に含まれる（詳細は git ログ参照）。
-
-- **keymap-drawer 自動更新（実生成確認済み）**:
-  - `POST /__roba/update-keymap-drawer` が `ok: true` を返すことを実機確認。
-  - `vite.config.js` に以下の修正を追加（commit `c5f2007`）:
-    - `dtsiPath` = `boards/shields/roBa/roBa.dtsi` を定義。
-    - `keymap draw` に `-d dtsiPath` を追加（roBa はカスタム KBD のため ZMK DB にない）。
-    - `PYTHONUTF8: "1"` を env に渡す（日本語 Windows の cp932 問題を回避）。
-  - `keymap-drawer/roBa.yaml` と `roBa.svg` が keymap-drawer 0.23.0 フォーマットで再生成済み（commit `c5f2007`）。
-  - Python 3.13.13 / keymap-drawer 0.23.0 を winget / pip でインストール済み。
-
-- **テスト状況**: `npm test` 64 tests / 6 suites 成功（layout 修正は純粋な JSX/CSS 変更のため影響なし）。
-
-### 過去の主な実装済み機能（概要）
-
-- Read-only MVP（43キー表示、7レイヤー、bindings/combos/macros/behaviors/sensors/markdown/diagnostics タブ）
-- Phase 2 source-range editing 土台（`replaceBinding` / `replaceBindings`）
-- Preview UI（Context Diff / `.keymap Preview`）
-- 1 binding 保存 + dev-only endpoint（`POST /__roba/save-binding`）
-- Pending changes + Save all（`POST /__roba/save-bindings`）
-- Combo 編集（binding / positions / layers / timeout-ms）と Save all 統合
-- Macro 編集（binding / wait-ms / tap-ms）と Save all 統合
-- Layer rename と Save all 統合
-- keymap-drawer 自動更新（probe-first pattern、CLI 未配置時の graceful fallback）
+- Keycode Picker（`keycodeCatalog.js` 9カテゴリ・約111エントリ、検索・カテゴリ絞り込み、`KeycodePicker` モーダル）
+- Step 1: Capture 未対応キーへの誘導ヒント、Shifted Symbols カタログ追加
 
 ## 次にやること
 
-Post-Phase 2-B（Keycode Picker）は完了。以下の順序で進める:
+### ~~Step 1: Capture 未対応キーへの誘導（完了）~~
 
-### Step 1: Capture 未対応キーへの誘導（小規模・最優先）
+### ~~Step 2: Combo / Macro への picker 展開（完了・コミット未）~~
 
-- unsupported キーを Capture した時に captureStatus で「Pick keycode で選択可」のヒントを追加する。
-- 変更量が少なく、既存の Key Capture UX をすぐ改善できる。
+- ブラウザ動作確認 → コミット → push。
 
-### Step 2: Combo / Macro への picker 展開（中規模）
+### Step 3: SVG クリックによる Combo ポジション入力（中規模・次のタスク）
 
-- 既存の `KeycodePicker` コンポーネントを Combo 編集・Macro 編集からも呼び出せるようにする。
-- 新規 UI 設計は不要。既存 picker をそのまま再利用するだけ。
-- Step 1 完了後に着手。
+- Combos タブで既存コンボを選択中、キーボード SVG のキーをクリックすると `positionsRaw` にそのキー番号をトグル追加/削除する。
+- Bindings タブでは従来通り `selectedPosition` を切り替える動作を維持し、Combos タブのみ別ハンドラーに分岐させる。
+- コンボハイライト表示を `comboDraft.positionsRaw` の状態に連動させる（draft と確定済みポジションを視覚的に区別できると望ましい）。
 
-### Step 3: `&lt` / `&mt` 構造化 picker（大規模・Phase 3）
+### Step 4: `&lt` / `&mt` 構造化 picker（大規模）
 
 - hold-tap ビヘイビアを複数パラメータで GUI 設定できる専用 picker を新設する。
   - ビヘイビア選択（`&kp` / `&lt` / `&mt` など）→ パラメータ入力（レイヤー番号 or モディファイア ＋ キーコード）
-- Step 2 完了後に設計・着手（Combo/Macro での利用ニーズも踏まえて設計する）。
+- Combo / Macro での利用ニーズも踏まえて設計する。
+
+### Phase 5: 新規コンボ・マクロ追加（大規模・将来）
+
+- Combos タブに "New combo" ボタンを設け、`.keymap` の `combos { }` ブロックに新しいノードを挿入する。
+- Macros タブに "New macro" ボタンを設け、`macros { }` ブロックに新しいノードを挿入する。
+- 既存マクロへの binding 行の追加/削除も含む。
+- 既存の「ソース範囲を上書きする」ロジックとは異なり、新しいテキストブロックをゼロから挿入する設計が必要なため、Step 4 完了後に別途設計する。
 
 ## 現在の注意点
 
