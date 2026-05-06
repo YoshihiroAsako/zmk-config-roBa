@@ -350,7 +350,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 #### F. `&inc_dec_cp` behavior 対応（候補・D の後）
 
 - **目的**: Consumer-press（音量・メディア等）専用の `&inc_dec_cp` behavior を Sensors タブで選択・編集できるようにする。
-- **前提**: Task D（Consumer code カタログ拡張）が完了していることが望ましい。
+- **前提**: Task D（Consumer code カタログ拡張）が完了していることが望ましい。Task E の後に実施。
 
 #### G. マウスホイール（`&msc`）sensor-binding 対応（低優先）
 
@@ -365,10 +365,10 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 1. ~~**C**（完了）~~
 2. ~~**A**（完了）~~
 3. ~~**B**（完了・ブラウザ確認待ち）~~
-4. **E**（sensor-bindings のレイヤー追加・削除 UI）— ユーザー要望
-5. **D**（Consumer code カタログ拡張）— E と前後しても可
-6. **F**（`&inc_dec_cp` 対応）— D の後
-7. **G**（`&msc` 対応）— 低優先
+4. **E**（sensor-bindings のレイヤー追加・削除 UI）← 次
+5. **D**（Consumer code カタログ拡張）
+6. **F**（`&inc_dec_cp` 対応）
+7. **G**（`&msc` 対応）
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。
 
