@@ -421,6 +421,18 @@ function validateSourceChange(source, change) {
     if (change.range.start !== change.range.end) throw new Error("macro-node-insert must be a zero-length range.");
     if (change.currentRaw !== "") throw new Error("macro-node-insert must have empty currentRaw.");
     validateMacroNodeInsertion(source, change);
+  } else if (change.kind === "trackball-automouse-layer") {
+    validateAutomouseLayerValue(change.nextRaw);
+    if (!/^\d+$/.test(source.slice(change.range.start, change.range.end).trim())) {
+      throw new Error("automouse-layer source range is invalid.");
+    }
+    validateTrackballSettingsPreserved(source, change);
+  } else if (change.kind === "trackball-scroll-layers") {
+    validateScrollLayersValue(change.nextRaw);
+    if (!/^[\d\s]+$/.test(source.slice(change.range.start, change.range.end).trim())) {
+      throw new Error("scroll-layers source range is invalid.");
+    }
+    validateTrackballSettingsPreserved(source, change);
   } else {
     throw new Error("Unsupported pending change kind.");
   }
@@ -568,6 +580,43 @@ function validateLayerName(name) {
   }
   if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) {
     throw new Error("Layer name must start with a letter or underscore and contain only letters, digits, underscore, or hyphen.");
+  }
+}
+
+function validateAutomouseLayerValue(raw, layerCount = 99) {
+  const text = String(raw || "").trim();
+  if (!/^\d+$/.test(text)) throw new Error("automouse-layer must be a non-negative integer.");
+  const n = Number(text);
+  if (n < 0 || n >= layerCount) {
+    throw new Error(`automouse-layer out of range.`);
+  }
+}
+
+function validateScrollLayersValue(raw, layerCount = 99) {
+  const text = String(raw || "").trim();
+  if (!text) throw new Error("scroll-layers must not be empty.");
+  if (text !== text.replace(/\s+/g, " ")) throw new Error("scroll-layers must be a single-space-separated list.");
+  const layers = text.split(" ").map((value) => {
+    if (!/^\d+$/.test(value)) throw new Error("scroll-layers must be integer layer indices.");
+    return Number(value);
+  });
+  if (new Set(layers).size !== layers.length) throw new Error("scroll-layers must be unique.");
+  if (layers.some((layer) => layer < 0 || layer >= layerCount)) {
+    throw new Error(`scroll-layers out of range.`);
+  }
+}
+
+function validateTrackballSettingsPreserved(source, change) {
+  const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+  const afterParsed = parseKeymap(nextSource);
+  if (!afterParsed.trackballSettings) {
+    throw new Error(`${change.kind}: trackball settings missing after replacement.`);
+  }
+  if (change.kind === "trackball-automouse-layer" && !afterParsed.trackballSettings.automouseLayer) {
+    throw new Error("trackball-automouse-layer: automouse-layer property missing after replacement.");
+  }
+  if (change.kind === "trackball-scroll-layers" && !afterParsed.trackballSettings.scrollLayers) {
+    throw new Error("trackball-scroll-layers: scroll-layers property missing after replacement.");
   }
 }
 

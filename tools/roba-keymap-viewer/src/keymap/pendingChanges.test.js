@@ -7,12 +7,14 @@ import {
   buildDraftChange,
   buildComboDraftChanges,
   buildLayerRenameDraftChange,
+  buildTrackballAutomouseDraftChange,
+  buildTrackballScrollLayersDraftChange,
   buildPendingChangesState,
   removeDraftChange,
   upsertDraftChange,
   upsertDraftChanges,
 } from "./pendingChanges.js";
-import { parseKeymap } from "./parseKeymap.js";
+import { parseKeymap, parseTrackballSettings } from "./parseKeymap.js";
 import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -405,5 +407,91 @@ describe("pending keymap changes", () => {
     const state = buildPendingChangesState(source, [change], parsed.layers);
     assert.equal(state.valid, false);
     assert.match(state.message, /out of range/);
+  });
+});
+
+describe("trackball pending changes", () => {
+  const makeTrackballSource = (automouse, scroll) => `
+&trackball {
+    automouse-layer = <${automouse}>;
+    scroll-layers = <${scroll}>;
+};
+/ { keymap { compatible = "zmk,keymap"; default_layer { bindings = <&trans &trans &trans>; }; layer_1 { bindings = <&trans &trans &trans>; }; layer_2 { bindings = <&trans &trans &trans>; }; layer_3 { bindings = <&trans &trans &trans>; }; layer_4 { bindings = <&trans &trans &trans>; }; layer_5 { bindings = <&trans &trans &trans>; }; layer_6 { bindings = <&trans &trans &trans>; }; }; };
+`;
+
+  it("buildTrackballAutomouseDraftChange creates a valid change", () => {
+    const source = makeTrackballSource(4, 5);
+    const ts = parseTrackballSettings(source);
+    const change = buildTrackballAutomouseDraftChange({ trackballSettings: ts, nextRaw: "3" });
+    assert.ok(change);
+    assert.equal(change.kind, "trackball-automouse-layer");
+    assert.equal(change.currentRaw, "4");
+    assert.equal(change.nextRaw, "3");
+  });
+
+  it("buildTrackballScrollLayersDraftChange sorts values ascending", () => {
+    const source = makeTrackballSource(4, 5);
+    const ts = parseTrackballSettings(source);
+    const change = buildTrackballScrollLayersDraftChange({ trackballSettings: ts, nextRaw: "6 5" });
+    assert.ok(change);
+    assert.equal(change.nextRaw, "5 6");
+  });
+
+  it("buildPendingChangesState validates automouse-layer out of range", () => {
+    const source = makeTrackballSource(4, 5);
+    const parsed = parseKeymap(source);
+    const ts = parseTrackballSettings(source);
+    const change = buildTrackballAutomouseDraftChange({ trackballSettings: ts, nextRaw: "99" });
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.match(state.message, /automouse-layer/);
+  });
+
+  it("buildPendingChangesState accepts automouse-layer = 0 (disabled)", () => {
+    const source = makeTrackballSource(4, 5);
+    const parsed = parseKeymap(source);
+    const ts = parseTrackballSettings(source);
+    const change = buildTrackballAutomouseDraftChange({ trackballSettings: ts, nextRaw: "0" });
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+  });
+
+  it("buildPendingChangesState rejects empty scroll-layers", () => {
+    const source = makeTrackballSource(4, 5);
+    const parsed = parseKeymap(source);
+    const ts = parseTrackballSettings(source);
+    const change = buildTrackballScrollLayersDraftChange({ trackballSettings: ts, nextRaw: "" });
+    assert.ok(change, "change created even with empty nextRaw");
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.match(state.message, /scroll-layers/);
+  });
+
+  it("buildPendingChangesState rejects duplicate scroll-layers", () => {
+    const source = makeTrackballSource(4, 5);
+    const parsed = parseKeymap(source);
+    const ts = parseTrackballSettings(source);
+    const change = buildTrackballScrollLayersDraftChange({ trackballSettings: ts, nextRaw: "5 5" });
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.match(state.message, /unique/);
+  });
+
+  it("upsertDraftChange removes NoOp trackball change", () => {
+    const source = makeTrackballSource(4, 5);
+    const ts = parseTrackballSettings(source);
+    const change = buildTrackballAutomouseDraftChange({ trackballSettings: ts, nextRaw: "4" });
+    const result = upsertDraftChange([], change);
+    assert.equal(result.length, 0, "should be removed as NoOp");
+  });
+
+  it("buildPendingChangesState generates preview source for automouse-layer change", () => {
+    const source = makeTrackballSource(4, 5);
+    const parsed = parseKeymap(source);
+    const ts = parseTrackballSettings(source);
+    const change = buildTrackballAutomouseDraftChange({ trackballSettings: ts, nextRaw: "3" });
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+    assert.ok(state.nextSource.includes("automouse-layer = <3>"));
   });
 });

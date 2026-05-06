@@ -486,6 +486,60 @@ pre {
   cursor: pointer;
 }
 
+.fieldLabel {
+  color: #65758b;
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.trackballDisabledHint {
+  color: #c05000;
+  font-weight: 400;
+  text-transform: none;
+}
+
+.comboPreviewBox select {
+  width: 100%;
+  height: 30px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid #c8d4e4;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #18202f;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.trackballSettingsScroll {
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scrollLayerCheckboxList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+label.scrollLayerCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.scrollLayerCheckbox input[type="checkbox"] {
+  width: auto;
+  height: auto;
+  flex-shrink: 0;
+}
+
 .comboPickerRow {
   display: flex;
   flex-wrap: wrap;
@@ -863,7 +917,7 @@ td code {
 
 .diffGrid > div {
   display: grid;
-  grid-template-rows: auto minmax(42px, auto) auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(80px, auto) auto auto minmax(100px, 1fr);
   min-width: 0;
   min-height: 0;
   border: 1px solid #d7e0ec;

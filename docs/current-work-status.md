@@ -40,6 +40,43 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-06: Trackball layer settings 実装・検証済み（未 push）
+
+実装済み:
+
+- **`parseTrackballSettings()` 追加**: `parseKeymap.js` に `maskComments()` と `parseTrackballSettings()` を追加。comment-aware scanner（`/* */` / `//` をスペースで mask して offset を維持）で `automouse-layer` / `scroll-layers` を抽出。`parseKeymap()` の戻り値に `trackballSettings` を追加。
+- **pending change 対応**: `pendingChanges.js` に `buildTrackballAutomouseDraftChange()` / `buildTrackballScrollLayersDraftChange()` builder を追加。`scroll-layers` は昇順正規化。`validatePendingChange()` に `trackball-automouse-layer` / `trackball-scroll-layers` の validation（範囲チェック・重複チェック）を追加。`upsertDraftChange` の既存 NoOp 判定で `currentRaw === nextRaw` はスキップ。
+- **server 側 validation 対応**: `saveBindingChange.js` に 2 kind の `validateSourceChange()` 分岐を追加。保存後に `trackballSettings` と対象 property が残存することを `validateTrackballSettingsPreserved()` で確認。
+- **Settings タブ UI 追加**: `App.jsx` に `Settings` タブを追加。`trackballDraft` state を追加し、source リロード / save / restore 後に初期化。`TrackballSettingsPanel` コンポーネントを追加。`automouse-layer` は select（`0` は disabled 表示）、`scroll-layers` は checkbox list で選択。
+- **テスト追加**: `parseKeymap.test.js` に 7 ケース、`pendingChanges.test.js` に 8 ケース、`saveBindingChange.test.js` に 4 ケース追加。
+- **検証**: `npm test` は 163 tests / 24 suites 全パス。`npm run build` 成功。dev server での手動確認は未実施（次のステップ）。
+- **未 push**: 未コミット差分あり。手動ブラウザ確認後に commit/push する。
+
+### 2026-05-06: Trackball layer settings 計画プロンプト追加
+
+実施内容:
+
+- `docs/trackball-layer-settings-planning-prompt.md` を追加。
+- `automouse-layer` / `scroll-layers` を Viewer から編集可能にする機能の計画を、AI に依頼するためのコピペ用指示スクリプトを整備。
+- 現状整理、方針、データモデル、UI、保存ロジック、バリデーション、テスト、段階実装、リスク、チェックリストまで一式で出力させるテンプレートにした。
+
+### 2026-05-06: Trackball layer settings 実装計画レビュー資料追加
+
+実施内容:
+
+- `docs/trackball-layer-settings-implementation-plan.md` を追加。
+- `automouse-layer` / `scroll-layers` 編集機能について、他 AI / レビュアーに見せるための現状整理・実装方針・データモデル・UI・保存ロジック・バリデーション・テスト・段階実装・リスク・レビュー観点を文書化。
+- まだ実装はしていない。次はこの計画のレビュー結果を反映してから着手する。
+
+### 2026-05-06: Trackball layer settings レビュー結果反映
+
+実施内容:
+
+- `docs/trackball-layer-settings-implementation-plan.md` に Claude Code レビューと Codex 再レビューの採用方針を反映。
+- MVP 方針として、comment-aware property scan、`automouse-layer = <0>` の disabled 表示、`scroll-layers` の昇順保存、保存後の `trackballSettings` 残存チェックを追加。
+- `keymap-drawer` 再生成 skip は MVP 必須ではなく、実装直前に既存挙動維持と比較して決める扱いにした。
+- まだ実装はしていない。次は計画に沿って実装するか、追加レビューを行う。
+
 ### 2026-05-06: Key Press 修飾キー選択 UI 実装・検証済み（未 push）
 
 実装済み:
@@ -224,10 +261,14 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ### 次の候補（任意・未着手）
 
-主要機能と Key Press 修飾キー選択 UI は実装済み。次に着手するなら、ブラウザ上での手動確認、微調整、または未 push 差分の整理を優先する。
+1. **Trackball layer settings の手動ブラウザ確認**
+   - dev server を起動して `Settings` タブを開き、`automouse-layer` select と `scroll-layers` checkbox list を操作する。
+   - Preview に diff が出て `Save all` で保存できることを確認する。
+   - Reload 後に UI に保存後の値が反映されることを確認する。
+   - 問題なければ未 push 差分を整理して commit/push する。
 
-1. **Key Press 修飾キー選択 UI の手動ブラウザ確認**
-   - dev server は `http://127.0.0.1:5184/` で起動確認済み。
+2. **Key Press 修飾キー選択 UI の手動ブラウザ確認**
+   - dev server は `http://127.0.0.1:5184/` で起動確認済み（前回実装時）。
    - `Pick` から `KP` を選び、modifier toggle と keycode 検索で `&kp LS(PSCRN)` や `&kp LC(LS(TAB))` が作れることを確認する。
    - 問題なければ未 push 差分を整理して commit/push する。
 
@@ -244,6 +285,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - New combo / New macro の保存フローを追加で手動ブラウザ確認する。
 - Macro binding 行追加/削除の UX を微調整する（例: 行の並べ替え、undo 表示）。
+- `docs/trackball-layer-settings-implementation-plan.md` に沿って、trackball layer settings 編集機能を実装する。
 
 ## 現在の注意点
 
@@ -270,6 +312,8 @@ roBa Keymap Viewer:
 詳細資料:
 
 - `docs/viewer-to-device-guide.md`
+- `docs/trackball-layer-settings-planning-prompt.md`
+- `docs/trackball-layer-settings-implementation-plan.md`
 - `docs/zmk-studio-like-app-plan.md`
 - `docs/zmk-studio-like-app-phase0-research.md`
 - `docs/zmk-studio-like-app-phase0-rereview.md`

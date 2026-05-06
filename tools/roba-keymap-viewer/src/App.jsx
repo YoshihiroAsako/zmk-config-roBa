@@ -28,6 +28,8 @@ import {
   buildNewMacroDraftChanges,
   buildLayerRenameDraftChange,
   buildMacroDraftChanges,
+  buildTrackballAutomouseDraftChange,
+  buildTrackballScrollLayersDraftChange,
   buildPendingChangesState,
   getDraftId,
   removeDraftChange,
@@ -39,7 +41,7 @@ const KEY_SIZE = 44;
 const UNIT = 48;
 const TRACKBALL = { x: 10, y: 3.8, r: 0.62 };
 
-const TABS = ["Bindings", "Combos", "Macros", "Behaviors", "Sensors", "Preview", "Markdown", "Diagnostics"];
+const TABS = ["Bindings", "Combos", "Macros", "Behaviors", "Sensors", "Settings", "Preview", "Markdown", "Diagnostics"];
 const EMPTY_SAVE_STATUS = { tone: "idle", title: "", message: "", backupPath: "", drawerMessage: "" };
 
 function App() {
@@ -89,6 +91,7 @@ function App() {
   });
   const [isAddingMacro, setIsAddingMacro] = useState(false);
   const [newMacroDraft, setNewMacroDraft] = useState(() => createEmptyMacroDraft([]));
+  const [trackballDraft, setTrackballDraft] = useState({ automouseLayerRaw: "", scrollLayersRaw: "" });
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
@@ -293,6 +296,14 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [captureMode, captureContext, editorState.canEdit]);
 
+  useEffect(() => {
+    const ts = document.trackballSettings;
+    setTrackballDraft({
+      automouseLayerRaw: ts?.automouseLayer ? ts.automouseLayer.value.trim() : "",
+      scrollLayersRaw: ts?.scrollLayers ? ts.scrollLayers.raw.trim() : "",
+    });
+  }, [keymapSource]);
+
   const layerRenameDraftId = `layer-${activeLayer}-rename`;
   const layerRenamePending = pendingChanges.find((change) => change.id === layerRenameDraftId);
   useEffect(() => {
@@ -329,6 +340,7 @@ function App() {
       setPendingChanges([]);
       setIsAddingCombo(false);
       setIsAddingMacro(false);
+      setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
       setSaveStatus({
         tone: "ok",
         title: "Reloaded source",
@@ -485,6 +497,7 @@ function App() {
       setPendingChanges([]);
       setIsAddingCombo(false);
       setIsAddingMacro(false);
+      setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
       setSaveStatus({
         tone: "ok",
         title: "Saved pending changes",
@@ -554,6 +567,7 @@ function App() {
       setRedoStack([]);
       setIsAddingCombo(false);
       setIsAddingMacro(false);
+      setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
       setSaveStatus({
         tone: "ok",
         title: "Restored backup",
@@ -810,6 +824,47 @@ function App() {
     const id = `macro-${newMacroDraft.nameRaw.trim()}-node-insert`;
     commitPendingChanges(removeDraftChange(pendingChanges, id));
     setNewMacroDraft(createEmptyMacroDraft(document.macros));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  const trackballAutomousePendingId = "trackball-automouse-layer";
+  const trackballScrollPendingId = "trackball-scroll-layers";
+  const trackballPendingCount = pendingChanges.filter(
+    (change) => change.id === trackballAutomousePendingId || change.id === trackballScrollPendingId,
+  ).length;
+
+  const addTrackballDraft = () => {
+    const ts = document.trackballSettings;
+    if (!ts) return;
+    const changes = [];
+    const automouseChange = buildTrackballAutomouseDraftChange({
+      trackballSettings: ts,
+      nextRaw: trackballDraft.automouseLayerRaw,
+    });
+    if (automouseChange) changes.push(automouseChange);
+    const scrollChange = buildTrackballScrollLayersDraftChange({
+      trackballSettings: ts,
+      nextRaw: trackballDraft.scrollLayersRaw,
+    });
+    if (scrollChange) changes.push(scrollChange);
+    if (changes.length) {
+      commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
+      setSaveStatus(EMPTY_SAVE_STATUS);
+      setActiveTab("Preview");
+    }
+  };
+
+  const removeTrackballDraft = () => {
+    commitPendingChanges(
+      pendingChanges.filter(
+        (change) => change.id !== trackballAutomousePendingId && change.id !== trackballScrollPendingId,
+      ),
+    );
+    const ts = document.trackballSettings;
+    setTrackballDraft({
+      automouseLayerRaw: ts?.automouseLayer ? ts.automouseLayer.value.trim() : "",
+      scrollLayersRaw: ts?.scrollLayers ? ts.scrollLayers.raw.trim() : "",
+    });
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -1205,6 +1260,11 @@ function App() {
           onUndo={undo}
           onRedo={redo}
           saveEndpointAvailable={saveEndpointAvailable}
+          trackballDraft={trackballDraft}
+          trackballPendingCount={trackballPendingCount}
+          onTrackballDraftChange={(next) => { setTrackballDraft(next); setSaveStatus(EMPTY_SAVE_STATUS); }}
+          onAddTrackballDraft={addTrackballDraft}
+          onRemoveTrackballDraft={removeTrackballDraft}
         />
       </section>
     </div>
@@ -1798,6 +1858,11 @@ function PanelContent({
   onUndo,
   onRedo,
   saveEndpointAvailable,
+  trackballDraft,
+  trackballPendingCount,
+  onTrackballDraftChange,
+  onAddTrackballDraft,
+  onRemoveTrackballDraft,
 }) {
   if (tab === "Bindings") {
     return (
@@ -1894,6 +1959,20 @@ function PanelContent({
           )}
         />
       </div>
+    );
+  }
+
+  if (tab === "Settings") {
+    return (
+      <TrackballSettingsPanel
+        trackballSettings={document.trackballSettings}
+        layerNames={layerNames}
+        draft={trackballDraft}
+        pendingCount={trackballPendingCount}
+        onDraftChange={onTrackballDraftChange}
+        onAddDraft={onAddTrackballDraft}
+        onRemoveDraft={onRemoveTrackballDraft}
+      />
     );
   }
 
@@ -2257,6 +2336,127 @@ function getDiagnostics(document) {
 function shorten(value, max) {
   const text = String(value ?? "");
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function TrackballSettingsPanel({
+  trackballSettings,
+  layerNames,
+  draft,
+  pendingCount,
+  onDraftChange,
+  onAddDraft,
+  onRemoveDraft,
+}) {
+  if (!trackballSettings) {
+    return (
+      <div className="tableSection">
+        <div className="editorHeader"><strong>Settings</strong></div>
+        <div className="pendingEmpty">Trackball settings are not available in this keymap.</div>
+      </div>
+    );
+  }
+
+  const { automouseLayer, scrollLayers } = trackballSettings;
+  const layerCount = layerNames.length;
+
+  const automouseOptions = Array.from({ length: layerCount }, (_, index) => ({
+    index,
+    name: layerNames[index] || `layer_${index}`,
+    disabled: index === 0,
+  }));
+
+  const currentScrollSet = new Set(
+    String(draft.scrollLayersRaw || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(Number)
+      .filter((n) => Number.isInteger(n)),
+  );
+
+  const toggleScrollLayer = (index) => {
+    const next = new Set(currentScrollSet);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    const sorted = [...next].sort((a, b) => a - b).join(" ");
+    onDraftChange({ ...draft, scrollLayersRaw: sorted });
+  };
+
+  const currentAutomouseRaw = automouseLayer?.value.trim() ?? "";
+  const currentScrollRaw = scrollLayers?.raw.trim() ?? "";
+  const automouseChanged = draft.automouseLayerRaw !== currentAutomouseRaw;
+  const scrollChanged = draft.scrollLayersRaw !== currentScrollRaw;
+  const anyChanged = automouseChanged || scrollChanged;
+
+  return (
+    <div className="tableSection">
+      <div className="editorHeader"><strong>Settings</strong><span>Trackball</span></div>
+      <div className="trackballSettingsScroll">
+        {!automouseLayer && (
+          <div className="pendingEmpty">automouse-layer property not found (read-only).</div>
+        )}
+        {automouseLayer && (
+          <div className="comboPreviewBox active">
+            <label>
+              <span>
+                automouse-layer
+                {Number(draft.automouseLayerRaw) === 0 && (
+                  <span className="trackballDisabledHint"> — automouse disabled (value 0)</span>
+                )}
+              </span>
+              <select
+                aria-label="automouse-layer"
+                value={draft.automouseLayerRaw}
+                onChange={(event) => onDraftChange({ ...draft, automouseLayerRaw: event.target.value })}
+              >
+                {automouseOptions.map(({ index, name }) => (
+                  <option key={index} value={String(index)}>
+                    {index}: {name}{index === 0 ? " (disabled)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        {!scrollLayers && (
+          <div className="pendingEmpty">scroll-layers property not found (read-only).</div>
+        )}
+        {scrollLayers && (
+          <div className="comboPreviewBox active">
+            <span className="fieldLabel">scroll-layers</span>
+            <div className="scrollLayerCheckboxList" role="group" aria-label="scroll-layers">
+              {Array.from({ length: layerCount }, (_, index) => (
+                <label key={index} className="scrollLayerCheckbox">
+                  <input
+                    type="checkbox"
+                    checked={currentScrollSet.has(index)}
+                    onChange={() => toggleScrollLayer(index)}
+                  />
+                  {index}: {layerNames[index] || `layer_${index}`}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="editorActions">
+          <button
+            type="button"
+            disabled={!anyChanged}
+            onClick={onAddDraft}
+          >
+            {pendingCount ? "Update trackball draft" : "Add trackball draft"}
+          </button>
+          <button
+            type="button"
+            disabled={!pendingCount && !anyChanged}
+            onClick={onRemoveDraft}
+          >
+            Remove trackball draft
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function formatRange(range) {

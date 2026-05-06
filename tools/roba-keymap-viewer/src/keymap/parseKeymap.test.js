@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { describeBinding } from "./bindingDisplay.js";
-import { countDtsPhysicalKeys, parseKeymap, replaceBinding, replaceBindings } from "./parseKeymap.js";
+import { countDtsPhysicalKeys, parseKeymap, parseTrackballSettings, replaceBinding, replaceBindings } from "./parseKeymap.js";
 import { buildMarkdown } from "../export/markdown.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -297,5 +297,74 @@ describe("roBa keymap parser", () => {
         ]),
       /overlap/,
     );
+  });
+});
+
+describe("parseTrackballSettings", () => {
+  it("parses automouse-layer and scroll-layers from the canonical keymap", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const ts = parseTrackballSettings(source);
+    assert.ok(ts, "trackballSettings should not be null");
+    assert.ok(ts.automouseLayer, "automouseLayer should be present");
+    assert.equal(ts.automouseLayer.value.trim(), "4");
+    assert.ok(ts.scrollLayers, "scrollLayers should be present");
+    assert.deepEqual(ts.scrollLayers.values, [5]);
+  });
+
+  it("returns source ranges that point inside the angle brackets", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const ts = parseTrackballSettings(source);
+    const automouseSlice = source.slice(ts.automouseLayer.sourceRange.start, ts.automouseLayer.sourceRange.end);
+    assert.equal(automouseSlice.trim(), "4");
+    const scrollSlice = source.slice(ts.scrollLayers.sourceRange.start, ts.scrollLayers.sourceRange.end);
+    assert.equal(scrollSlice.trim(), "5");
+  });
+
+  it("returns null when &trackball block is absent", () => {
+    const source = "/ { keymap { compatible = \"zmk,keymap\"; layer { bindings = <&trans>; }; }; };";
+    const ts = parseTrackballSettings(source);
+    assert.equal(ts, null);
+  });
+
+  it("ignores property names inside line comments", () => {
+    const source = `
+&trackball {
+    // automouse-layer = <99>;
+    automouse-layer = <3>;
+    scroll-layers = <2>;
+};`;
+    const ts = parseTrackballSettings(source);
+    assert.ok(ts);
+    assert.equal(ts.automouseLayer.value.trim(), "3");
+  });
+
+  it("ignores property names inside block comments", () => {
+    const source = `
+&trackball {
+    /* scroll-layers = <99>;\n    still a comment */
+    automouse-layer = <4>;
+    scroll-layers = <5>;
+};`;
+    const ts = parseTrackballSettings(source);
+    assert.ok(ts);
+    assert.equal(ts.scrollLayers.values[0], 5);
+  });
+
+  it("parses multiple scroll-layers values", () => {
+    const source = `
+&trackball {
+    automouse-layer = <4>;
+    scroll-layers = <5 6>;
+};`;
+    const ts = parseTrackballSettings(source);
+    assert.ok(ts);
+    assert.deepEqual(ts.scrollLayers.values, [5, 6]);
+  });
+
+  it("parseKeymap includes trackballSettings in the result", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    assert.ok(parsed.trackballSettings, "trackballSettings should be in parseKeymap result");
+    assert.equal(parsed.trackballSettings.automouseLayer.value.trim(), "4");
   });
 });

@@ -93,6 +93,42 @@ export function buildNewMacroDraftChanges({ source, draft, existingMacros }) {
   return [buildNewMacroDraftChange({ source, draft, existingMacros })];
 }
 
+export function buildTrackballAutomouseDraftChange({ trackballSettings, nextRaw }) {
+  const prop = trackballSettings?.automouseLayer;
+  if (!prop) return null;
+  const currentRaw = prop.value.trim();
+  const next = String(nextRaw ?? "").trim();
+  return {
+    id: "trackball-automouse-layer",
+    kind: "trackball-automouse-layer",
+    label: "Trackball automouse-layer",
+    range: prop.sourceRange,
+    currentRaw,
+    nextRaw: next,
+  };
+}
+
+export function buildTrackballScrollLayersDraftChange({ trackballSettings, nextRaw }) {
+  const prop = trackballSettings?.scrollLayers;
+  if (!prop) return null;
+  const currentRaw = prop.raw.trim();
+  const sorted = String(nextRaw ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .join(" ");
+  return {
+    id: "trackball-scroll-layers",
+    kind: "trackball-scroll-layers",
+    label: "Trackball scroll-layers",
+    range: prop.sourceRange,
+    currentRaw,
+    nextRaw: sorted,
+  };
+}
+
 export function buildLayerRenameDraftChange({ layerIndex, currentName, nextName, nameRange }) {
   return {
     id: `layer-${layerIndex}-rename`,
@@ -339,6 +375,10 @@ function validatePendingChange(source, change, { layerCount = 7, keyCount = 43 }
     if (afterParsed.macros.length !== beforeParsed.macros.length + 1) {
       throw new Error(`${change.label}: macro-node-insert must add exactly one macro.`);
     }
+  } else if (change.kind === "trackball-automouse-layer") {
+    validateAutomouseLayerValue(change.nextRaw, layerCount);
+  } else if (change.kind === "trackball-scroll-layers") {
+    validateScrollLayersValue(change.nextRaw, layerCount);
   }
 }
 
@@ -466,6 +506,29 @@ function normalizeMacroDraftBindings(bindingDrafts, currentBindings = [], fullBi
     next[key] = value;
   }
   return next;
+}
+
+function validateAutomouseLayerValue(raw, layerCount = 7) {
+  const text = String(raw || "").trim();
+  if (!/^\d+$/.test(text)) throw new Error("automouse-layer must be a non-negative integer.");
+  const n = Number(text);
+  if (n < 0 || n >= layerCount) {
+    throw new Error(`automouse-layer must be between 0 and ${layerCount - 1}.`);
+  }
+}
+
+function validateScrollLayersValue(raw, layerCount = 7) {
+  const text = String(raw || "").trim();
+  if (!text) throw new Error("scroll-layers must not be empty.");
+  if (text !== normalizeSpace(text)) throw new Error("scroll-layers must be a single-space-separated list.");
+  const layers = text.split(" ").map((value) => {
+    if (!/^\d+$/.test(value)) throw new Error("scroll-layers must be integer layer indices.");
+    return Number(value);
+  });
+  if (new Set(layers).size !== layers.length) throw new Error("scroll-layers must be unique.");
+  if (layers.some((layer) => layer < 0 || layer >= layerCount)) {
+    throw new Error(`scroll-layers must be between 0 and ${layerCount - 1}.`);
+  }
 }
 
 function normalizeSpace(value) {

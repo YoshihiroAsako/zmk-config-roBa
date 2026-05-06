@@ -92,6 +92,47 @@ function getAnglePropertyInfo(body, propName, baseOffset = 0) {
   };
 }
 
+function maskComments(text) {
+  let result = text.replace(/\/\*[\s\S]*?\*\//g, (match) =>
+    match.replace(/[^\n\r]/g, " "),
+  );
+  result = result.replace(/\/\/[^\n]*/g, (match) => " ".repeat(match.length));
+  return result;
+}
+
+export function parseTrackballSettings(source) {
+  const block = findBlock(source, "&trackball");
+  if (!block) return null;
+
+  const bodyStart = block.start + 1;
+  const body = source.slice(bodyStart, block.end);
+  const maskedBody = maskComments(body);
+
+  const automouseInfo = getAnglePropertyInfo(maskedBody, "automouse-layer", bodyStart);
+  const scrollInfo = getAnglePropertyInfo(maskedBody, "scroll-layers", bodyStart);
+
+  return {
+    automouseLayer: automouseInfo
+      ? {
+          value: source.slice(automouseInfo.sourceRange.start, automouseInfo.sourceRange.end),
+          sourceRange: automouseInfo.sourceRange,
+        }
+      : null,
+    scrollLayers: scrollInfo
+      ? {
+          raw: source.slice(scrollInfo.sourceRange.start, scrollInfo.sourceRange.end),
+          values: source
+            .slice(scrollInfo.sourceRange.start, scrollInfo.sourceRange.end)
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean)
+            .map(Number),
+          sourceRange: scrollInfo.sourceRange,
+        }
+      : null,
+  };
+}
+
 function getStringProperty(body, propName) {
   const match = new RegExp(`${propName}\\s*=\\s*"([^"]*)"\\s*;`).exec(body);
   return match ? match[1] : "";
@@ -307,6 +348,7 @@ export function parseKeymap(source) {
     combos: parseCombos(source),
     macros: parseMacros(source),
     behaviors: parseBehaviors(source),
+    trackballSettings: parseTrackballSettings(source),
   };
 }
 

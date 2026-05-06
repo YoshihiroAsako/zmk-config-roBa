@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { parseKeymap } from "./parseKeymap.js";
+import { parseKeymap, parseTrackballSettings } from "./parseKeymap.js";
 import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
 import { buildNewComboDraftChange } from "./comboInsert.js";
 import { buildNewMacroDraftChange } from "./macroInsert.js";
@@ -622,6 +622,84 @@ describe("keymap backup restore helper", () => {
         /Backup path must point/,
       );
       assert.equal(await readTempKeymap(tempRoot), "current keymap");
+    });
+  });
+});
+
+describe("trackball saveBindingChanges", () => {
+  const makeTrackballSource = (automouse, scroll) => `
+&trackball {
+    automouse-layer = <${automouse}>;
+    scroll-layers = <${scroll}>;
+};
+/ { keymap { compatible = "zmk,keymap"; default_layer { bindings = <&trans>; }; }; };
+`;
+
+  it("saves automouse-layer change successfully", async () => {
+    const source = makeTrackballSource(4, 5);
+    const ts = parseTrackballSettings(source);
+    const change = {
+      kind: "trackball-automouse-layer",
+      range: ts.automouseLayer.sourceRange,
+      currentRaw: ts.automouseLayer.value.trim(),
+      nextRaw: "3",
+    };
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({ repoRoot: tempRoot, changes: [change] });
+      assert.equal(result.ok, true);
+      const saved = await readTempKeymap(tempRoot);
+      assert.ok(saved.includes("automouse-layer = <3>"));
+    });
+  });
+
+  it("saves scroll-layers change successfully", async () => {
+    const source = makeTrackballSource(4, 5);
+    const ts = parseTrackballSettings(source);
+    const change = {
+      kind: "trackball-scroll-layers",
+      range: ts.scrollLayers.sourceRange,
+      currentRaw: ts.scrollLayers.raw.trim(),
+      nextRaw: "5 6",
+    };
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({ repoRoot: tempRoot, changes: [change] });
+      assert.equal(result.ok, true);
+      const saved = await readTempKeymap(tempRoot);
+      assert.ok(saved.includes("scroll-layers = <5 6>"));
+    });
+  });
+
+  it("rejects automouse-layer when currentRaw mismatches source", async () => {
+    const source = makeTrackballSource(4, 5);
+    const ts = parseTrackballSettings(source);
+    const change = {
+      kind: "trackball-automouse-layer",
+      range: ts.automouseLayer.sourceRange,
+      currentRaw: "99",
+      nextRaw: "3",
+    };
+    await withTempRepo(source, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({ repoRoot: tempRoot, changes: [change] }),
+        /no longer match/,
+      );
+    });
+  });
+
+  it("rejects automouse-layer when source range contains non-integer content", async () => {
+    const source = makeTrackballSource(4, "5 6");
+    const ts = parseTrackballSettings(source);
+    const change = {
+      kind: "trackball-automouse-layer",
+      range: ts.scrollLayers.sourceRange,
+      currentRaw: ts.scrollLayers.raw.trim(),
+      nextRaw: "3",
+    };
+    await withTempRepo(source, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({ repoRoot: tempRoot, changes: [change] }),
+        /source range is invalid/,
+      );
     });
   });
 });
