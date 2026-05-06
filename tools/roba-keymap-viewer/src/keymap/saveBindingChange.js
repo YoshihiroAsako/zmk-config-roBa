@@ -435,12 +435,12 @@ function validateSourceChange(source, change) {
     }
     validateTrackballSettingsPreserved(source, change);
   } else if (change.kind === "sensor-binding") {
-    if (!/^&inc_dec_kp \S+ \S+$/.test(change.nextRaw.trim())) {
-      throw new Error("sensor-binding nextRaw must match &inc_dec_kp X Y format.");
+    if (!/^&inc_dec_(?:kp|cp) \S+ \S+$/.test(change.nextRaw.trim())) {
+      throw new Error("sensor-binding nextRaw must match &inc_dec_kp/cp X Y format.");
     }
     const currentSourceText = source.slice(change.range.start, change.range.end).trim();
-    if (!/^&inc_dec_kp \S+ \S+$/.test(currentSourceText)) {
-      throw new Error("sensor-binding source range does not contain a valid &inc_dec_kp expression.");
+    if (!/^&inc_dec_(?:kp|cp) \S+ \S+$/.test(currentSourceText)) {
+      throw new Error("sensor-binding source range does not contain a valid &inc_dec_kp/cp expression.");
     }
     validateSensorBindingPreserved(source, change);
   } else if (change.kind === "sensor-binding-insert") {
@@ -636,8 +636,8 @@ function validateSensorBindingPreserved(source, change) {
   if (!afterLayer || !afterLayer.sensorBindings.length) {
     throw new Error("sensor-binding: sensor-binding missing after replacement.");
   }
-  if (!/^&inc_dec_kp \S+ \S+$/.test(afterLayer.sensorBindings[0].raw.trim())) {
-    throw new Error("sensor-binding: replacement did not produce a valid &inc_dec_kp expression.");
+  if (!/^&inc_dec_(?:kp|cp) \S+ \S+$/.test(afterLayer.sensorBindings[0].raw.trim())) {
+    throw new Error("sensor-binding: replacement did not produce a valid &inc_dec_kp/cp expression.");
   }
 }
 
@@ -651,8 +651,9 @@ function validateSensorBindingInserted(source, change) {
   if (beforeLayer.sensorBindings.length) {
     throw new Error("sensor-binding-insert target layer already has sensor-bindings.");
   }
-  if (afterLayer.sensorBindings.length !== 1 || afterLayer.sensorBindings[0].behavior !== "&inc_dec_kp") {
-    throw new Error("sensor-binding-insert did not add a valid &inc_dec_kp binding.");
+  const insertedBehavior = afterLayer.sensorBindings[0]?.behavior;
+  if (afterLayer.sensorBindings.length !== 1 || (insertedBehavior !== "&inc_dec_kp" && insertedBehavior !== "&inc_dec_cp")) {
+    throw new Error("sensor-binding-insert did not add a valid &inc_dec_kp/cp binding.");
   }
 }
 
@@ -673,7 +674,7 @@ function validateSensorBindingRemoved(source, change) {
 
 function validateSensorBindingInsertionContent(nextRaw) {
   const match = String(nextRaw || "").match(/sensor-bindings\s*=\s*<([^<>;\r\n]+)>;\r?\n$/);
-  if (!match || !/^&inc_dec_kp \S+ \S+$/.test(match[1].trim())) {
+  if (!match || !/^&inc_dec_(?:kp|cp) \S+ \S+$/.test(match[1].trim())) {
     throw new Error("sensor-binding-insert content is invalid.");
   }
 }

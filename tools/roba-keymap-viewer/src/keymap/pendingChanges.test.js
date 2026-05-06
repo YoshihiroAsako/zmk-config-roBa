@@ -609,4 +609,49 @@ describe("sensor-binding pending changes", () => {
     assert.equal(state.valid, true);
     assert.equal(parseKeymap(state.nextSource).layers[0].sensorBindings.length, 0);
   });
+
+  it("buildSensorBindingDraftChange builds &inc_dec_cp change", () => {
+    const source = `
+/ { keymap { default_layer { bindings = <&kp A>; sensor-bindings = <&inc_dec_cp C_VOL_UP C_VOL_DN>; }; }; };`;
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: "C_NEXT", decKey: "C_PREV" });
+    assert.equal(change.kind, "sensor-binding");
+    assert.equal(change.nextRaw, "&inc_dec_cp C_NEXT C_PREV");
+    assert.equal(change.currentRaw, "&inc_dec_cp C_VOL_UP C_VOL_DN");
+  });
+
+  it("buildPendingChangesState generates preview for &inc_dec_cp change", () => {
+    const source = `
+/ { keymap { default_layer { bindings = <&kp A>; sensor-bindings = <&inc_dec_cp C_VOL_UP C_VOL_DN>; }; }; };`;
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: "C_NEXT", decKey: "C_PREV" });
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+    assert.ok(state.nextSource.includes("&inc_dec_cp C_NEXT C_PREV"));
+  });
+
+  it("buildSensorBindingInsertDraftChange inserts &inc_dec_cp into a layer", () => {
+    const source = `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+    };
+  };
+};`;
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const change = buildSensorBindingInsertDraftChange({ source, layer, behavior: "&inc_dec_cp", incKey: "C_VOL_UP", decKey: "C_VOL_DN" });
+    assert.equal(change.kind, "sensor-binding-insert");
+    assert.ok(change.nextRaw.includes("sensor-bindings = <&inc_dec_cp C_VOL_UP C_VOL_DN>;"));
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+    const afterSb = parseKeymap(state.nextSource).layers[0].sensorBindings[0];
+    assert.equal(afterSb.behavior, "&inc_dec_cp");
+    assert.equal(afterSb.incKey, "C_VOL_UP");
+  });
 });

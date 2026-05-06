@@ -130,7 +130,8 @@ export function buildTrackballScrollLayersDraftChange({ trackballSettings, nextR
 }
 
 export function buildSensorBindingDraftChange({ layer, sensorBinding, incKey, decKey }) {
-  const nextRaw = `&inc_dec_kp ${incKey} ${decKey}`;
+  const behavior = sensorBinding.behavior || "&inc_dec_kp";
+  const nextRaw = `${behavior} ${incKey} ${decKey}`;
   const currentRaw = sensorBinding.raw.trim();
   return {
     id: `layer-${layer.id}-sensor-binding`,
@@ -143,10 +144,10 @@ export function buildSensorBindingDraftChange({ layer, sensorBinding, incKey, de
   };
 }
 
-export function buildSensorBindingInsertDraftChange({ source, layer, incKey = "PG_UP", decKey = "PAGE_DOWN" }) {
+export function buildSensorBindingInsertDraftChange({ source, layer, behavior = "&inc_dec_kp", incKey = "PG_UP", decKey = "PAGE_DOWN" }) {
   if (!layer?.bodyRange) throw new Error("Cannot insert sensor-binding: layer body range unavailable.");
   if (layer.sensorBindings.length) throw new Error("Cannot insert sensor-binding: layer already has sensor-bindings.");
-  const nextValue = `&inc_dec_kp ${incKey} ${decKey}`;
+  const nextValue = `${behavior} ${incKey} ${decKey}`;
   validateSensorBindingValue(nextValue);
   const insertion = buildLayerPropertyInsertion(source, layer, "sensor-bindings", nextValue);
   return {
@@ -437,8 +438,9 @@ function validatePendingChange(source, change, { layerCount = 7, keyCount = 43 }
     const afterLayer = afterParsed.layers[change.layerIndex];
     if (!beforeLayer || !afterLayer) throw new Error(`${change.label}: target layer is missing.`);
     if (beforeLayer.sensorBindings.length) throw new Error(`${change.label}: target layer already has sensor-bindings.`);
-    if (afterLayer.sensorBindings.length !== 1 || afterLayer.sensorBindings[0].behavior !== "&inc_dec_kp") {
-      throw new Error(`${change.label}: sensor-binding-insert must add one &inc_dec_kp binding.`);
+    const insertedBehavior = afterLayer.sensorBindings[0]?.behavior;
+    if (afterLayer.sensorBindings.length !== 1 || (insertedBehavior !== "&inc_dec_kp" && insertedBehavior !== "&inc_dec_cp")) {
+      throw new Error(`${change.label}: sensor-binding-insert must add one &inc_dec_kp or &inc_dec_cp binding.`);
     }
   } else if (change.kind === "sensor-binding-remove") {
     if (change.nextRaw !== "") throw new Error(`${change.label}: sensor-binding-remove must have empty nextRaw.`);
@@ -599,8 +601,8 @@ function validateScrollLayersValue(raw, layerCount = 7) {
 
 function validateSensorBindingValue(value) {
   const trimmed = String(value || "").trim();
-  if (!/^&inc_dec_kp \S+ \S+$/.test(trimmed)) {
-    throw new Error("sensor-binding must be &inc_dec_kp followed by two keycode tokens.");
+  if (!/^&inc_dec_(?:kp|cp) \S+ \S+$/.test(trimmed)) {
+    throw new Error("sensor-binding must be &inc_dec_kp or &inc_dec_cp followed by two keycode tokens.");
   }
 }
 

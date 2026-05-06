@@ -99,6 +99,7 @@ function App() {
   const [sensorDrafts, setSensorDrafts] = useState({});
   const [selectedSensorLayerIndex, setSelectedSensorLayerIndex] = useState(null);
   const [sensorInsertLayerIndex, setSensorInsertLayerIndex] = useState("");
+  const [sensorInsertBehavior, setSensorInsertBehavior] = useState("&inc_dec_kp");
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
@@ -312,8 +313,8 @@ function App() {
     const drafts = {};
     for (const layer of document.layers) {
       const sb = layer.sensorBindings[0];
-      if (sb?.behavior === "&inc_dec_kp") {
-        drafts[layer.id] = { incKey: sb.incKey ?? "", decKey: sb.decKey ?? "" };
+      if (sb?.behavior === "&inc_dec_kp" || sb?.behavior === "&inc_dec_cp") {
+        drafts[layer.id] = { behavior: sb.behavior, incKey: sb.incKey ?? "", decKey: sb.decKey ?? "" };
       }
     }
     setSensorDrafts(drafts);
@@ -359,6 +360,7 @@ function App() {
       setSensorDrafts({});
       setSelectedSensorLayerIndex(null);
       setSensorInsertLayerIndex("");
+      setSensorInsertBehavior("&inc_dec_kp");
       setSaveStatus({
         tone: "ok",
         title: "Reloaded source",
@@ -520,6 +522,7 @@ function App() {
       setSensorDrafts({});
       setSelectedSensorLayerIndex(null);
       setSensorInsertLayerIndex("");
+      setSensorInsertBehavior("&inc_dec_kp");
       setSaveStatus({
         tone: "ok",
         title: "Saved pending changes",
@@ -593,6 +596,7 @@ function App() {
       setSensorDrafts({});
       setSelectedSensorLayerIndex(null);
       setSensorInsertLayerIndex("");
+      setSensorInsertBehavior("&inc_dec_kp");
       setSaveStatus({
         tone: "ok",
         title: "Restored backup",
@@ -853,7 +857,8 @@ function App() {
   };
 
   const sensorLayersWithBindings = document.layers.filter(
-    (layer) => layer.sensorBindings.length > 0 && layer.sensorBindings[0].behavior === "&inc_dec_kp",
+    (layer) => layer.sensorBindings.length > 0 &&
+      (layer.sensorBindings[0].behavior === "&inc_dec_kp" || layer.sensorBindings[0].behavior === "&inc_dec_cp"),
   );
   const sensorLayersWithoutBindings = document.layers.filter((layer) => layer.sensorBindings.length === 0);
   const effectiveSensorInsertLayerIndex = sensorInsertLayerIndex === "" && sensorLayersWithoutBindings.length
@@ -864,10 +869,11 @@ function App() {
     const layer = document.layers.find((l) => l.id === layerIndex);
     if (!layer) return;
     const sb = layer.sensorBindings[0];
-    if (!sb || sb.behavior !== "&inc_dec_kp") return;
+    if (!sb || (sb.behavior !== "&inc_dec_kp" && sb.behavior !== "&inc_dec_cp")) return;
     const draft = sensorDrafts[layerIndex];
     if (!draft) return;
-    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: draft.incKey, decKey: draft.decKey });
+    const effectiveSensorBinding = { ...sb, behavior: draft.behavior || sb.behavior };
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: effectiveSensorBinding, incKey: draft.incKey, decKey: draft.decKey });
     commitPendingChanges(upsertDraftChange(pendingChanges, change));
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
@@ -877,7 +883,10 @@ function App() {
     const layerIndex = Number(effectiveSensorInsertLayerIndex);
     const layer = document.layers.find((l) => l.id === layerIndex);
     if (!layer || layer.sensorBindings.length) return;
-    const change = buildSensorBindingInsertDraftChange({ source: keymapSource, layer });
+    const behavior = sensorInsertBehavior || "&inc_dec_kp";
+    const incKey = behavior === "&inc_dec_cp" ? "C_VOL_UP" : "PG_UP";
+    const decKey = behavior === "&inc_dec_cp" ? "C_VOL_DN" : "PAGE_DOWN";
+    const change = buildSensorBindingInsertDraftChange({ source: keymapSource, layer, behavior, incKey, decKey });
     commitPendingChanges(upsertDraftChange(pendingChanges, change));
     setSelectedSensorLayerIndex(layerIndex);
     setSaveStatus(EMPTY_SAVE_STATUS);
@@ -899,10 +908,10 @@ function App() {
     commitPendingChanges(pendingChanges.filter((change) => change.id !== draftId));
     const layer = document.layers.find((l) => l.id === layerIndex);
     const sb = layer?.sensorBindings[0];
-    if (sb?.behavior === "&inc_dec_kp") {
+    if (sb?.behavior === "&inc_dec_kp" || sb?.behavior === "&inc_dec_cp") {
       setSensorDrafts((prev) => ({
         ...prev,
-        [layerIndex]: { incKey: sb.incKey ?? "", decKey: sb.decKey ?? "" },
+        [layerIndex]: { behavior: sb.behavior, incKey: sb.incKey ?? "", decKey: sb.decKey ?? "" },
       }));
     }
     setSaveStatus(EMPTY_SAVE_STATUS);
@@ -1274,6 +1283,7 @@ function App() {
           initialBinding={pickerInitialBinding}
           layerNames={layerNames}
           restrictTo={pickerContext.type === "sensor-inc" || pickerContext.type === "sensor-dec" ? ["&kp"] : null}
+          initialCategory={pickerContext.initialCategory ?? ""}
           onSelect={(binding) => {
             if (pickerContext.type === "binding") {
               setDraftBinding(binding);
@@ -1363,19 +1373,29 @@ function App() {
           sensorLayersWithoutBindings={sensorLayersWithoutBindings}
           selectedSensorLayerIndex={selectedSensorLayerIndex}
           sensorInsertLayerIndex={effectiveSensorInsertLayerIndex}
+          sensorInsertBehavior={sensorInsertBehavior}
           onSelectSensorLayer={setSelectedSensorLayerIndex}
           onSelectSensorInsertLayer={setSensorInsertLayerIndex}
+          onSelectSensorInsertBehavior={setSensorInsertBehavior}
           onSensorDraftChange={(layerIndex, field, value) => {
             setSensorDrafts((prev) => ({ ...prev, [layerIndex]: { ...prev[layerIndex], [field]: value } }));
             setSaveStatus(EMPTY_SAVE_STATUS);
           }}
-          onSensorPickInc={(layerIndex) => setPickerContext({ type: "sensor-inc", layerIndex })}
-          onSensorPickDec={(layerIndex) => setPickerContext({ type: "sensor-dec", layerIndex })}
+          onSensorPickInc={(layerIndex) => setPickerContext({
+            type: "sensor-inc",
+            layerIndex,
+            initialCategory: sensorDrafts[layerIndex]?.behavior === "&inc_dec_cp" ? "Consumer" : undefined,
+          })}
+          onSensorPickDec={(layerIndex) => setPickerContext({
+            type: "sensor-dec",
+            layerIndex,
+            initialCategory: sensorDrafts[layerIndex]?.behavior === "&inc_dec_cp" ? "Consumer" : undefined,
+          })}
           onSensorSwap={(layerIndex) => {
             setSensorDrafts((prev) => {
               const d = prev[layerIndex];
               if (!d) return prev;
-              return { ...prev, [layerIndex]: { incKey: d.decKey, decKey: d.incKey } };
+              return { ...prev, [layerIndex]: { behavior: d.behavior, incKey: d.decKey, decKey: d.incKey } };
             });
             setSaveStatus(EMPTY_SAVE_STATUS);
           }}
@@ -1988,6 +2008,8 @@ function PanelContent({
   sensorInsertLayerIndex,
   onSelectSensorLayer,
   onSelectSensorInsertLayer,
+  sensorInsertBehavior,
+  onSelectSensorInsertBehavior,
   onSensorDraftChange,
   onSensorPickInc,
   onSensorPickDec,
@@ -2069,9 +2091,11 @@ function PanelContent({
     const sensorDraft = selectedSensorLayerIndex != null ? sensorDrafts[selectedSensorLayerIndex] : null;
     const sensorPendingId = selectedSensorLayerIndex != null ? `layer-${selectedSensorLayerIndex}-sensor-binding` : null;
     const sensorPending = pendingChanges.find((c) => c.id === sensorPendingId);
+    const savedBehavior = selectedSensorLayer?.sensorBindings[0]?.behavior ?? "&inc_dec_kp";
     const sensorChanged = sensorDraft && selectedSensorLayer
       ? sensorDraft.incKey !== (selectedSensorLayer.sensorBindings[0]?.incKey ?? "")
         || sensorDraft.decKey !== (selectedSensorLayer.sensorBindings[0]?.decKey ?? "")
+        || (sensorDraft.behavior || savedBehavior) !== savedBehavior
       : false;
     return (
       <div className="splitPanel">
@@ -2104,6 +2128,16 @@ function PanelContent({
                   <option key={layer.id} value={layer.id}>{layer.name}</option>
                 ))}
               </select>
+              <select
+                id="sensor-add-behavior"
+                value={sensorInsertBehavior}
+                onChange={(event) => onSelectSensorInsertBehavior(event.target.value)}
+                disabled={!sensorLayersWithoutBindings.length}
+                title="behavior"
+              >
+                <option value="&inc_dec_kp">kp (HID key)</option>
+                <option value="&inc_dec_cp">cp (Consumer)</option>
+              </select>
               <button type="button" disabled={!sensorLayersWithoutBindings.length} onClick={onAddSensorLayerDraft}>
                 Add layer
               </button>
@@ -2116,6 +2150,7 @@ function PanelContent({
             draft={sensorDraft}
             pending={sensorPending}
             changed={sensorChanged}
+            onBehaviorChange={(behavior) => onSensorDraftChange(selectedSensorLayerIndex, "behavior", behavior)}
             onPickInc={() => onSensorPickInc(selectedSensorLayerIndex)}
             onPickDec={() => onSensorPickDec(selectedSensorLayerIndex)}
             onSwap={() => onSensorSwap(selectedSensorLayerIndex)}
@@ -2506,15 +2541,28 @@ function shorten(value, max) {
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
-function SensorDetailPanel({ layer, draft, pending, changed, onPickInc, onPickDec, onSwap, onAddDraft, onRemoveDraft, onDeleteBinding }) {
+function SensorDetailPanel({ layer, draft, pending, changed, onBehaviorChange, onPickInc, onPickDec, onSwap, onAddDraft, onRemoveDraft, onDeleteBinding }) {
   const sb = layer.sensorBindings[0];
-  const previewRaw = `&inc_dec_kp ${draft.incKey || "?"} ${draft.decKey || "?"}`;
+  const effectiveBehavior = draft.behavior || sb.behavior || "&inc_dec_kp";
+  const previewRaw = `${effectiveBehavior} ${draft.incKey || "?"} ${draft.decKey || "?"}`;
   const pendingRemove = pending?.kind === "sensor-binding-remove";
   return (
     <section className="sensorDetailPanel" aria-label="sensor binding editor">
       <div className="editorHeader">
         <strong>{layer.name}</strong>
         <span className="eyebrow">sensor-binding</span>
+      </div>
+      <div className="fieldGroup">
+        <span className="fieldLabel">Behavior</span>
+        <div className="fieldRow">
+          <select
+            value={effectiveBehavior}
+            onChange={(event) => onBehaviorChange(event.target.value)}
+          >
+            <option value="&inc_dec_kp">kp (HID key)</option>
+            <option value="&inc_dec_cp">cp (Consumer)</option>
+          </select>
+        </div>
       </div>
       <div className="fieldGroup">
         <span className="fieldLabel">Inc (時計回り)</span>
@@ -2682,14 +2730,14 @@ function formatRange(range) {
   return range ? `${range.start}..${range.end}` : "Unavailable";
 }
 
-function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose, restrictTo = null }) {
+function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose, restrictTo = null, initialCategory = "" }) {
   const initialDraft = useMemo(
     () => parseStructuredBinding(initialBinding, layerNames.length),
     [initialBinding, layerNames.length],
   );
   const [draft, setDraft] = useState(initialDraft);
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(initialCategory);
   const searchRef = useRef(null);
 
   useEffect(() => {

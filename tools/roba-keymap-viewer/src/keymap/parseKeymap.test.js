@@ -31,7 +31,7 @@ describe("roBa keymap parser", () => {
     assert.equal(parsed.combos.length, 5);
     assert.equal(parsed.macros.length, 1);
     assert.equal(parsed.behaviors.some((behavior) => behavior.name === "lt_to_layer_0"), true);
-    assert.equal(parsed.layers.flatMap((layer) => layer.sensorBindings).length, 2);
+    assert.equal(parsed.layers.flatMap((layer) => layer.sensorBindings).length, 3);
   });
 
   it("keeps important roBa bindings visible as raw binding expressions", async () => {
@@ -419,5 +419,39 @@ describe("parseTrackballSettings", () => {
     assert.equal(sb.behavior, "&other_behavior");
     assert.equal(sb.incKey, null);
     assert.equal(sb.decKey, null);
+  });
+
+  it("parseSensorBindings parses &inc_dec_cp behavior", () => {
+    const source = `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+      sensor-bindings = <&inc_dec_cp C_VOL_UP C_VOL_DN>;
+    };
+  };
+};`;
+    const parsed = parseKeymap(source);
+    const sb = parsed.layers[0].sensorBindings[0];
+    assert.equal(sb.behavior, "&inc_dec_cp");
+    assert.equal(sb.incKey, "C_VOL_UP");
+    assert.equal(sb.decKey, "C_VOL_DN");
+    assert.ok(sb.raw.includes("&inc_dec_cp C_VOL_UP C_VOL_DN"));
+  });
+
+  it("parseSensorBindings sourceRange is valid for &inc_dec_cp", () => {
+    const source = `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+      sensor-bindings = <&inc_dec_cp C_NEXT C_PREV>;
+    };
+  };
+};`;
+    const parsed = parseKeymap(source);
+    const sb = parsed.layers[0].sensorBindings[0];
+    const text = source.slice(sb.sourceRange.start, sb.sourceRange.end).trim();
+    assert.ok(text.startsWith("&inc_dec_cp"), `sourceRange should contain &inc_dec_cp, got: ${text}`);
   });
 });

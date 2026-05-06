@@ -41,6 +41,26 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-07: Task F 実装・検証・push 済み（`&inc_dec_cp` behavior 対応）
+
+実装済み:
+
+- **`parseSensorBindings` 拡張**: `&inc_dec_cp` も `&inc_dec_kp` と同様に `incKey`/`decKey` を解析するようにした。
+- **`pendingChanges.js` 拡張**: `buildSensorBindingDraftChange` が `sensorBinding.behavior` を使って `&inc_dec_cp X Y` を生成するよう対応。`buildSensorBindingInsertDraftChange` に `behavior` パラメータを追加（デフォルト `&inc_dec_kp`）。`validateSensorBindingValue` を `^&inc_dec_(?:kp|cp) \S+ \S+$` に拡張。`sensor-binding-insert` の after-check も両 behavior を許可。
+- **`saveBindingChange.js` 拡張**: 4 箇所の `&inc_dec_kp` 正規表現を `&inc_dec_(?:kp|cp)` に変更。
+- **`App.jsx` 拡張**:
+  - `sensorDrafts` state に `behavior` フィールドを追加。`&inc_dec_cp` レイヤーも初期化対象に。
+  - `sensorLayersWithBindings` フィルターを `&inc_dec_cp` にも対応。
+  - `addSensorDraft` / `removeSensorDraft` で behavior を引き継ぐよう修正。
+  - `addSensorLayerDraft` に `sensorInsertBehavior` state を追加。`&inc_dec_cp` 選択時は `C_VOL_UP`/`C_VOL_DN` をデフォルトに。
+  - `sensorChanged` の判定に behavior 変更を追加。
+  - "Add sensor-binding" UI に behavior セレクト（kp / cp）を追加。
+  - `SensorDetailPanel` に Behavior セレクト（kp / cp）を追加。behavior 変更は `onBehaviorChange` handler で処理。
+  - `KeycodePicker` に `initialCategory` prop を追加。`&inc_dec_cp` のとき "Consumer" を初期カテゴリに設定。
+- **テスト追加**: `parseKeymap.test.js` に 2 ケース、`pendingChanges.test.js` に 3 ケース、`saveBindingChange.test.js` に 2 ケース追加。
+- **検証**: 196 tests / 26 suites 全パス。`npm run build` 成功。ブラウザ自動確認は `agent-browser` CLI 不在のため未実施。
+- **commit/push**: `main` に push 済み。
+
 ### 2026-05-07: Task D 実装・検証済み（Consumer code カタログ拡張）
 
 実装済み:
@@ -373,10 +393,11 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **スコープ**: `&inc_dec_kp X Y` 形式のみ。
 - **検証**: 185 tests / 26 suites 全パス。`npm run build` 成功。ユーザー側ブラウザ確認済み。push 済み。
 
-#### F. `&inc_dec_cp` behavior 対応（候補・D の後）
+#### ~~F. `&inc_dec_cp` behavior 対応~~（完了）
 
 - **目的**: Consumer-press（音量・メディア等）専用の `&inc_dec_cp` behavior を Sensors タブで選択・編集できるようにする。
-- **前提**: Task D（Consumer code カタログ拡張）が完了していることが望ましい。Task E の後に実施。
+- **実装**: parseSensorBindings / pendingChanges / saveBindingChange を拡張。Sensors タブに behavior セレクト追加。KeycodePicker に `initialCategory` 追加。
+- **検証**: 196 tests / 26 suites 全パス。`npm run build` 成功。push 済み。
 
 #### G. マウスホイール（`&msc`）sensor-binding 対応（低優先）
 
@@ -393,8 +414,8 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 3. ~~**B**（完了）~~
 4. ~~**E**（sensor-bindings のレイヤー追加・削除 UI）~~（完了）
 5. ~~**D**（Consumer code カタログ拡張）~~（完了）
-6. **F**（`&inc_dec_cp` 対応）← 次候補
-7. **G**（`&msc` 対応）
+6. ~~**F**（`&inc_dec_cp` 対応）~~（完了）
+7. **G**（`&msc` 対応）← 次候補
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。
 

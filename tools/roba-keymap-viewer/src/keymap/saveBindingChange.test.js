@@ -839,4 +839,67 @@ describe("saveBindingChanges sensor-binding", () => {
       assert.equal(parseKeymap(saved).layers[0].sensorBindings.length, 0);
     });
   });
+
+  it("saves &inc_dec_cp sensor-binding change successfully", async () => {
+    const source = `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+      sensor-bindings = <&inc_dec_cp C_VOL_UP C_VOL_DN>;
+    };
+  };
+};`;
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = {
+      id: `layer-${layer.id}-sensor-binding`,
+      kind: "sensor-binding",
+      label: `${layer.name} sensor-binding`,
+      layerIndex: layer.id,
+      range: sb.sourceRange,
+      currentRaw: sb.raw.trim(),
+      nextRaw: "&inc_dec_cp C_NEXT C_PREV",
+    };
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({ repoRoot: tempRoot, changes: [change] });
+      assert.ok(result.ok, result.message);
+      const saved = await readFile(path.join(tempRoot, "config", "roBa.keymap"), "utf8");
+      const afterSb = parseKeymap(saved).layers[0].sensorBindings[0];
+      assert.equal(afterSb.behavior, "&inc_dec_cp");
+      assert.equal(afterSb.incKey, "C_NEXT");
+      assert.equal(afterSb.decKey, "C_PREV");
+    });
+  });
+
+  it("saves &inc_dec_cp sensor-binding insertion successfully", async () => {
+    const source = `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+    };
+  };
+};`;
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const insertChange = {
+      id: `layer-${layer.id}-sensor-binding`,
+      kind: "sensor-binding-insert",
+      label: `${layer.name} sensor-binding`,
+      layerIndex: layer.id,
+      range: { start: layer.bodyRange.end, end: layer.bodyRange.end },
+      currentRaw: "",
+      nextRaw: "      sensor-bindings = <&inc_dec_cp C_VOL_UP C_VOL_DN>;\n",
+    };
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({ repoRoot: tempRoot, changes: [insertChange] });
+      assert.ok(result.ok, result.message);
+      const saved = await readFile(path.join(tempRoot, "config", "roBa.keymap"), "utf8");
+      const afterSb = parseKeymap(saved).layers[0].sensorBindings[0];
+      assert.equal(afterSb.behavior, "&inc_dec_cp");
+      assert.equal(afterSb.incKey, "C_VOL_UP");
+    });
+  });
 });

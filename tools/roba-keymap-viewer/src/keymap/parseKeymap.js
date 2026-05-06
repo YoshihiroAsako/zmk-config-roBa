@@ -154,13 +154,13 @@ function parseSensorBindings(body, bodyStart = 0) {
   return entries.map((entry) => {
     const tokens = entry.raw.trim().split(/\s+/);
     const behavior = tokens[0] || "";
-    const isIncDecKp = behavior === "&inc_dec_kp";
+    const isIncDecBehavior = behavior === "&inc_dec_kp" || behavior === "&inc_dec_cp";
     return {
       raw: entry.raw,
       sourceRange: entry.sourceRange,
       behavior,
-      incKey: isIncDecKp ? (tokens[1] ?? null) : null,
-      decKey: isIncDecKp ? (tokens[2] ?? null) : null,
+      incKey: isIncDecBehavior ? (tokens[1] ?? null) : null,
+      decKey: isIncDecBehavior ? (tokens[2] ?? null) : null,
     };
   });
 }
