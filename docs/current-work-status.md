@@ -53,7 +53,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **`KeycodePicker` UI 更新**: `MKP` ボタン追加。`&mkp` 選択時は Mouse button セレクト（MB1〜MB5）を表示し、Tap keycode 入力・modifier toggle・検索カタログを非表示。
 - **テスト追加**: build / parse / round-trip / fallback / invalid mouse button。168 tests / 24 suites 全パス。`npm run build` 成功。
 - **commit/push**: `f6af2ae MKPマウスボタンPickerを実装_20260507` として `main` に push 済み。
-- **ブラウザ確認**: 未実施（手動で確認すること）。
+- **ブラウザ確認**: ユーザー確認済み。
 
 ### 2026-05-07: Task C 実装・検証・push 済み（LT/MT の tap keycode に KP modifier 引き継ぎ）
 
