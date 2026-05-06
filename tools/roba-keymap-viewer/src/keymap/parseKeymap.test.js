@@ -367,4 +367,48 @@ describe("parseTrackballSettings", () => {
     assert.ok(parsed.trackballSettings, "trackballSettings should be in parseKeymap result");
     assert.equal(parsed.trackballSettings.automouseLayer.value.trim(), "4");
   });
+
+  it("sensorBindings are structured objects with incKey and decKey", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const sensorLayers = parsed.layers.filter((layer) => layer.sensorBindings.length > 0);
+    assert.ok(sensorLayers.length >= 2, "at least 2 layers should have sensor bindings");
+    for (const layer of sensorLayers) {
+      const sb = layer.sensorBindings[0];
+      assert.equal(typeof sb.raw, "string", "raw must be a string");
+      assert.equal(sb.behavior, "&inc_dec_kp");
+      assert.ok(sb.incKey, "incKey must be non-empty");
+      assert.ok(sb.decKey, "decKey must be non-empty");
+      assert.ok(sb.sourceRange?.start != null, "sourceRange.start must be set");
+      assert.ok(sb.sourceRange?.end != null, "sourceRange.end must be set");
+    }
+  });
+
+  it("sensorBindings sourceRange points to the correct text in source", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const defaultLayer = parsed.layers[0];
+    const sb = defaultLayer.sensorBindings[0];
+    assert.ok(sb, "default_layer should have a sensor binding");
+    const text = source.slice(sb.sourceRange.start, sb.sourceRange.end).trim();
+    assert.ok(text.startsWith("&inc_dec_kp"), `source range should contain &inc_dec_kp, got: ${text}`);
+    assert.equal(text, sb.raw.trim());
+  });
+
+  it("sensorBindings with non-inc_dec_kp behavior has null incKey/decKey", () => {
+    const source = `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+      sensor-bindings = <&other_behavior>;
+    };
+  };
+};`;
+    const parsed = parseKeymap(source);
+    const sb = parsed.layers[0].sensorBindings[0];
+    assert.equal(sb.behavior, "&other_behavior");
+    assert.equal(sb.incKey, null);
+    assert.equal(sb.decKey, null);
+  });
 });

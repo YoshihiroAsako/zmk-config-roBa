@@ -433,6 +433,15 @@ function validateSourceChange(source, change) {
       throw new Error("scroll-layers source range is invalid.");
     }
     validateTrackballSettingsPreserved(source, change);
+  } else if (change.kind === "sensor-binding") {
+    if (!/^&inc_dec_kp \S+ \S+$/.test(change.nextRaw.trim())) {
+      throw new Error("sensor-binding nextRaw must match &inc_dec_kp X Y format.");
+    }
+    const currentSourceText = source.slice(change.range.start, change.range.end).trim();
+    if (!/^&inc_dec_kp \S+ \S+$/.test(currentSourceText)) {
+      throw new Error("sensor-binding source range does not contain a valid &inc_dec_kp expression.");
+    }
+    validateSensorBindingPreserved(source, change);
   } else {
     throw new Error("Unsupported pending change kind.");
   }
@@ -603,6 +612,18 @@ function validateScrollLayersValue(raw, layerCount = 99) {
   if (new Set(layers).size !== layers.length) throw new Error("scroll-layers must be unique.");
   if (layers.some((layer) => layer < 0 || layer >= layerCount)) {
     throw new Error(`scroll-layers out of range.`);
+  }
+}
+
+function validateSensorBindingPreserved(source, change) {
+  const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+  const afterParsed = parseKeymap(nextSource);
+  const afterLayer = afterParsed.layers.find((layer) => layer.id === change.layerIndex);
+  if (!afterLayer || !afterLayer.sensorBindings.length) {
+    throw new Error("sensor-binding: sensor-binding missing after replacement.");
+  }
+  if (!/^&inc_dec_kp \S+ \S+$/.test(afterLayer.sensorBindings[0].raw.trim())) {
+    throw new Error("sensor-binding: replacement did not produce a valid &inc_dec_kp expression.");
   }
 }
 

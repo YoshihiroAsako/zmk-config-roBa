@@ -34,7 +34,7 @@ export function buildMarkdown(document) {
     .filter((layer) => layer.sensorBindings.length)
     .forEach((layer) => {
       layer.sensorBindings.forEach((binding) => {
-        lines.push(`| ${layer.name} | \`${binding}\` |`);
+        lines.push(`| ${layer.name} | \`${binding.raw}\` |`);
       });
     });
   lines.push("");

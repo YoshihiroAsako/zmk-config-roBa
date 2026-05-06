@@ -9,6 +9,7 @@ import {
   buildLayerRenameDraftChange,
   buildTrackballAutomouseDraftChange,
   buildTrackballScrollLayersDraftChange,
+  buildSensorBindingDraftChange,
   buildPendingChangesState,
   removeDraftChange,
   upsertDraftChange,
@@ -493,5 +494,83 @@ describe("trackball pending changes", () => {
     const state = buildPendingChangesState(source, [change], parsed.layers);
     assert.equal(state.valid, true);
     assert.ok(state.nextSource.includes("automouse-layer = <3>"));
+  });
+});
+
+describe("sensor-binding pending changes", () => {
+  const makeSensorSource = (incKey, decKey) => `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+      sensor-bindings = <&inc_dec_kp ${incKey} ${decKey}>;
+    };
+  };
+};`;
+
+  it("buildSensorBindingDraftChange builds a valid change", () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: "LEFT", decKey: "RIGHT" });
+    assert.equal(change.kind, "sensor-binding");
+    assert.equal(change.id, "layer-0-sensor-binding");
+    assert.equal(change.nextRaw, "&inc_dec_kp LEFT RIGHT");
+    assert.equal(change.currentRaw, "&inc_dec_kp PG_UP PAGE_DOWN");
+    assert.ok(change.range.start < change.range.end);
+  });
+
+  it("buildSensorBindingDraftChange with modifier keycode", () => {
+    const source = makeSensorSource("LC(PAGE_UP)", "LC(PAGE_DOWN)");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: "LC(LEFT)", decKey: "LC(RIGHT)" });
+    assert.equal(change.nextRaw, "&inc_dec_kp LC(LEFT) LC(RIGHT)");
+  });
+
+  it("validatePendingChange rejects invalid sensor-binding format", () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: "LEFT", decKey: "RIGHT" });
+    const badChange = { ...change, nextRaw: "&lt 0 A" };
+    const state = buildPendingChangesState(source, [badChange], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.ok(state.message, "should have an error message");
+  });
+
+  it("upsertDraftChange inserts sensor-binding change", () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: "LEFT", decKey: "RIGHT" });
+    const result = upsertDraftChange([], change);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].id, "layer-0-sensor-binding");
+  });
+
+  it("upsertDraftChange removes NoOp sensor-binding change", () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: "PG_UP", decKey: "PAGE_DOWN" });
+    const result = upsertDraftChange([], change);
+    assert.equal(result.length, 0, "NoOp change should be removed");
+  });
+
+  it("buildPendingChangesState generates preview source for sensor-binding change", () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: "LEFT", decKey: "RIGHT" });
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+    assert.ok(state.nextSource.includes("&inc_dec_kp LEFT RIGHT"));
   });
 });

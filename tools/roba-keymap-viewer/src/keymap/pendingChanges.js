@@ -129,6 +129,20 @@ export function buildTrackballScrollLayersDraftChange({ trackballSettings, nextR
   };
 }
 
+export function buildSensorBindingDraftChange({ layer, sensorBinding, incKey, decKey }) {
+  const nextRaw = `&inc_dec_kp ${incKey} ${decKey}`;
+  const currentRaw = sensorBinding.raw.trim();
+  return {
+    id: `layer-${layer.id}-sensor-binding`,
+    kind: "sensor-binding",
+    label: `${layer.name} sensor-binding`,
+    layerIndex: layer.id,
+    range: sensorBinding.sourceRange,
+    currentRaw,
+    nextRaw,
+  };
+}
+
 export function buildLayerRenameDraftChange({ layerIndex, currentName, nextName, nameRange }) {
   return {
     id: `layer-${layerIndex}-rename`,
@@ -379,6 +393,8 @@ function validatePendingChange(source, change, { layerCount = 7, keyCount = 43 }
     validateAutomouseLayerValue(change.nextRaw, layerCount);
   } else if (change.kind === "trackball-scroll-layers") {
     validateScrollLayersValue(change.nextRaw, layerCount);
+  } else if (change.kind === "sensor-binding") {
+    validateSensorBindingValue(change.nextRaw);
   }
 }
 
@@ -528,6 +544,13 @@ function validateScrollLayersValue(raw, layerCount = 7) {
   if (new Set(layers).size !== layers.length) throw new Error("scroll-layers must be unique.");
   if (layers.some((layer) => layer < 0 || layer >= layerCount)) {
     throw new Error(`scroll-layers must be between 0 and ${layerCount - 1}.`);
+  }
+}
+
+function validateSensorBindingValue(value) {
+  const trimmed = String(value || "").trim();
+  if (!/^&inc_dec_kp \S+ \S+$/.test(trimmed)) {
+    throw new Error("sensor-binding must be &inc_dec_kp followed by two keycode tokens.");
   }
 }
 

@@ -36,24 +36,29 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
 - 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
-- ZMK Studio 風の `Key Press` 修飾キー選択 UI まで実装済み。次はブラウザ上の手動確認と commit/push 整理が候補。
-- 次回チャットでは **Task B（エンコーダー回転 sensor-bindings 編集）** に着手する。詳細計画は `docs/sensor-bindings-implementation-plan.md` を参照（必要になった時だけ読む）。
+- Task B（エンコーダー回転 sensor-bindings 編集）まで実装済み。181 tests / 26 suites 全パス。`npm run build` 成功。
+- **次**: ブラウザ手動確認 → commit/push。
 
 ## 最新チェックポイント
 
+### 2026-05-07: Task B 実装完了・手動ブラウザ確認待ち（エンコーダー sensor-bindings 編集）
+
+実装済み:
+
+- **`parseSensorBindings()` 追加**: `parseKeymap.js` に `parseSensorBindings()` 追加。`sensorBindings` を `string[]` から `{ raw, sourceRange, behavior, incKey, decKey }[]` 構造体配列に変更。`&inc_dec_kp` 以外の behavior は `incKey/decKey = null`。
+- **`markdown.js` 更新**: `binding.raw` を使うよう修正（string → 構造体変更に対応）。
+- **`buildSensorBindingDraftChange()` 追加**: `pendingChanges.js` に `sensor-binding` kind の builder を追加。
+- **`validateSensorBindingValue()` 追加**: `pendingChanges.js` に `^&inc_dec_kp \S+ \S+$` 形式チェックを追加。`validatePendingChange` に `sensor-binding` 分岐を追加。
+- **`validateSensorBindingPreserved()` 追加**: `saveBindingChange.js` に sensor-binding の validateSourceChange 分岐と preserved 検証を追加。
+- **`KeycodePicker` 拡張**: `restrictTo` プロップを追加。`sensor-inc/dec` 用途では `["&kp"]` を渡して LT/MT/MKP を非表示。
+- **`App.jsx` Sensors タブ UI**: split panel 形式へ再構成。左ペインに sensor-bindings を持つ layer 一覧（Inc/Dec 表示）。右ペインに `SensorDetailPanel`（Pick ボタン・Swap ボタン・Preview・Add/Remove draft）。
+- **`sensorDrafts` state / handlers**: `addSensorDraft` / `removeSensorDraft` 追加。reload/save/restore 時に `setSensorDrafts({})` でリセット。
+- **テスト追加**: `parseKeymap.test.js` に 3 ケース、`pendingChanges.test.js` に 5 ケース、`saveBindingChange.test.js` に 4 ケース追加。181 tests / 26 suites 全パス。`npm run build` 成功。
+- **commit/push**: 未実施（ブラウザ確認待ち）。
+
 ### 2026-05-07: Task B 計画確定（エンコーダー sensor-bindings 編集）
 
-設計判断確定:
-
-- **対象**: `default_layer` と `ARROW` の `sensor-bindings = <&inc_dec_kp X Y>;`。`&inc_dec_kp` 形式のみ MVP 対応。
-- **inc/dec keycode**: `&kp` 相当（modifier 込みの `LC(LEFT)` 等を含む）のみ。
-- **Picker 制限**: `KeycodePicker` に `restrictTo: ["&kp"]` プロップを追加し、sensor 用途では KP 以外の Behavior（LT/MT/MKP）を非表示にする。デフォルトは全 Behavior 表示で既存利用箇所には影響なし。
-- **layer 列挙**: 左ペインには sensor-bindings を持つ layer のみ表示。新規追加・削除は MVP 外。
-- **Swap inc/dec ボタン**: layer ごとの方向反転を 1 クリックで行える UX を追加。
-- **対象外**: ハードウェアレベルの方向反転（`boards/shields/roBa/*.overlay` 編集）は Sensors タブから触らない。UI に注記のみ。
-- **対象外**: Consumer code（音量・メディア・明るさ）は `keycodeCatalog.js` への追加が必要なため別タスクに切り出し。
-
-詳細計画は `docs/sensor-bindings-implementation-plan.md` に記載。実装順序（parseKeymap → pendingChanges/save → Picker `restrictTo` → App.jsx UI → 手動確認 → commit/push）も同ドキュメント参照。
+詳細計画は `docs/sensor-bindings-implementation-plan.md` に記載済み。
 
 ### 2026-05-07: Task A 実装・検証・push 済み（MKP マウスボタン Picker）
 
@@ -318,15 +323,9 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - 168 tests / 24 suites 全パス。push 済み。ブラウザ確認は手動で実施すること。
 
-#### B. エンコーダー回転（`sensor-bindings`）編集 — 計画確定済み・次に着手
+#### ~~B. エンコーダー回転（`sensor-bindings`）編集~~（実装済み・ブラウザ確認待ち）
 
-- **詳細計画**: `docs/sensor-bindings-implementation-plan.md` を参照。
-- **概要**: read-only の Sensors タブを編集 UI に拡張し、各 layer の `&inc_dec_kp X Y` の inc/dec keycode を Pick で変更できるようにする。
-- **対象**: `default_layer` と `ARROW` の `sensor-bindings`（`&inc_dec_kp` 形式のみ MVP 対応）。
-- **inc/dec keycode**: `&kp` 相当（modifier 込みの `LC(LEFT)` 等を含む）。
-- **UX**: Inc/Dec Picker、Swap inc/dec ボタン（layer ごとの方向反転）、編集中 layer のみ表示。
-- **対象外（別タスク）**: ハードウェアレベル反転（`.overlay` 編集）、Consumer code（音量・メディア）対応、`&inc_dec_cp` 切替、マウスホイール（`&msc`）。
-- **実装順序**: parseKeymap → pendingChanges/save → Picker `restrictTo` プロップ追加 → App.jsx UI → 手動ブラウザ確認 → commit/push。
+- 181 tests / 26 suites 全パス。`npm run build` 成功。手動ブラウザ確認後に commit/push。
 
 #### D. Consumer code カタログ拡張（Task B 完了後の候補）
 
@@ -342,7 +341,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 1. ~~**C**（完了）~~
 2. ~~**A**（完了）~~
-3. **B**（parse / save / UI と影響範囲が広いので最後）← 次はここ。詳細計画 `docs/sensor-bindings-implementation-plan.md` 参照
+3. ~~**B**（完了・ブラウザ確認待ち）~~
 4. **D**（Consumer code カタログ拡張）— B 完了後の任意タスク
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。

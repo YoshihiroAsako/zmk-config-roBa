@@ -31,6 +31,7 @@ import {
   buildMacroDraftChanges,
   buildTrackballAutomouseDraftChange,
   buildTrackballScrollLayersDraftChange,
+  buildSensorBindingDraftChange,
   buildPendingChangesState,
   getDraftId,
   removeDraftChange,
@@ -93,6 +94,8 @@ function App() {
   const [isAddingMacro, setIsAddingMacro] = useState(false);
   const [newMacroDraft, setNewMacroDraft] = useState(() => createEmptyMacroDraft([]));
   const [trackballDraft, setTrackballDraft] = useState({ automouseLayerRaw: "", scrollLayersRaw: "" });
+  const [sensorDrafts, setSensorDrafts] = useState({});
+  const [selectedSensorLayerIndex, setSelectedSensorLayerIndex] = useState(null);
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
@@ -303,6 +306,14 @@ function App() {
       automouseLayerRaw: ts?.automouseLayer ? ts.automouseLayer.value.trim() : "",
       scrollLayersRaw: ts?.scrollLayers ? ts.scrollLayers.raw.trim() : "",
     });
+    const drafts = {};
+    for (const layer of document.layers) {
+      const sb = layer.sensorBindings[0];
+      if (sb?.behavior === "&inc_dec_kp") {
+        drafts[layer.id] = { incKey: sb.incKey ?? "", decKey: sb.decKey ?? "" };
+      }
+    }
+    setSensorDrafts(drafts);
   }, [keymapSource]);
 
   const layerRenameDraftId = `layer-${activeLayer}-rename`;
@@ -342,6 +353,8 @@ function App() {
       setIsAddingCombo(false);
       setIsAddingMacro(false);
       setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
+      setSensorDrafts({});
+      setSelectedSensorLayerIndex(null);
       setSaveStatus({
         tone: "ok",
         title: "Reloaded source",
@@ -499,6 +512,8 @@ function App() {
       setIsAddingCombo(false);
       setIsAddingMacro(false);
       setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
+      setSensorDrafts({});
+      setSelectedSensorLayerIndex(null);
       setSaveStatus({
         tone: "ok",
         title: "Saved pending changes",
@@ -569,6 +584,8 @@ function App() {
       setIsAddingCombo(false);
       setIsAddingMacro(false);
       setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
+      setSensorDrafts({});
+      setSelectedSensorLayerIndex(null);
       setSaveStatus({
         tone: "ok",
         title: "Restored backup",
@@ -828,6 +845,37 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const sensorLayersWithBindings = document.layers.filter(
+    (layer) => layer.sensorBindings.length > 0 && layer.sensorBindings[0].behavior === "&inc_dec_kp",
+  );
+
+  const addSensorDraft = (layerIndex) => {
+    const layer = document.layers.find((l) => l.id === layerIndex);
+    if (!layer) return;
+    const sb = layer.sensorBindings[0];
+    if (!sb || sb.behavior !== "&inc_dec_kp") return;
+    const draft = sensorDrafts[layerIndex];
+    if (!draft) return;
+    const change = buildSensorBindingDraftChange({ layer, sensorBinding: sb, incKey: draft.incKey, decKey: draft.decKey });
+    commitPendingChanges(upsertDraftChange(pendingChanges, change));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const removeSensorDraft = (layerIndex) => {
+    const draftId = `layer-${layerIndex}-sensor-binding`;
+    commitPendingChanges(pendingChanges.filter((change) => change.id !== draftId));
+    const layer = document.layers.find((l) => l.id === layerIndex);
+    const sb = layer?.sensorBindings[0];
+    if (sb?.behavior === "&inc_dec_kp") {
+      setSensorDrafts((prev) => ({
+        ...prev,
+        [layerIndex]: { incKey: sb.incKey ?? "", decKey: sb.decKey ?? "" },
+      }));
+    }
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
   const trackballAutomousePendingId = "trackball-automouse-layer";
   const trackballScrollPendingId = "trackball-scroll-layers";
   const trackballPendingCount = pendingChanges.filter(
@@ -879,6 +927,10 @@ function App() {
         ? macroDraft.bindingDrafts?.[pickerContext.index] ?? selectedMacro?.bindingEntries?.[pickerContext.index]?.raw
       : pickerContext?.type === "new-macro"
         ? newMacroDraft.bindingsRaw
+      : pickerContext?.type === "sensor-inc"
+        ? `&kp ${sensorDrafts[pickerContext.layerIndex]?.incKey || ""}`
+      : pickerContext?.type === "sensor-dec"
+        ? `&kp ${sensorDrafts[pickerContext.layerIndex]?.decKey || ""}`
         : "";
 
   return (
@@ -1189,6 +1241,7 @@ function App() {
         <KeycodePicker
           initialBinding={pickerInitialBinding}
           layerNames={layerNames}
+          restrictTo={pickerContext.type === "sensor-inc" || pickerContext.type === "sensor-dec" ? ["&kp"] : null}
           onSelect={(binding) => {
             if (pickerContext.type === "binding") {
               setDraftBinding(binding);
@@ -1204,6 +1257,13 @@ function App() {
               }));
             } else if (pickerContext.type === "new-macro") {
               setNewMacroDraft((prev) => ({ ...prev, bindingsRaw: binding }));
+            } else if (pickerContext.type === "sensor-inc" || pickerContext.type === "sensor-dec") {
+              const keycode = binding.replace(/^&kp\s+/, "").trim();
+              const field = pickerContext.type === "sensor-inc" ? "incKey" : "decKey";
+              setSensorDrafts((prev) => ({
+                ...prev,
+                [pickerContext.layerIndex]: { ...prev[pickerContext.layerIndex], [field]: keycode },
+              }));
             }
             setSaveStatus(EMPTY_SAVE_STATUS);
             setPickerContext(null);
@@ -1266,6 +1326,26 @@ function App() {
           onTrackballDraftChange={(next) => { setTrackballDraft(next); setSaveStatus(EMPTY_SAVE_STATUS); }}
           onAddTrackballDraft={addTrackballDraft}
           onRemoveTrackballDraft={removeTrackballDraft}
+          sensorDrafts={sensorDrafts}
+          sensorLayersWithBindings={sensorLayersWithBindings}
+          selectedSensorLayerIndex={selectedSensorLayerIndex}
+          onSelectSensorLayer={setSelectedSensorLayerIndex}
+          onSensorDraftChange={(layerIndex, field, value) => {
+            setSensorDrafts((prev) => ({ ...prev, [layerIndex]: { ...prev[layerIndex], [field]: value } }));
+            setSaveStatus(EMPTY_SAVE_STATUS);
+          }}
+          onSensorPickInc={(layerIndex) => setPickerContext({ type: "sensor-inc", layerIndex })}
+          onSensorPickDec={(layerIndex) => setPickerContext({ type: "sensor-dec", layerIndex })}
+          onSensorSwap={(layerIndex) => {
+            setSensorDrafts((prev) => {
+              const d = prev[layerIndex];
+              if (!d) return prev;
+              return { ...prev, [layerIndex]: { incKey: d.decKey, decKey: d.incKey } };
+            });
+            setSaveStatus(EMPTY_SAVE_STATUS);
+          }}
+          onAddSensorDraft={addSensorDraft}
+          onRemoveSensorDraft={removeSensorDraft}
         />
       </section>
     </div>
@@ -1864,6 +1944,16 @@ function PanelContent({
   onTrackballDraftChange,
   onAddTrackballDraft,
   onRemoveTrackballDraft,
+  sensorDrafts,
+  sensorLayersWithBindings,
+  selectedSensorLayerIndex,
+  onSelectSensorLayer,
+  onSensorDraftChange,
+  onSensorPickInc,
+  onSensorPickDec,
+  onSensorSwap,
+  onAddSensorDraft,
+  onRemoveSensorDraft,
 }) {
   if (tab === "Bindings") {
     return (
@@ -1933,32 +2023,48 @@ function PanelContent({
   }
 
   if (tab === "Sensors") {
-    const sensorRows = document.layers.flatMap((layer) =>
-      layer.sensorBindings.map((binding) => ({ layer: layer.name, binding })),
-    );
+    const selectedSensorLayer = sensorLayersWithBindings.find((l) => l.id === selectedSensorLayerIndex) ?? null;
+    const sensorDraft = selectedSensorLayerIndex != null ? sensorDrafts[selectedSensorLayerIndex] : null;
+    const sensorPendingId = selectedSensorLayerIndex != null ? `layer-${selectedSensorLayerIndex}-sensor-binding` : null;
+    const sensorPending = pendingChanges.find((c) => c.id === sensorPendingId);
+    const sensorChanged = sensorDraft && selectedSensorLayer
+      ? sensorDraft.incKey !== (selectedSensorLayer.sensorBindings[0]?.incKey ?? "")
+        || sensorDraft.decKey !== (selectedSensorLayer.sensorBindings[0]?.decKey ?? "")
+      : false;
     return (
       <div className="splitPanel">
-        <Table
-          columns={["Layer", "Sensor binding"]}
-          rows={sensorRows}
-          renderRow={(row) => (
-            <tr key={`${row.layer}-${row.binding}`}>
-              <td>{row.layer}</td>
-              <td><code>{row.binding}</code></td>
-            </tr>
-          )}
-        />
-        <Table
-          columns={["Metadata ref", "Name", "Enabled"]}
-          rows={document.metadataSensors}
-          renderRow={(sensor) => (
-            <tr key={sensor.ref}>
-              <td>{sensor.ref}</td>
-              <td>{sensor.name || sensor.identifier}</td>
-              <td>{String(sensor.enabled)}</td>
-            </tr>
-          )}
-        />
+        <div className="tableSection">
+          <Table
+            columns={["Layer", "Inc", "Dec"]}
+            rows={sensorLayersWithBindings}
+            renderRow={(layer) => (
+              <tr
+                key={layer.id}
+                className={layer.id === selectedSensorLayerIndex ? "selectedRow clickableRow" : "clickableRow"}
+                onClick={() => onSelectSensorLayer(layer.id)}
+              >
+                <td>{layer.name}</td>
+                <td><code>{layer.sensorBindings[0]?.incKey}</code></td>
+                <td><code>{layer.sensorBindings[0]?.decKey}</code></td>
+              </tr>
+            )}
+          />
+        </div>
+        {selectedSensorLayer && sensorDraft ? (
+          <SensorDetailPanel
+            layer={selectedSensorLayer}
+            draft={sensorDraft}
+            pending={sensorPending}
+            changed={sensorChanged}
+            onPickInc={() => onSensorPickInc(selectedSensorLayerIndex)}
+            onPickDec={() => onSensorPickDec(selectedSensorLayerIndex)}
+            onSwap={() => onSensorSwap(selectedSensorLayerIndex)}
+            onAddDraft={() => onAddSensorDraft(selectedSensorLayerIndex)}
+            onRemoveDraft={() => onRemoveSensorDraft(selectedSensorLayerIndex)}
+          />
+        ) : (
+          <div className="detailPlaceholder">← レイヤーを選択して編集</div>
+        )}
       </div>
     );
   }
@@ -2339,6 +2445,53 @@ function shorten(value, max) {
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
+function SensorDetailPanel({ layer, draft, pending, changed, onPickInc, onPickDec, onSwap, onAddDraft, onRemoveDraft }) {
+  const sb = layer.sensorBindings[0];
+  const previewRaw = `&inc_dec_kp ${draft.incKey || "?"} ${draft.decKey || "?"}`;
+  return (
+    <section className="sensorDetailPanel" aria-label="sensor binding editor">
+      <div className="editorHeader">
+        <strong>{layer.name}</strong>
+        <span className="eyebrow">sensor-binding</span>
+      </div>
+      <div className="fieldGroup">
+        <span className="fieldLabel">Inc (時計回り)</span>
+        <div className="fieldRow">
+          <code className="fieldValue">{draft.incKey || "(未設定)"}</code>
+          <button type="button" onClick={onPickInc}>Pick</button>
+        </div>
+      </div>
+      <div className="fieldGroup">
+        <span className="fieldLabel">Dec (反時計回り)</span>
+        <div className="fieldRow">
+          <code className="fieldValue">{draft.decKey || "(未設定)"}</code>
+          <button type="button" onClick={onPickDec}>Pick</button>
+        </div>
+      </div>
+      <div className="fieldGroup">
+        <button type="button" onClick={onSwap} title="inc と dec を入れ替え">⇄ Swap inc/dec</button>
+      </div>
+      <div className="comboPreviewBox">
+        <span className="fieldLabel">Preview</span>
+        <code>{previewRaw}</code>
+        {pending && <span className="pendingBadge">draft</span>}
+      </div>
+      <p className="trackballDisabledHint">
+        全レイヤー方向反転は <code>boards/shields/roBa/roBa.overlay</code> の編集が必要です。
+      </p>
+      <div className="editorActions">
+        <button type="button" disabled={!changed && !pending} onClick={onAddDraft}>
+          {pending ? "Update draft" : "Add draft"}
+        </button>
+        <button type="button" disabled={!pending && !changed} onClick={onRemoveDraft}>
+          Remove draft
+        </button>
+      </div>
+      <div className="fieldLabel">保存済み: <code>{sb.raw}</code></div>
+    </section>
+  );
+}
+
 function TrackballSettingsPanel({
   trackballSettings,
   layerNames,
@@ -2464,7 +2617,7 @@ function formatRange(range) {
   return range ? `${range.start}..${range.end}` : "Unavailable";
 }
 
-function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose }) {
+function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose, restrictTo = null }) {
   const initialDraft = useMemo(
     () => parseStructuredBinding(initialBinding, layerNames.length),
     [initialBinding, layerNames.length],
@@ -2522,7 +2675,7 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
         </div>
         <div className="structuredPicker">
           <div className="behaviorPicker" role="group" aria-label="Behavior">
-            {STRUCTURED_BEHAVIORS.map((behavior) => {
+            {STRUCTURED_BEHAVIORS.filter((b) => !restrictTo || restrictTo.includes(b)).map((behavior) => {
               const label = STRUCTURED_BEHAVIOR_LABELS[behavior];
               return (
                 <button

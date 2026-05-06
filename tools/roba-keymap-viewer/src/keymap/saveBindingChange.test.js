@@ -703,3 +703,84 @@ describe("trackball saveBindingChanges", () => {
     });
   });
 });
+
+describe("saveBindingChanges sensor-binding", () => {
+  const makeSensorSource = (incKey, decKey) => `
+/ {
+  keymap {
+    default_layer {
+      bindings = <&kp A>;
+      sensor-bindings = <&inc_dec_kp ${incKey} ${decKey}>;
+    };
+  };
+};`;
+
+  function makeSensorChange(source, incKey, decKey) {
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const sb = layer.sensorBindings[0];
+    return {
+      id: `layer-${layer.id}-sensor-binding`,
+      kind: "sensor-binding",
+      label: `${layer.name} sensor-binding`,
+      layerIndex: layer.id,
+      range: sb.sourceRange,
+      currentRaw: sb.raw.trim(),
+      nextRaw: `&inc_dec_kp ${incKey} ${decKey}`,
+    };
+  }
+
+  it("saves sensor-binding change successfully", async () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const change = makeSensorChange(source, "LEFT", "RIGHT");
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({ repoRoot: tempRoot, changes: [change] });
+      assert.ok(result.ok, result.message);
+      const saved = await readFile(path.join(tempRoot, "config", "roBa.keymap"), "utf8");
+      const parsed = parseKeymap(saved);
+      const sb = parsed.layers[0].sensorBindings[0];
+      assert.equal(sb.incKey, "LEFT");
+      assert.equal(sb.decKey, "RIGHT");
+    });
+  });
+
+  it("saves sensor-binding change with modifier keycode", async () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const change = makeSensorChange(source, "LC(PAGE_UP)", "LC(PAGE_DOWN)");
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({ repoRoot: tempRoot, changes: [change] });
+      assert.ok(result.ok, result.message);
+      const saved = await readFile(path.join(tempRoot, "config", "roBa.keymap"), "utf8");
+      const parsed = parseKeymap(saved);
+      const sb = parsed.layers[0].sensorBindings[0];
+      assert.equal(sb.incKey, "LC(PAGE_UP)");
+      assert.equal(sb.decKey, "LC(PAGE_DOWN)");
+    });
+  });
+
+  it("rejects sensor-binding with invalid nextRaw format", async () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const change = { ...makeSensorChange(source, "LEFT", "RIGHT"), nextRaw: "&lt 0 A" };
+    await withTempRepo(source, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({ repoRoot: tempRoot, changes: [change] }),
+        /nextRaw must match/,
+      );
+    });
+  });
+
+  it("rejects sensor-binding when source range does not contain &inc_dec_kp", async () => {
+    const source = makeSensorSource("PG_UP", "PAGE_DOWN");
+    const change = makeSensorChange(source, "LEFT", "RIGHT");
+    const parsed = parseKeymap(source);
+    const layer = parsed.layers[0];
+    const bindingEntry = layer.bindingEntries[0];
+    const badChange = { ...change, range: bindingEntry.sourceRange, currentRaw: bindingEntry.raw };
+    await withTempRepo(source, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({ repoRoot: tempRoot, changes: [badChange] }),
+        /source range does not contain/,
+      );
+    });
+  });
+});

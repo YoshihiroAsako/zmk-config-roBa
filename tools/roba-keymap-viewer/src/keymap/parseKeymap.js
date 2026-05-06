@@ -147,6 +147,24 @@ function splitBindingExpressions(value) {
   return splitBindingEntries(value).map((entry) => entry.raw);
 }
 
+function parseSensorBindings(body, bodyStart = 0) {
+  const propInfo = getAnglePropertyInfo(body, "sensor-bindings", bodyStart);
+  if (!propInfo) return [];
+  const entries = splitBindingEntries(propInfo.value, propInfo.sourceRange.start);
+  return entries.map((entry) => {
+    const tokens = entry.raw.trim().split(/\s+/);
+    const behavior = tokens[0] || "";
+    const isIncDecKp = behavior === "&inc_dec_kp";
+    return {
+      raw: entry.raw,
+      sourceRange: entry.sourceRange,
+      behavior,
+      incKey: isIncDecKp ? (tokens[1] ?? null) : null,
+      decKey: isIncDecKp ? (tokens[2] ?? null) : null,
+    };
+  });
+}
+
 function splitBindingEntries(value, sourceStart = 0) {
   const starts = findBindingStarts(value);
   return starts
@@ -338,7 +356,7 @@ export function parseKeymap(source) {
       nameRange: layer.nameRange,
       bindings: bindingEntries.map((entry) => entry.raw),
       bindingEntries,
-      sensorBindings: splitBindingExpressions(getAngleProperty(layer.body, "sensor-bindings")),
+      sensorBindings: parseSensorBindings(layer.body, layer.bodyStart),
       raw: layer.raw,
     };
   });
