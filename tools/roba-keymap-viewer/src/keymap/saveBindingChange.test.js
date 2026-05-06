@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { parseKeymap } from "./parseKeymap.js";
 import { buildLayersChange, buildTimeoutMsChange } from "./comboPreview.js";
 import { buildNewComboDraftChange } from "./comboInsert.js";
+import { buildNewMacroDraftChange } from "./macroInsert.js";
 import { buildSaveDiagnostics, replaceKeymapChanges, saveBindingChange, saveBindingChanges } from "./saveBindingChange.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -479,6 +480,50 @@ describe("save binding change helper", () => {
       assert.equal(savedParsed.combos.length, parsed.combos.length + 1);
       assert.equal(inserted.binding, "&kp A");
       assert.deepEqual(inserted.positions, [0, 1]);
+      assert.equal(result.diagnostics.every((item) => item.ok), true);
+    });
+  });
+
+  it("backs up once and saves a new macro insertion", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const change = buildNewMacroDraftChange({
+      source,
+      draft: {
+        nameRaw: "macro_save_test",
+        bindingsRaw: "&kp A",
+        waitMsRaw: "10",
+        tapMsRaw: "20",
+        labelRaw: "MACRO_SAVE_TEST",
+      },
+      existingMacros: parsed.macros,
+    });
+
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({
+        repoRoot: tempRoot,
+        changes: [
+          {
+            kind: change.kind,
+            range: change.range,
+            currentRaw: change.currentRaw,
+            nextRaw: change.nextRaw,
+          },
+        ],
+        now: new Date(2026, 4, 6, 10, 15, 0),
+      });
+      const savedSource = await readTempKeymap(tempRoot);
+      const savedParsed = parseKeymap(savedSource);
+      const inserted = savedParsed.macros.find((macro) => macro.name === "macro_save_test");
+
+      assert.equal(result.ok, true);
+      assert.equal(result.backupPath, "config/.roBa.keymap.bak/20260506-101500.roBa.keymap");
+      assert.equal(savedParsed.macros.length, parsed.macros.length + 1);
+      assert.equal(inserted.compatible, "zmk,behavior-macro");
+      assert.equal(inserted.bindingCells, 0);
+      assert.deepEqual(inserted.bindings, ["&kp A"]);
+      assert.equal(inserted.waitMs, 10);
+      assert.equal(inserted.tapMs, 20);
       assert.equal(result.diagnostics.every((item) => item.ok), true);
     });
   });

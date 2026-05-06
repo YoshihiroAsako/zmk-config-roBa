@@ -2,6 +2,7 @@ import { isEditableBindingExpression, parseKeymap, replaceBindings } from "./par
 import { buildContextDiff } from "./editorPreview.js";
 import { buildLayersChange, buildLineInsertionDiff, buildLineRemovalDiff, buildTimeoutMsChange } from "./comboPreview.js";
 import { buildNewComboDraftChange } from "./comboInsert.js";
+import { buildNewMacroDraftChange } from "./macroInsert.js";
 import { buildTapMsChange, buildWaitMsChange } from "./macroPreview.js";
 
 export function getDraftId(layerIndex, position) {
@@ -86,6 +87,10 @@ export function buildComboDraftChanges({ source = null, combo, bindingRaw, posit
 
 export function buildNewComboDraftChanges({ source, draft, existingCombos, keyCount = 43, layerCount = 7 }) {
   return [buildNewComboDraftChange({ source, draft, existingCombos, keyCount, layerCount })];
+}
+
+export function buildNewMacroDraftChanges({ source, draft, existingMacros }) {
+  return [buildNewMacroDraftChange({ source, draft, existingMacros })];
 }
 
 export function buildLayerRenameDraftChange({ layerIndex, currentName, nextName, nameRange }) {
@@ -297,6 +302,15 @@ function validatePendingChange(source, change) {
     const afterParsed = parseKeymap(nextSource);
     if (afterParsed.combos.length !== beforeParsed.combos.length + 1) {
       throw new Error(`${change.label}: combo-node-insert must add exactly one combo.`);
+    }
+  } else if (change.kind === "macro-node-insert") {
+    if (change.range.start !== change.range.end) throw new Error(`${change.label}: macro-node-insert must be a zero-length range.`);
+    if (change.currentRaw !== "") throw new Error(`${change.label}: macro-node-insert must have empty currentRaw.`);
+    const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+    const beforeParsed = parseKeymap(source);
+    const afterParsed = parseKeymap(nextSource);
+    if (afterParsed.macros.length !== beforeParsed.macros.length + 1) {
+      throw new Error(`${change.label}: macro-node-insert must add exactly one macro.`);
     }
   }
 }

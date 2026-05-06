@@ -319,6 +319,10 @@ function validateSourceChange(source, change) {
     if (change.range.start !== change.range.end) throw new Error("combo-node-insert must be a zero-length range.");
     if (change.currentRaw !== "") throw new Error("combo-node-insert must have empty currentRaw.");
     validateComboNodeInsertion(source, change);
+  } else if (change.kind === "macro-node-insert") {
+    if (change.range.start !== change.range.end) throw new Error("macro-node-insert must be a zero-length range.");
+    if (change.currentRaw !== "") throw new Error("macro-node-insert must have empty currentRaw.");
+    validateMacroNodeInsertion(source, change);
   } else {
     throw new Error("Unsupported pending change kind.");
   }
@@ -327,7 +331,7 @@ function validateSourceChange(source, change) {
 function getExpectedDeltas(changes) {
   return {
     comboDelta: changes.filter((change) => change.kind === "combo-node-insert").length,
-    macroDelta: 0,
+    macroDelta: changes.filter((change) => change.kind === "macro-node-insert").length,
   };
 }
 
@@ -353,6 +357,35 @@ function validateComboNodeInsertion(source, change) {
   validateComboPositions(inserted.positions.join(" "));
   if (inserted.layers.length) validateLayerValues(inserted.layers.join(" "));
   if (inserted.timeoutMsRange) validateTimeoutMsValue(String(inserted.timeoutMs));
+}
+
+function validateMacroNodeInsertion(source, change) {
+  if (typeof change.nextRaw !== "string" || !change.nextRaw.endsWith("\n")) {
+    throw new Error("macro-node-insert content must end with a newline.");
+  }
+  if (!/^\s*[A-Za-z_][A-Za-z0-9_-]*:\s*[A-Za-z_][A-Za-z0-9_-]*\s*\{[\s\S]*\};\r?\n$/.test(change.nextRaw)) {
+    throw new Error("macro-node-insert content is invalid.");
+  }
+
+  const beforeParsed = parseKeymap(source);
+  const nextSource = `${source.slice(0, change.range.start)}${change.nextRaw}${source.slice(change.range.end)}`;
+  const afterParsed = parseKeymap(nextSource);
+  if (afterParsed.macros.length !== beforeParsed.macros.length + 1) {
+    throw new Error("macro-node-insert must add exactly one macro.");
+  }
+  const inserted = afterParsed.macros.find((macro) => !beforeParsed.macros.some((before) => before.name === macro.name));
+  if (!inserted) throw new Error("macro-node-insert did not add a unique macro name.");
+  if (inserted.compatible !== "zmk,behavior-macro") {
+    throw new Error("macro-node-insert compatible value is invalid.");
+  }
+  if (inserted.bindingCells !== 0) {
+    throw new Error("macro-node-insert #binding-cells value is invalid.");
+  }
+  if (!inserted.bindings.length || inserted.bindings.some((binding) => !isEditableBindingExpression(binding))) {
+    throw new Error("macro-node-insert bindings are not supported.");
+  }
+  if (inserted.waitMsRange) validateMacroMsValue(String(inserted.waitMs), "wait-ms");
+  if (inserted.tapMsRange) validateMacroMsValue(String(inserted.tapMs), "tap-ms");
 }
 
 function validateRange(source, range) {

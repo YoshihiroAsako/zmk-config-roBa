@@ -38,6 +38,16 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-06: Phase 5 新規 macro 追加 MVP 実装・検証済み
+
+実装済み（Phase 5 の macro 追加 MVP）:
+
+- **Macros タブに New macro 導線を追加**: "New macro" ボタンから右ペインに新規 macro draft UI を表示。node name / bindings / wait-ms / tap-ms / label を入力でき、bindings は既存 picker と連携する。
+- **新規 macro node insertion helper 追加**: `macro-node-insert` pending change として、`macros { }` ブロック末尾へ安全にノードを挿入する `keymap/macroInsert.js` を追加。
+- **Save all 対応**: `saveBindingChanges` が `macro-node-insert` のときだけ macro count +1 を許可。保存前に挿入後 keymap を再パースして、1 macro だけ増えることを検証する。
+- **テスト追加**: `macroInsert.test.js` と `saveBindingChange.test.js` の新規 macro 保存テストを追加。
+- **検証**: `npm test` は 132 tests / 20 suites 全パス。`npm run build` 成功。Vite dev server は `http://127.0.0.1:5173/` で HTTP 200 と HTML 応答を確認済み。`agent-browser` CLI は PATH に無かったためブラウザ自動操作は未実施。
+
 ### 2026-05-06: Phase 5 新規 combo 追加 MVP 実装・検証済み
 
 実装済み（Phase 5 の combo 追加 MVP）:
@@ -98,11 +108,10 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 ### Phase 5: 新規コンボ・マクロ追加（進行中）
 
 - ~~Combos タブに "New combo" ボタンを設け、`.keymap` の `combos { }` ブロックに新しいノードを挿入する。~~
-- Macros タブに "New macro" ボタンを設け、`macros { }` ブロックに新しいノードを挿入する。
+- ~~Macros タブに "New macro" ボタンを設け、`macros { }` ブロックに新しいノードを挿入する。~~
 - 既存マクロへの binding 行の追加/削除も含む。
 - 次の候補:
-  - New combo UI の手動ブラウザ確認（`agent-browser` が使える環境、またはユーザー側ブラウザ）。
-  - New macro の node insertion helper と draft UI を、今回の `combo-node-insert` と同じ pending change 方針で設計する。
+  - New combo / New macro UI の手動ブラウザ確認（`agent-browser` が使える環境、またはユーザー側ブラウザ）。
   - 既存マクロへの binding 行追加/削除を小さく切って設計する。
 
 ## 現在の注意点

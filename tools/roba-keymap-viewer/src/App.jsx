@@ -8,6 +8,7 @@ import { captureKeyToBinding } from "./keymap/keyCapture.js";
 import { describeBinding } from "./keymap/bindingDisplay.js";
 import { buildComboPreviewState } from "./keymap/comboPreview.js";
 import { buildNewComboPreviewState, createEmptyComboDraft } from "./keymap/comboInsert.js";
+import { buildNewMacroPreviewState, createEmptyMacroDraft } from "./keymap/macroInsert.js";
 import { buildEditorState } from "./keymap/editorPreview.js";
 import {
   HOLD_TAP_MODIFIERS,
@@ -22,6 +23,7 @@ import {
   buildDraftChange,
   buildComboDraftChanges,
   buildNewComboDraftChanges,
+  buildNewMacroDraftChanges,
   buildLayerRenameDraftChange,
   buildMacroDraftChanges,
   buildPendingChangesState,
@@ -79,6 +81,8 @@ function App() {
     waitMsRaw: "",
     tapMsRaw: "",
   });
+  const [isAddingMacro, setIsAddingMacro] = useState(false);
+  const [newMacroDraft, setNewMacroDraft] = useState(() => createEmptyMacroDraft([]));
   const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
@@ -108,7 +112,7 @@ function App() {
       ]
     : [];
   const selectedComboPendingCount = pendingChanges.filter((change) => selectedComboDraftIds.includes(change.id)).length;
-  const selectedMacro = document.macros.find((macro) => macro.name === selectedMacroName);
+  const selectedMacro = isAddingMacro ? null : document.macros.find((macro) => macro.name === selectedMacroName);
   const selectedMacroDraftIds = selectedMacro
     ? [
         ...(selectedMacro.bindingEntries || []).map((_, index) => `macro-${selectedMacro.name}-binding-${index}`),
@@ -152,6 +156,10 @@ function App() {
     () => buildMacroPreviewState(keymapSource, selectedMacro, macroDraft),
     [keymapSource, selectedMacro, macroDraft],
   );
+  const newMacroPreviewState = useMemo(
+    () => buildNewMacroPreviewState(keymapSource, newMacroDraft, document.macros),
+    [keymapSource, newMacroDraft, document.macros],
+  );
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
 
@@ -187,6 +195,15 @@ function App() {
       tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
     });
   }, [selectedMacro]);
+
+  useEffect(() => {
+    if (!isAddingMacro) {
+      setNewMacroDraft((current) => ({
+        ...createEmptyMacroDraft(document.macros),
+        bindingsRaw: current.bindingsRaw || "&kp A",
+      }));
+    }
+  }, [document.macros, isAddingMacro]);
 
   useEffect(() => {
     if (!captureMode) return;
@@ -265,6 +282,7 @@ function App() {
       setDraftBinding(null);
       setPendingChanges([]);
       setIsAddingCombo(false);
+      setIsAddingMacro(false);
       setSaveStatus({
         tone: "ok",
         title: "Reloaded source",
@@ -396,6 +414,7 @@ function App() {
       setDraftBinding(null);
       setPendingChanges([]);
       setIsAddingCombo(false);
+      setIsAddingMacro(false);
       setSaveStatus({
         tone: "ok",
         title: "Saved pending changes",
@@ -534,7 +553,16 @@ function App() {
   };
 
   const selectMacro = (macro) => {
+    setIsAddingMacro(false);
     setSelectedMacroName(macro.name);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  const startNewMacro = () => {
+    setIsAddingMacro(true);
+    setSelectedMacroName("");
+    setNewMacroDraft(createEmptyMacroDraft(document.macros));
+    setActiveTab("Macros");
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -579,6 +607,25 @@ function App() {
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
+  const addNewMacroDraft = () => {
+    if (!newMacroPreviewState.changed || !newMacroPreviewState.valid) return;
+    const changes = buildNewMacroDraftChanges({
+      source: keymapSource,
+      draft: newMacroDraft,
+      existingMacros: document.macros,
+    });
+    setPendingChanges((current) => upsertDraftChanges(current, changes));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
+  };
+
+  const removeNewMacroDraft = () => {
+    const id = `macro-${newMacroDraft.nameRaw.trim()}-node-insert`;
+    setPendingChanges((changes) => removeDraftChange(changes, id));
+    setNewMacroDraft(createEmptyMacroDraft(document.macros));
+    setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
   const pickerInitialBinding = pickerContext?.type === "binding"
     ? effectiveDraftBinding
     : pickerContext?.type === "combo"
@@ -587,6 +634,8 @@ function App() {
         ? newComboDraft.bindingRaw
       : pickerContext?.type === "macro"
         ? macroDraft.bindingDrafts?.[pickerContext.index] ?? selectedMacro?.bindingEntries?.[pickerContext.index]?.raw
+      : pickerContext?.type === "new-macro"
+        ? newMacroDraft.bindingsRaw
         : "";
 
   return (
@@ -754,6 +803,20 @@ function App() {
               onPickBinding={(index) => setPickerContext({ type: "macro", index })}
             />
           )}
+          {activeTab === "Macros" && isAddingMacro && (
+            <NewMacroDetailPanel
+              draft={newMacroDraft}
+              previewState={newMacroPreviewState}
+              pending={pendingChanges.some((change) => change.id === `macro-${newMacroDraft.nameRaw.trim()}-node-insert`)}
+              onAddDraft={addNewMacroDraft}
+              onRemoveDraft={removeNewMacroDraft}
+              onDraftChange={(nextDraft) => {
+                setNewMacroDraft(nextDraft);
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
+              onPickBinding={() => setPickerContext({ type: "new-macro" })}
+            />
+          )}
           <div className={editorState.canEdit ? "editorBox" : "editorBox disabled"}>
             <div className="editorHeader">
               <strong>Phase 2 Preview</strong>
@@ -849,6 +912,8 @@ function App() {
                 ...prev,
                 bindingDrafts: { ...prev.bindingDrafts, [pickerContext.index]: binding },
               }));
+            } else if (pickerContext.type === "new-macro") {
+              setNewMacroDraft((prev) => ({ ...prev, bindingsRaw: binding }));
             }
             setSaveStatus(EMPTY_SAVE_STATUS);
             setPickerContext(null);
@@ -894,6 +959,7 @@ function App() {
           onSelectCombo={selectCombo}
           onNewCombo={startNewCombo}
           onSelectMacro={selectMacro}
+          onNewMacro={startNewMacro}
           onRemovePendingChange={(id) => setPendingChanges((changes) => removeDraftChange(changes, id))}
           onClearPendingChanges={clearPendingChanges}
           onSavePendingChanges={saveAllPendingChanges}
@@ -1119,6 +1185,85 @@ function LayerRenameRow({ currentName, draft, pending, disabled, onChange, onAdd
   );
 }
 
+function NewMacroDetailPanel({ draft, previewState, pending, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
+  return (
+    <section className="comboDetailPanel" aria-label="new macro details">
+      <div className="editorHeader">
+        <strong>New macro</strong>
+        <span>{draft.nameRaw || "unnamed"}</span>
+      </div>
+      <div className="comboPreviewBox active">
+        <label>
+          <span>Node name</span>
+          <input
+            aria-label="New macro node name"
+            value={draft.nameRaw}
+            onChange={(event) => onDraftChange({ ...draft, nameRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Bindings</span>
+          <div className="comboPickerRow">
+            <input
+              aria-label="New macro bindings"
+              value={draft.bindingsRaw}
+              onChange={(event) => onDraftChange({ ...draft, bindingsRaw: event.target.value })}
+            />
+            <button type="button" className="pickerInlineBtn" onClick={onPickBinding}>
+              Pick
+            </button>
+          </div>
+        </label>
+        <label>
+          <span>wait-ms</span>
+          <input
+            aria-label="New macro wait-ms"
+            placeholder="empty = no wait-ms property"
+            value={draft.waitMsRaw}
+            onChange={(event) => onDraftChange({ ...draft, waitMsRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>tap-ms</span>
+          <input
+            aria-label="New macro tap-ms"
+            placeholder="empty = no tap-ms property"
+            value={draft.tapMsRaw}
+            onChange={(event) => onDraftChange({ ...draft, tapMsRaw: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Label</span>
+          <input
+            aria-label="New macro label"
+            placeholder="optional"
+            value={draft.labelRaw}
+            onChange={(event) => onDraftChange({ ...draft, labelRaw: event.target.value })}
+          />
+        </label>
+        <div className="editorStatus">{previewState.message}</div>
+        <div className="editorActions">
+          <button
+            type="button"
+            disabled={!previewState.changed || !previewState.valid}
+            onClick={onAddDraft}
+          >
+            {pending ? "Update new macro draft" : "Add new macro draft"}
+          </button>
+          <button
+            type="button"
+            disabled={!pending}
+            onClick={onRemoveDraft}
+          >
+            Remove new macro draft
+          </button>
+        </div>
+      </div>
+      <pre className="rawNodePreview">{previewState.change?.nextRaw || "Fill in a valid new macro draft."}</pre>
+    </section>
+  );
+}
+
 function MacroDetailPanel({ macro, draft, previewState, pendingCount, onAddDraft, onRemoveDraft, onDraftChange, onPickBinding }) {
   const editableSet = new Set(previewState.editableIndices || []);
   const bindingDrafts = draft.bindingDrafts || {};
@@ -1306,6 +1451,7 @@ function PanelContent({
   onSelectCombo,
   onNewCombo,
   onSelectMacro,
+  onNewMacro,
   onRemovePendingChange,
   onClearPendingChanges,
   onSavePendingChanges,
@@ -1337,22 +1483,27 @@ function PanelContent({
 
   if (tab === "Macros") {
     return (
-      <Table
-        columns={["Name", "Compatible", "Binding cells", "Bindings"]}
-        rows={document.macros}
-        renderRow={(macro) => (
-          <tr
-            className={macro.name === selectedMacroName ? "selectedRow clickableRow" : "clickableRow"}
-            key={macro.name}
-            onClick={() => onSelectMacro(macro)}
-          >
-            <td>{macro.name}</td>
-            <td>{macro.compatible}</td>
-            <td>{macro.bindingCells}</td>
-            <td><code>{macro.bindings.join(" ; ")}</code></td>
-          </tr>
-        )}
-      />
+      <div className="tableSection">
+        <div className="tableActions">
+          <button type="button" onClick={onNewMacro}>New macro</button>
+        </div>
+        <Table
+          columns={["Name", "Compatible", "Binding cells", "Bindings"]}
+          rows={document.macros}
+          renderRow={(macro) => (
+            <tr
+              className={macro.name === selectedMacroName ? "selectedRow clickableRow" : "clickableRow"}
+              key={macro.name}
+              onClick={() => onSelectMacro(macro)}
+            >
+              <td>{macro.name}</td>
+              <td>{macro.compatible}</td>
+              <td>{macro.bindingCells}</td>
+              <td><code>{macro.bindings.join(" ; ")}</code></td>
+            </tr>
+          )}
+        />
+      </div>
     );
   }
 
@@ -1666,7 +1817,7 @@ function getDiagnostics(document) {
     { label: "Layer count", value: document.layers.length, ok: document.layers.length === 7 },
     { label: "Every layer binding count", value: layerCountsOk ? "43 each" : "mismatch", ok: layerCountsOk },
     { label: "Combo count", value: document.combos.length, ok: document.combos.length >= 5 },
-    { label: "Macro count", value: document.macros.length, ok: document.macros.length === 1 },
+    { label: "Macro count", value: document.macros.length, ok: document.macros.length >= 1 },
     { label: "Sensor binding count", value: sensorBindingCount, ok: sensorBindingCount === 2 },
   ];
 }
