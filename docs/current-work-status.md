@@ -36,10 +36,23 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
 - 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
-- Task E（sensor-bindings のレイヤー追加・削除 UI）まで実装・検証・push 済み。185 tests / 26 suites 全パス。`npm run build` 成功。
-- **次候補**: Task D（Consumer code カタログ拡張）。
+- Task D（Consumer code カタログ拡張）まで実装・検証・push 済み。189 tests / 26 suites 全パス。`npm run build` 成功。
+- **次候補**: Task F（`&inc_dec_cp` behavior 対応）。
 
 ## 最新チェックポイント
+
+### 2026-05-07: Task D 実装・検証済み（Consumer code カタログ拡張）
+
+実装済み:
+
+- **Consumer カテゴリ追加**: `keycodeCatalog.js` の `CATEGORIES` に `Consumer` を追加。
+- **Consumer keycode 追加**: `C_VOL_UP` / `C_VOL_DN` / `C_MUTE` / `C_PP` / `C_PLAY` / `C_PAUSE` / `C_STOP` / `C_NEXT` / `C_PREV` / `C_FF` / `C_RW` / `C_BRI_INC` / `C_BRI_DEC` を Picker から選べるようにした。
+- **検索 alias 追加**: 公式 ZMK の長い別名（例: `C_VOLUME_UP`, `C_PLAY_PAUSE`, `C_BRIGHTNESS_INC`）や `volume` / `media` / `brightness` で検索できるようにした。
+- **表示ラベル追加**: `bindingDisplay.js` で `&kp C_VOL_UP` などを `Vol+` / `Vol-` / `Next` / `Prev` / `Bri+` / `Bri-` のようなコンパクト表示にした。
+- **テスト追加**: `keycodeCatalog.test.js` に Consumer keycode の存在・件数・検索テスト、`parseKeymap.test.js` に Consumer keycode 表示テストを追加。
+- **検証**: 189 tests / 26 suites 全パス。`npm run build` 成功。dev server は `http://127.0.0.1:5183/` で HTTP 200 確認済み。
+- **ブラウザ自動確認**: `agent-browser` CLI が PATH に無かったため未実施。
+- **commit/push**: `main` に push 済み。
 
 ### 2026-05-07: Task E 実装・検証・push 済み（sensor-bindings のレイヤー追加・削除 UI）
 
@@ -341,11 +354,12 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - 181 tests / 26 suites 全パス。`npm run build` 成功。push 済み。
 
-#### D. Consumer code カタログ拡張（候補）
+#### ~~D. Consumer code カタログ拡張~~（完了）
 
 - **目的**: Sensors タブや Bindings タブで音量（`C_VOL_UP` / `C_VOL_DN`）・メディア（`C_NEXT` / `C_PREV`）・明るさ（`C_BRI_INC` / `C_BRI_DEC`）等を Picker から選べるようにする。
 - **対象ファイル**: `tools/roba-keymap-viewer/src/keymap/keycodeCatalog.js`（および関連表示・テスト）。
-- **状況**: Task B では既存カタログにある keycode のみ扱う。Consumer code が必要になった時点で別タスクとして着手する。
+- **実装**: `Consumer` カテゴリと 13 件の Consumer keycode を追加。検索 alias と compact display label も追加。
+- **検証**: 189 tests / 26 suites 全パス。`npm run build` 成功。dev server HTTP 200 確認済み。`agent-browser` CLI 不在のためブラウザ自動確認は未実施。
 
 #### ~~C. LT/MT の tap keycode に KP modifier 引き継ぎ（完了）~~
 
@@ -378,8 +392,8 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 2. ~~**A**（完了）~~
 3. ~~**B**（完了）~~
 4. ~~**E**（sensor-bindings のレイヤー追加・削除 UI）~~（完了）
-5. **D**（Consumer code カタログ拡張）← 次候補
-6. **F**（`&inc_dec_cp` 対応）
+5. ~~**D**（Consumer code カタログ拡張）~~（完了）
+6. **F**（`&inc_dec_cp` 対応）← 次候補
 7. **G**（`&msc` 対応）
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。

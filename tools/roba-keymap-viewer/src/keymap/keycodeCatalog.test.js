@@ -48,6 +48,21 @@ describe("KEYCODE_CATALOG", () => {
     const numbers = KEYCODE_CATALOG.filter((item) => item.category === "Numbers");
     assert.equal(numbers.length, 10);
   });
+
+  test("has common consumer media, volume, and brightness keycodes", () => {
+    const codes = KEYCODE_CATALOG.map((item) => item.code);
+    assert.ok(codes.includes("C_VOL_UP"), "C_VOL_UP missing");
+    assert.ok(codes.includes("C_VOL_DN"), "C_VOL_DN missing");
+    assert.ok(codes.includes("C_NEXT"), "C_NEXT missing");
+    assert.ok(codes.includes("C_PREV"), "C_PREV missing");
+    assert.ok(codes.includes("C_BRI_INC"), "C_BRI_INC missing");
+    assert.ok(codes.includes("C_BRI_DEC"), "C_BRI_DEC missing");
+  });
+
+  test("has 13 consumer keycodes", () => {
+    const consumer = KEYCODE_CATALOG.filter((item) => item.category === "Consumer");
+    assert.equal(consumer.length, 13);
+  });
 });
 
 describe("searchCatalog", () => {
@@ -145,5 +160,19 @@ describe("searchCatalog", () => {
   test("matches RIGHT_ALT by note AltGr", () => {
     const results = searchCatalog("AltGr");
     assert.ok(results.some((item) => item.code === "RIGHT_ALT"));
+  });
+
+  test("matches consumer codes by common media keywords", () => {
+    const volume = searchCatalog("volume", "Consumer");
+    assert.ok(volume.some((item) => item.code === "C_VOL_UP"));
+    assert.ok(volume.some((item) => item.code === "C_VOL_DN"));
+
+    const media = searchCatalog("media", "Consumer");
+    assert.ok(media.some((item) => item.code === "C_NEXT"));
+    assert.ok(media.some((item) => item.code === "C_PREV"));
+
+    const brightness = searchCatalog("brightness", "Consumer");
+    assert.ok(brightness.some((item) => item.code === "C_BRI_INC"));
+    assert.ok(brightness.some((item) => item.code === "C_BRI_DEC"));
   });
 });

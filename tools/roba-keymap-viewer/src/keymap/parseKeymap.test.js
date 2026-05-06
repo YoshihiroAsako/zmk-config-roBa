@@ -69,6 +69,15 @@ describe("roBa keymap parser", () => {
     assert.equal(describeBinding("&kp RC(RS(TAB))").display, "RC+RS+TAB");
   });
 
+  it("shows common consumer keycodes with compact labels", () => {
+    assert.equal(describeBinding("&kp C_VOL_UP").display, "Vol+");
+    assert.equal(describeBinding("&kp C_VOL_DN").display, "Vol-");
+    assert.equal(describeBinding("&kp C_NEXT").display, "Next");
+    assert.equal(describeBinding("&kp C_PREV").display, "Prev");
+    assert.equal(describeBinding("&kp C_BRI_INC").display, "Bri+");
+    assert.equal(describeBinding("&kp C_BRI_DEC").display, "Bri-");
+  });
+
   it("keeps uncertain Windows JIS symbol keycodes visibly marked", () => {
     const tilde = describeBinding("&kp TILDE");
     const rightParenthesis = describeBinding("&kp RIGHT_PARENTHESIS");

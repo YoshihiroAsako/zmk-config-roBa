@@ -7,6 +7,7 @@ export const CATEGORIES = [
   "Symbols",
   "Shifted Symbols",
   "Modifiers",
+  "Consumer",
   "International",
 ];
 
@@ -110,6 +111,21 @@ export const KEYCODE_CATALOG = [
   { code: "RIGHT_ALT",     label: "R Alt",   category: "Modifiers", aliases: ["RALT"],                      note: "AltGr" },
   { code: "LEFT_GUI",      label: "L Win",   category: "Modifiers", aliases: ["LGUI", "LWIN", "LCMD"],      note: "Win / Cmd" },
   { code: "RIGHT_GUI",     label: "R Win",   category: "Modifiers", aliases: ["RGUI", "RWIN", "RCMD"],      note: "Win / Cmd" },
+
+  // Consumer
+  { code: "C_VOL_UP",  label: "Volume Up",     category: "Consumer", aliases: ["C_VOLUME_UP", "volume"],         note: "Consumer volume up" },
+  { code: "C_VOL_DN",  label: "Volume Down",   category: "Consumer", aliases: ["C_VOLUME_DOWN", "volume"],       note: "Consumer volume down" },
+  { code: "C_MUTE",    label: "Mute",          category: "Consumer", aliases: ["mute"],                          note: "Consumer mute" },
+  { code: "C_PP",      label: "Play / Pause",  category: "Consumer", aliases: ["C_PLAY_PAUSE", "media"],         note: "Consumer media play/pause" },
+  { code: "C_PLAY",    label: "Play",          category: "Consumer", aliases: ["media"],                         note: "Consumer media play" },
+  { code: "C_PAUSE",   label: "Pause",         category: "Consumer", aliases: ["media"],                         note: "Consumer media pause" },
+  { code: "C_STOP",    label: "Stop",          category: "Consumer", aliases: ["media"],                         note: "Consumer media stop" },
+  { code: "C_NEXT",    label: "Next Track",    category: "Consumer", aliases: ["media", "next"],                 note: "Consumer media next" },
+  { code: "C_PREV",    label: "Previous Track",category: "Consumer", aliases: ["C_PREVIOUS", "media", "prev"],  note: "Consumer media previous" },
+  { code: "C_FF",      label: "Fast Forward",  category: "Consumer", aliases: ["C_FAST_FORWARD", "media"],       note: "Consumer media fast forward" },
+  { code: "C_RW",      label: "Rewind",        category: "Consumer", aliases: ["C_REWIND", "media"],             note: "Consumer media rewind" },
+  { code: "C_BRI_INC", label: "Brightness Up", category: "Consumer", aliases: ["C_BRIGHTNESS_INC", "C_BRI_UP"],  note: "Consumer brightness increase" },
+  { code: "C_BRI_DEC", label: "Brightness Down",category: "Consumer", aliases: ["C_BRIGHTNESS_DEC", "C_BRI_DN"],note: "Consumer brightness decrease" },
 
   // International / JIS
   { code: "INT_YEN",      label: "¥ INT_YEN",           category: "International", aliases: [], note: "JIS yen / backslash (left of Backspace)" },
