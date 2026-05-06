@@ -37,9 +37,23 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
 - 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
 - ZMK Studio 風の `Key Press` 修飾キー選択 UI まで実装済み。次はブラウザ上の手動確認と commit/push 整理が候補。
-- 次回チャットでは「## 次にやること」の **新規実装タスク 3 件**（マウスボタン Pick / エンコーダー sensor-bindings 編集 / LT・MT への KP modifier 引き継ぎ）に着手する。
+- 次回チャットでは **Task B（エンコーダー回転 sensor-bindings 編集）** に着手する。詳細計画は `docs/sensor-bindings-implementation-plan.md` を参照（必要になった時だけ読む）。
 
 ## 最新チェックポイント
+
+### 2026-05-07: Task B 計画確定（エンコーダー sensor-bindings 編集）
+
+設計判断確定:
+
+- **対象**: `default_layer` と `ARROW` の `sensor-bindings = <&inc_dec_kp X Y>;`。`&inc_dec_kp` 形式のみ MVP 対応。
+- **inc/dec keycode**: `&kp` 相当（modifier 込みの `LC(LEFT)` 等を含む）のみ。
+- **Picker 制限**: `KeycodePicker` に `restrictTo: ["&kp"]` プロップを追加し、sensor 用途では KP 以外の Behavior（LT/MT/MKP）を非表示にする。デフォルトは全 Behavior 表示で既存利用箇所には影響なし。
+- **layer 列挙**: 左ペインには sensor-bindings を持つ layer のみ表示。新規追加・削除は MVP 外。
+- **Swap inc/dec ボタン**: layer ごとの方向反転を 1 クリックで行える UX を追加。
+- **対象外**: ハードウェアレベルの方向反転（`boards/shields/roBa/*.overlay` 編集）は Sensors タブから触らない。UI に注記のみ。
+- **対象外**: Consumer code（音量・メディア・明るさ）は `keycodeCatalog.js` への追加が必要なため別タスクに切り出し。
+
+詳細計画は `docs/sensor-bindings-implementation-plan.md` に記載。実装順序（parseKeymap → pendingChanges/save → Picker `restrictTo` → App.jsx UI → 手動確認 → commit/push）も同ドキュメント参照。
 
 ### 2026-05-07: Task A 実装・検証・push 済み（MKP マウスボタン Picker）
 
@@ -304,21 +318,21 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 - 168 tests / 24 suites 全パス。push 済み。ブラウザ確認は手動で実施すること。
 
-#### B. エンコーダー回転（`sensor-bindings`）編集
+#### B. エンコーダー回転（`sensor-bindings`）編集 — 計画確定済み・次に着手
 
-- **目的**: 現在 read-only の Sensors タブで、各レイヤーの `sensor-bindings = <&inc_dec_kp ...>` を編集できるようにする。スクロール挙動（PG_UP/PG_DOWN）以外への変更（例: `LEFT_ARROW`/`RIGHT_ARROW`、ボリューム、トラック移動など）を可能にする。
-- **対象**: `default_layer` と `ARROW` の `sensor-bindings` のみ。今は `&inc_dec_kp X Y` 形式のみ対応で十分。
-- **データモデル方針（要設計レビュー）**:
-  - parseKeymap で各 layer の `sensor-bindings` を `{ behavior: "&inc_dec_kp", incKey, decKey, sourceRange }` 形式で保持。
-  - pending change kind: `sensor-binding` を新設。layer index と new raw を持つ。
-  - source-range 編集で `sensor-bindings = <...>` の中身だけ書き換える。
-- **対象ファイル（想定）**:
-  - `tools/roba-keymap-viewer/src/keymap/parseKeymap.js`: `sensor-bindings` の source range も保持するよう拡張。
-  - `tools/roba-keymap-viewer/src/keymap/pendingChanges.js`: `sensor-binding` builder と validation 追加。
-  - `tools/roba-keymap-viewer/src/server/saveBindingChange.js`: 保存後に sensor-bindings が残存・パース可能か検証。
-  - `tools/roba-keymap-viewer/src/App.jsx`: Sensors タブを編集 UI に拡張。各 layer の inc / dec keycode を Pick で選択可能に。
-- **UI 仕様**: 各 layer に「Inc keycode」「Dec keycode」の Pick ボタン。今回は `&kp` 相当の keycode（modifier 含む）を選べれば十分。`&inc_dec_kp` 以外（例: `&inc_dec_cp`）への切替は MVP 外。
-- **テスト**: parse / pending change / save 各レイヤーで追加。
+- **詳細計画**: `docs/sensor-bindings-implementation-plan.md` を参照。
+- **概要**: read-only の Sensors タブを編集 UI に拡張し、各 layer の `&inc_dec_kp X Y` の inc/dec keycode を Pick で変更できるようにする。
+- **対象**: `default_layer` と `ARROW` の `sensor-bindings`（`&inc_dec_kp` 形式のみ MVP 対応）。
+- **inc/dec keycode**: `&kp` 相当（modifier 込みの `LC(LEFT)` 等を含む）。
+- **UX**: Inc/Dec Picker、Swap inc/dec ボタン（layer ごとの方向反転）、編集中 layer のみ表示。
+- **対象外（別タスク）**: ハードウェアレベル反転（`.overlay` 編集）、Consumer code（音量・メディア）対応、`&inc_dec_cp` 切替、マウスホイール（`&msc`）。
+- **実装順序**: parseKeymap → pendingChanges/save → Picker `restrictTo` プロップ追加 → App.jsx UI → 手動ブラウザ確認 → commit/push。
+
+#### D. Consumer code カタログ拡張（Task B 完了後の候補）
+
+- **目的**: Sensors タブや Bindings タブで音量（`C_VOL_UP` / `C_VOL_DN`）・メディア（`C_NEXT` / `C_PREV`）・明るさ（`C_BRI_INC` / `C_BRI_DEC`）等を Picker から選べるようにする。
+- **対象ファイル**: `tools/roba-keymap-viewer/src/keymap/keycodeCatalog.js`（および関連表示・テスト）。
+- **状況**: Task B では既存カタログにある keycode のみ扱う。Consumer code が必要になった時点で別タスクとして着手する。
 
 #### ~~C. LT/MT の tap keycode に KP modifier 引き継ぎ（完了）~~
 
@@ -328,7 +342,8 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 1. ~~**C**（完了）~~
 2. ~~**A**（完了）~~
-3. **B**（parse / save / UI と影響範囲が広いので最後）← 次はここ
+3. **B**（parse / save / UI と影響範囲が広いので最後）← 次はここ。詳細計画 `docs/sensor-bindings-implementation-plan.md` 参照
+4. **D**（Consumer code カタログ拡張）— B 完了後の任意タスク
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。
 
@@ -378,6 +393,7 @@ roBa Keymap Viewer:
 詳細資料:
 
 - `docs/viewer-to-device-guide.md`
+- `docs/sensor-bindings-implementation-plan.md`
 - `docs/trackball-layer-settings-planning-prompt.md`
 - `docs/trackball-layer-settings-implementation-plan.md`
 - `docs/zmk-studio-like-app-plan.md`
