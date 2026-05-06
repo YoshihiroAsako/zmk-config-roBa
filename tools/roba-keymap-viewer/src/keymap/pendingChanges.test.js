@@ -336,4 +336,74 @@ describe("pending keymap changes", () => {
     assert.equal(state.valid, false);
     assert.match(state.message, /letter or underscore/);
   });
+
+  it("rejects binding with &lt N where N is out of layer range", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const entry = parsed.layers[0].bindingEntries[0];
+    const change = buildDraftChange({
+      layerIndex: 0,
+      layerName: parsed.layers[0].name,
+      position: 0,
+      entry,
+      nextRaw: "&lt 7 TAB",
+    });
+
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.match(state.message, /out of range/);
+  });
+
+  it("rejects binding with &mo N where N is out of layer range", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const entry = parsed.layers[0].bindingEntries[0];
+    const change = buildDraftChange({
+      layerIndex: 0,
+      layerName: parsed.layers[0].name,
+      position: 0,
+      entry,
+      nextRaw: "&mo 99",
+    });
+
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.match(state.message, /out of range/);
+  });
+
+  it("accepts binding with layer reference at the highest valid index", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const entry = parsed.layers[0].bindingEntries[0];
+    const change = buildDraftChange({
+      layerIndex: 0,
+      layerName: parsed.layers[0].name,
+      position: 0,
+      entry,
+      nextRaw: `&lt ${parsed.layers.length - 1} TAB`,
+    });
+
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, true);
+  });
+
+  it("rejects combo-binding with layer reference out of range", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos[0];
+    assert.ok(combo, "roBa keymap must have at least one combo");
+    const change = {
+      id: `combo-${combo.name}-binding`,
+      kind: "combo-binding",
+      label: `${combo.name} binding`,
+      comboName: combo.name,
+      range: combo.bindingEntry.sourceRange,
+      currentRaw: combo.binding,
+      nextRaw: `&mo ${parsed.layers.length}`,
+    };
+
+    const state = buildPendingChangesState(source, [change], parsed.layers);
+    assert.equal(state.valid, false);
+    assert.match(state.message, /out of range/);
+  });
 });

@@ -40,6 +40,18 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-06: Save 前バリデーション実装・検証済み（未 push）
+
+実装済み:
+
+- **`validateBindingLayerRef()` 追加**: `&lt N` / `&mo N` / `&to N` の N が `layerCount` 範囲外の場合にエラーを投げる helper。
+- **`binding` / `combo-binding` / `macro-binding` の layer range チェック**: `validatePendingChange()` に各 kind ごとのチェックを追加。
+- **`macro-bindings-replace` の layer range チェック**: nextRaw の editable binding をすべて検査。
+- **`buildPendingChangesState` に `context` 引数追加**: `{ keyCount }` を受け取り、`layerCount`（= `layers.length`）と `keyCount`（デフォルト 43）を `validatePendingChange` に渡す。ハードコードされていた値を実際の値で置き換え。
+- **App.jsx の呼び出し更新**: `{ keyCount: document.physicalLayout.length }` を渡すよう修正。
+- **テスト追加**: 4 ケース追加（`&lt N` out-of-range、`&mo N` out-of-range、最大有効インデックスで有効、combo-binding out-of-range）。
+- **検証**: `npm test` は 139 tests / 20 suites 全パス。`npm run build` 成功。実ブラウザ確認: 未実施。
+
 ### 2026-05-06: 外部変更検知付き Save all 実装・検証済み（未 push）
 
 実装済み:
@@ -150,10 +162,8 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 1. ~~**外部変更検知付き Save all（安全性強化）** — 実装済み・未 push~~
    - mtime チェック（FILE_CHANGED）と keymap-drawer 未コミット差分警告（DRAWER_DIRTY）を実装。実ブラウザ確認は未実施。push 前にブラウザで動作確認すること。
-2. **Save 前バリデーション（推し）**
-   - `&lt N` / `&mo N` の `N` がレイヤー範囲外、combo の `key-positions` の範囲外・重複・数不足、combo / macro の node name 重複や不正名、macro の空 bindings、`layers = <...>` の範囲外などを保存前に警告。
-   - 既存 macro の非対応 binding を扱う場合は、保存前後で保持条件が崩れていないことも検査する。
-   - 目的: パースは通るが Actions ビルドで落ちる類のミスを push 前に検出する。
+2. ~~**Save 前バリデーション（推し）** — 実装済み・未 push~~
+   - `&lt N` / `&mo N` / `&to N` の layer range チェック、`combo-positions` / `layers` の range チェック（hardcode 排除）を実装。node name 重複は既存の change-build 時検証で対応済み。実ブラウザ確認は未実施。push 前に動作確認すること。
 3. **Undo / Redo（pending changes ベース）**
    - `pendingChanges` 配列の履歴スタックを持ち、1 個前の状態へ戻せるようにする。今は「全 discard」しか戻し方がない。
 4. **キーボードショートカット**

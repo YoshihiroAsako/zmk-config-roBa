@@ -133,8 +133,8 @@ function App() {
     [selectedEntry, effectiveDraftBinding, document],
   );
   const pendingState = useMemo(
-    () => buildPendingChangesState(keymapSource, pendingChanges, document.layers),
-    [keymapSource, pendingChanges, document.layers],
+    () => buildPendingChangesState(keymapSource, pendingChanges, document.layers, { keyCount: document.physicalLayout.length }),
+    [keymapSource, pendingChanges, document.layers, document.physicalLayout.length],
   );
   const comboPreviewState = useMemo(
     () => buildComboPreviewState(

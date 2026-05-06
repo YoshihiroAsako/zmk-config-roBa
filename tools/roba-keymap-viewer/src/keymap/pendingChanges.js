@@ -194,7 +194,7 @@ export function removeDraftChange(changes, id) {
   return changes.filter((item) => item.id !== id);
 }
 
-export function buildPendingChangesState(source, changes, layers) {
+export function buildPendingChangesState(source, changes, layers, context = {}) {
   if (changes.length === 0) {
     return {
       valid: false,
@@ -205,13 +205,16 @@ export function buildPendingChangesState(source, changes, layers) {
     };
   }
 
+  const layerCount = layers.length;
+  const keyCount = context.keyCount ?? 43;
+
   try {
     for (const change of changes) {
       const currentRaw = source.slice(change.range?.start, change.range?.end).trim();
       if (currentRaw !== change.currentRaw) {
         throw new Error(`${change.label || change.id} changed on disk. Reload source.`);
       }
-      validatePendingChange(source, change);
+      validatePendingChange(source, change, { layerCount, keyCount });
     }
 
     const nextSource = applyPendingChanges(source, changes);
@@ -278,24 +281,32 @@ function applyPendingChanges(source, changes) {
     ), source);
 }
 
-function validatePendingChange(source, change) {
-  if (change.kind === "combo-binding" || change.kind === "macro-binding") {
+function validatePendingChange(source, change, { layerCount = 7, keyCount = 43 } = {}) {
+  if (change.kind === "binding") {
+    validateBindingLayerRef(change.nextRaw, layerCount, change.label || change.id);
+  } else if (change.kind === "combo-binding" || change.kind === "macro-binding") {
     if (!isEditableBindingExpression(change.currentRaw)) {
       throw new Error(`${change.label} is outside the Phase 2 edit set.`);
     }
     if (!isEditableBindingExpression(change.nextRaw)) {
       throw new Error(`${change.label} replacement is not supported in Phase 2.`);
     }
+    validateBindingLayerRef(change.nextRaw, layerCount, change.label);
   } else if (change.kind === "macro-bindings-replace") {
     validateMacroBindingsValue(change.currentRaw, change.nextRaw);
+    for (const entry of splitBindingExpressions(change.nextRaw)) {
+      if (isEditableBindingExpression(entry)) {
+        validateBindingLayerRef(entry, layerCount, change.label);
+      }
+    }
   } else if (change.kind === "combo-positions") {
-    validateComboPositions(change.nextRaw);
+    validateComboPositions(change.nextRaw, keyCount);
   } else if (change.kind === "layers-replace") {
-    validateLayerValues(change.nextRaw);
+    validateLayerValues(change.nextRaw, layerCount);
   } else if (change.kind === "layers-remove") {
     if (change.nextRaw !== "") throw new Error(`${change.label}: layers-remove must have empty nextRaw.`);
   } else if (change.kind === "layers-insert") {
-    validateLayerInsertionContent(change.nextRaw);
+    validateLayerInsertionContent(change.nextRaw, layerCount);
   } else if (change.kind === "timeout-ms-replace") {
     validateTimeoutMsValue(change.nextRaw);
   } else if (change.kind === "timeout-ms-remove") {
@@ -367,10 +378,10 @@ function validateLayerValues(raw, layerCount = 7) {
   }
 }
 
-function validateLayerInsertionContent(nextRaw) {
+function validateLayerInsertionContent(nextRaw, layerCount) {
   const match = nextRaw.match(/layers\s*=\s*<([\d\s]+)>;\r?\n$/);
   if (!match) throw new Error("layers-insert content is invalid.");
-  validateLayerValues(match[1].trim());
+  validateLayerValues(match[1].trim(), layerCount);
 }
 
 function validateTimeoutMsValue(raw) {
@@ -406,6 +417,16 @@ function validateLayerName(name) {
   }
   if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) {
     throw new Error("Layer name must start with a letter or underscore and contain only letters, digits, underscore, or hyphen.");
+  }
+}
+
+function validateBindingLayerRef(binding, layerCount, label) {
+  const m = String(binding || "").match(/^&(?:lt|mo|to)\s+(\d+)/);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (n >= layerCount) {
+      throw new Error(`${label}: layer ${n} is out of range (${layerCount} layer${layerCount === 1 ? "" : "s"} defined, indices 0–${layerCount - 1}).`);
+    }
   }
 }
 
