@@ -2,9 +2,18 @@ layout: {zmk_keyboard: roBa}
 layers:
   default:
   - [Q, W, E, R, T, Y, U, I, O, P]
-  - [A, S, D, F, G, Sft+Gui+S, '-', H, J, K]
+  - - {t: A, h: LEFT SHIFT}
+    - S
+    - D
+    - F
+    - G
+    - Sft+Gui+S
+    - '-'
+    - H
+    - J
+    - K
   - - L
-    - ''''
+    - {t: '-', h: RIGHT SHIFT}
     - {t: Z, h: LEFT SHIFT}
     - X
     - C
@@ -16,15 +25,15 @@ layers:
   - - M
     - ','
     - .
-    - /
+    - '?'
     - LCTRL
     - LEFT WIN
     - SCROLL
-    - {t: '&to_layer_0 INT_HENKAN', h: BT}
+    - {t: HENK, h: BT}
     - {t: SPACE, h: NUM}
-    - {t: '&to_layer_0 INT_MUHENKAN', h: ARROW}
+    - {t: MUHN, h: ARROW}
   - - BACKSPACE
-    - {t: ENTER, h: FUNCTION}
+    - {t: ENTER, h: NUM}
     - DEL
   FUNCTION:
   - - {t: ▽, type: trans}
@@ -68,7 +77,7 @@ layers:
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
   - - {t: ▽, type: trans}
-    - {type: held}
+    - {t: ▽, type: trans}
     - F12
   NUM:
   - ['-', KP 7, KP 8, KP 9, ':', '=', ^, +, '*', (]

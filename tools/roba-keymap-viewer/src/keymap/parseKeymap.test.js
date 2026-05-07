@@ -30,7 +30,7 @@ describe("roBa keymap parser", () => {
     );
     assert.equal(parsed.combos.length, 5);
     assert.equal(parsed.macros.length, 1);
-    assert.equal(parsed.behaviors.some((behavior) => behavior.name === "lt_to_layer_0"), true);
+    assert.equal(parsed.behaviors.some((behavior) => behavior.name === "lt_to_layer_0"), false);
     assert.equal(parsed.layers.flatMap((layer) => layer.sensorBindings).length, 3);
   });
 
@@ -43,7 +43,7 @@ describe("roBa keymap parser", () => {
 
     assert.equal(defaultLayer.bindings[36], "&mo 5");
     assert.equal(describeBinding(defaultLayer.bindings[36], layerNames).display, "SCROLL");
-    assert.equal(defaultLayer.bindings[37], "&lt_to_layer_0 6 INT_HENKAN");
+    assert.equal(defaultLayer.bindings[37], "&lt 6 INT_HENKAN");
     assert.equal(numLayer.bindings[29], "&kp RIGHT_BRACKET");
     assert.equal(describeBinding(numLayer.bindings[33], layerNames).display, "\\");
   });
@@ -114,7 +114,7 @@ describe("roBa keymap parser", () => {
       source.slice(defaultLayer.bindingEntries[0].sourceRange.start, defaultLayer.bindingEntries[0].sourceRange.end),
       "&kp Q",
     );
-    assert.equal(defaultLayer.bindingEntries[37].raw, "&lt_to_layer_0 6 INT_HENKAN");
+    assert.equal(defaultLayer.bindingEntries[37].raw, "&lt 6 INT_HENKAN");
   });
 
   it("tracks source ranges for combo nodes and combo binding expressions", async () => {

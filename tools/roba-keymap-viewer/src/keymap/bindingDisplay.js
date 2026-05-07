@@ -223,20 +223,6 @@ export function describeBinding(raw, layerNames = []) {
     };
   }
 
-  match = /^&lt_to_layer_0 (\d+) (\S+)$/.exec(value);
-  if (match) {
-    const layer = Number(match[1]);
-    return {
-      raw: value,
-      behavior: "&lt_to_layer_0",
-      params: [match[1], match[2]],
-      kind: "custom-hold-tap",
-      display: layerNames[layer] || `L${layer}`,
-      editability: "source-only",
-      note: `custom hold-tap, tap sends ${match[2]} after &to 0`,
-    };
-  }
-
   match = /^&to_layer_0 (\S+)$/.exec(value);
   if (match) {
     return {

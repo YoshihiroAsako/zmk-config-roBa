@@ -57,8 +57,8 @@ describe("editor preview state", () => {
     assert.equal(state.canEdit, true);
     assert.equal(state.changed, true);
     assert.equal(state.diff, "- &kp Q\n+ &kp B");
-    assert.match(state.contextDiff, /-84 &kp Q/);
-    assert.match(state.contextDiff, /\+84 &kp B/);
+    assert.match(state.contextDiff, /-73 &kp Q/);
+    assert.match(state.contextDiff, /\+73 &kp B/);
     assert.match(state.contextDiff, /&kp W/);
     assert.match(state.message, /Preview ready/);
     assert.equal(
@@ -91,13 +91,13 @@ describe("editor preview state", () => {
 
     assert.equal(momentary.canEdit, true);
     assert.equal(momentary.diff, "- &mo 5\n+ &mo 4");
-    assert.match(momentary.contextDiff, /-87 .*&mo 5/);
-    assert.match(momentary.contextDiff, /\+87 .*&mo 4/);
+    assert.match(momentary.contextDiff, /-76 .*&mo 5/);
+    assert.match(momentary.contextDiff, /\+76 .*&mo 4/);
     assert.equal(parseKeymap(momentary.nextSource).layers[0].bindings[36], "&mo 4");
     assert.equal(layerTap.canEdit, true);
     assert.equal(layerTap.diff, "- &lt 2 SPACE\n+ &lt 1 TAB");
-    assert.match(layerTap.contextDiff, /-87 .*&lt 2 SPACE/);
-    assert.match(layerTap.contextDiff, /\+87 .*&lt 1 TAB/);
+    assert.match(layerTap.contextDiff, /-76 .*&lt 2 SPACE/);
+    assert.match(layerTap.contextDiff, /\+76 .*&lt 1 TAB/);
     assert.equal(parseKeymap(layerTap.nextSource).layers[0].bindings[38], "&lt 1 TAB");
     assert.equal(modTap.canEdit, true);
     assert.equal(modTap.diff, "- &mt LEFT_SHIFT Z\n+ &mt LEFT_CONTROL X");
@@ -136,10 +136,10 @@ describe("editor preview state", () => {
     const range = parsed.layers[0].bindingEntries[38].sourceRange;
     const diff = buildContextDiff(source, range, "&lt 1 TAB");
 
-    assert.match(diff, /^ 86 /m);
-    assert.match(diff, /^-87 .*&lt 2 SPACE/m);
-    assert.match(diff, /^\+87 .*&lt 1 TAB/m);
-    assert.match(diff, /^ 88 /m);
+    assert.match(diff, /^ 75 /m);
+    assert.match(diff, /^-76 .*&lt 2 SPACE/m);
+    assert.match(diff, /^\+76 .*&lt 1 TAB/m);
+    assert.match(diff, /^ 77 /m);
     assert.equal(diff.split("\n").every((line) => line.length <= 108), true);
     assert.doesNotMatch(diff, /undefined/);
   });
