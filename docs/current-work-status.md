@@ -399,9 +399,11 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **実装**: parseSensorBindings / pendingChanges / saveBindingChange を拡張。Sensors タブに behavior セレクト追加。KeycodePicker に `initialCategory` 追加。
 - **検証**: 196 tests / 26 suites 全パス。`npm run build` 成功。push 済み。
 
-#### G. マウスホイール（`&msc`）sensor-binding 対応（低優先）
+#### G. マウスホイール（`&msc`）sensor-binding 対応 — **スコープ外**
 
-- **目的**: `sensor-bindings = <&msc SCRL_UP>` 等を Sensors タブで編集できるようにする。
+- `&msc` は現在の keymap に未使用。roBa にはトラックボールがあるためエンコーダーを `&msc` に使う需要が薄い。
+- `&inc_dec_kp/cp` とは構造が異なる（2エントリ別々）ため実装コストが高い。
+- 将来必要になった時点で検討する。
 
 #### H. ハードウェアレベル方向反転（スコープ外）
 
@@ -415,7 +417,7 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 4. ~~**E**（sensor-bindings のレイヤー追加・削除 UI）~~（完了）
 5. ~~**D**（Consumer code カタログ拡張）~~（完了）
 6. ~~**F**（`&inc_dec_cp` 対応）~~（完了）
-7. **G**（`&msc` 対応）← 次候補
+7. ~~**G**（`&msc` 対応）~~ — スコープ外
 
 各タスク完了ごとに `npm test` / `npm run build` / 手動ブラウザ確認 → commit / push → `docs/current-work-status.md` 更新の順で進める。
 

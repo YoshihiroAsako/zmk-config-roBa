@@ -22,7 +22,30 @@ describe("editor preview state", () => {
     assert.equal(isPhase2Editable("&mo 1"), true);
     assert.equal(isPhase2Editable("&lt 2 SPACE"), true);
     assert.equal(isPhase2Editable("&mt LEFT_SHIFT Z"), true);
+    assert.equal(isPhase2Editable("&mkp MB1"), true);
+    assert.equal(isPhase2Editable("&mkp MB4"), true);
     assert.equal(isPhase2Editable("&bt BT_SEL 0"), false);
+  });
+
+  it("allows editing existing &mkp bindings and replacing &trans with &mkp", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const parsed = parseKeymap(source);
+    // MOUSE layer (index 4): &mkp MB1 is at position 18
+    const mkpEntry = parsed.layers[4].bindingEntries[18];
+    assert.equal(mkpEntry.raw, "&mkp MB1");
+    const mkpState = buildEditorState(source, mkpEntry, "&mkp MB4", parsed.layers);
+    assert.equal(mkpState.canEdit, true);
+    assert.equal(mkpState.changed, true);
+    assert.equal(mkpState.diff, "- &mkp MB1\n+ &mkp MB4");
+    assert.match(mkpState.message, /Preview ready/);
+    // &trans → &mkp: pick any &trans entry in MOUSE layer (position 0)
+    const transEntry = parsed.layers[4].bindingEntries[0];
+    assert.equal(transEntry.raw, "&trans");
+    const replaceState = buildEditorState(source, transEntry, "&mkp MB4", parsed.layers);
+    assert.equal(replaceState.canEdit, true);
+    assert.equal(replaceState.changed, true);
+    assert.equal(replaceState.diff, "- &trans\n+ &mkp MB4");
+    assert.match(replaceState.message, /Preview ready/);
   });
 
   it("builds a one-binding diff and keymap preview for editable entries", async () => {

@@ -446,5 +446,6 @@ export function isEditableBindingExpression(raw) {
     /^&kp \S+$/.test(raw) ||
     /^&mo \d+$/.test(raw) ||
     /^&lt \d+ \S+$/.test(raw) ||
-    /^&mt \S+ \S+$/.test(raw);
+    /^&mt \S+ \S+$/.test(raw) ||
+    /^&mkp \S+$/.test(raw);
 }
