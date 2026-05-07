@@ -1,11 +1,30 @@
-export const STRUCTURED_BEHAVIORS = ["&kp", "&lt", "&mt", "&mkp"];
+export const STRUCTURED_BEHAVIORS = ["&kp", "&lt", "&mt", "&mkp", "&bt", "&bootloader"];
 
 export const STRUCTURED_BEHAVIOR_LABELS = {
   "&kp": { short: "KP", long: "Key Press" },
   "&lt": { short: "LT", long: "Layer-Tap" },
   "&mt": { short: "MT", long: "Mod-Tap" },
   "&mkp": { short: "MKP", long: "Mouse Button Press" },
+  "&bt": { short: "BT", long: "Bluetooth" },
+  "&bootloader": { short: "BOOT", long: "Bootloader" },
 };
+
+export const BT_COMMANDS = [
+  { id: "BT_SEL 0", label: "Select Profile 0 (BT_SEL 0)" },
+  { id: "BT_SEL 1", label: "Select Profile 1 (BT_SEL 1)" },
+  { id: "BT_SEL 2", label: "Select Profile 2 (BT_SEL 2)" },
+  { id: "BT_SEL 3", label: "Select Profile 3 (BT_SEL 3)" },
+  { id: "BT_SEL 4", label: "Select Profile 4 (BT_SEL 4)" },
+  { id: "BT_CLR",     label: "Clear Current Pairing (BT_CLR)" },
+  { id: "BT_CLR_ALL", label: "Clear All Pairings (BT_CLR_ALL)" },
+  { id: "BT_PRV",     label: "Previous Profile (BT_PRV)" },
+  { id: "BT_NXT",     label: "Next Profile (BT_NXT)" },
+  { id: "BT_DISC 0", label: "Disconnect Profile 0 (BT_DISC 0)" },
+  { id: "BT_DISC 1", label: "Disconnect Profile 1 (BT_DISC 1)" },
+  { id: "BT_DISC 2", label: "Disconnect Profile 2 (BT_DISC 2)" },
+  { id: "BT_DISC 3", label: "Disconnect Profile 3 (BT_DISC 3)" },
+  { id: "BT_DISC 4", label: "Disconnect Profile 4 (BT_DISC 4)" },
+];
 
 export const MOUSE_BUTTONS = [
   { code: "MB1", label: "Left (MB1)" },
@@ -89,6 +108,30 @@ export function parseStructuredBinding(raw, layerCount = 0) {
     };
   }
 
+  match = /^&bt (\S+)(?: (\d+))?$/.exec(value);
+  if (match) {
+    const cmd = match[2] !== undefined ? `${match[1]} ${match[2]}` : match[1];
+    const btCommand = BT_COMMANDS.some((c) => c.id === cmd) ? cmd : BT_COMMANDS[0].id;
+    return {
+      behavior: "&bt",
+      btCommand,
+      layerIndex: 0,
+      modifier: HOLD_TAP_MODIFIERS[0].code,
+      keycode: "A",
+      keypressModifiers: [],
+    };
+  }
+
+  if (value === "&bootloader") {
+    return {
+      behavior: "&bootloader",
+      layerIndex: 0,
+      modifier: HOLD_TAP_MODIFIERS[0].code,
+      keycode: "A",
+      keypressModifiers: [],
+    };
+  }
+
   return {
     behavior: "&kp",
     layerIndex: 0,
@@ -98,9 +141,20 @@ export function parseStructuredBinding(raw, layerCount = 0) {
   };
 }
 
-export function buildStructuredBinding({ behavior, layerIndex, modifier, keycode, keypressModifiers = [], mouseButton = "MB1" }, layerCount = 0) {
+export function buildStructuredBinding({ behavior, layerIndex, modifier, keycode, keypressModifiers = [], mouseButton = "MB1", btCommand = BT_COMMANDS[0].id }, layerCount = 0) {
   if (!STRUCTURED_BEHAVIORS.includes(behavior)) {
     throw new Error("Unsupported behavior.");
+  }
+
+  if (behavior === "&bootloader") {
+    return "&bootloader";
+  }
+
+  if (behavior === "&bt") {
+    if (!BT_COMMANDS.some((c) => c.id === btCommand)) {
+      throw new Error("Invalid BT command.");
+    }
+    return `&bt ${btCommand}`;
   }
 
   if (behavior === "&mkp") {

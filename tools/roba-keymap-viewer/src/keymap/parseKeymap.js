@@ -443,9 +443,12 @@ function validateEditableBindingExpression(nextRaw) {
 export function isEditableBindingExpression(raw) {
   return raw === "&trans" ||
     raw === "&none" ||
+    raw === "&bootloader" ||
     /^&kp \S+$/.test(raw) ||
     /^&mo \d+$/.test(raw) ||
     /^&lt \d+ \S+$/.test(raw) ||
     /^&mt \S+ \S+$/.test(raw) ||
-    /^&mkp \S+$/.test(raw);
+    /^&mkp \S+$/.test(raw) ||
+    /^&bt \S+$/.test(raw) ||
+    /^&bt \S+ \d+$/.test(raw);
 }

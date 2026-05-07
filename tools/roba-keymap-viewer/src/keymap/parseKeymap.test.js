@@ -295,7 +295,7 @@ describe("roBa keymap parser", () => {
     const first = parsed.layers[0].bindingEntries[0].sourceRange;
     const second = parsed.layers[0].bindingEntries[1].sourceRange;
 
-    assert.throws(() => replaceBinding(source, first, "&bt BT_SEL 0"), /not supported/);
+    assert.throws(() => replaceBinding(source, first, "&to 0"), /not supported/);
     assert.throws(() => replaceBinding(source, first, " &kp A"), /trimmed/);
     assert.throws(() => replaceBinding(source, { start: first.start, end: second.end }, "&kp A"), /one binding/);
     assert.throws(

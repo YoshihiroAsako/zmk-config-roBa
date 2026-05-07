@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  BT_COMMANDS,
   KEY_PRESS_MODIFIERS,
   MOUSE_BUTTONS,
   buildStructuredBinding,
@@ -164,6 +165,90 @@ describe("structured binding helpers", () => {
     assert.equal(validateStructuredBinding({ behavior: "&kp", keycode: "A B" }, 7).ok, false);
     assert.equal(validateStructuredBinding({ behavior: "&lt", layerIndex: 7, keycode: "A" }, 7).ok, false);
     assert.equal(validateStructuredBinding({ behavior: "&mt", modifier: "LEFT_SHIFT", keycode: "A" }, 7).ok, true);
+  });
+
+  it("builds bluetooth bindings", () => {
+    assert.equal(buildStructuredBinding({ behavior: "&bt", btCommand: "BT_SEL 0" }), "&bt BT_SEL 0");
+    assert.equal(buildStructuredBinding({ behavior: "&bt", btCommand: "BT_SEL 4" }), "&bt BT_SEL 4");
+    assert.equal(buildStructuredBinding({ behavior: "&bt", btCommand: "BT_CLR" }), "&bt BT_CLR");
+    assert.equal(buildStructuredBinding({ behavior: "&bt", btCommand: "BT_CLR_ALL" }), "&bt BT_CLR_ALL");
+    assert.equal(buildStructuredBinding({ behavior: "&bt", btCommand: "BT_PRV" }), "&bt BT_PRV");
+    assert.equal(buildStructuredBinding({ behavior: "&bt", btCommand: "BT_NXT" }), "&bt BT_NXT");
+    assert.equal(buildStructuredBinding({ behavior: "&bt", btCommand: "BT_DISC 0" }), "&bt BT_DISC 0");
+    assert.equal(buildStructuredBinding({ behavior: "&bt", btCommand: "BT_DISC 4" }), "&bt BT_DISC 4");
+    assert.equal(buildStructuredBinding({ behavior: "&bootloader" }), "&bootloader");
+  });
+
+  it("parses bluetooth and bootloader bindings", () => {
+    assert.deepEqual(parseStructuredBinding("&bt BT_SEL 0"), {
+      behavior: "&bt",
+      btCommand: "BT_SEL 0",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+    assert.deepEqual(parseStructuredBinding("&bt BT_SEL 3"), {
+      behavior: "&bt",
+      btCommand: "BT_SEL 3",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+    assert.deepEqual(parseStructuredBinding("&bt BT_CLR"), {
+      behavior: "&bt",
+      btCommand: "BT_CLR",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+    assert.deepEqual(parseStructuredBinding("&bt BT_CLR_ALL"), {
+      behavior: "&bt",
+      btCommand: "BT_CLR_ALL",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+    assert.deepEqual(parseStructuredBinding("&bt BT_DISC 2"), {
+      behavior: "&bt",
+      btCommand: "BT_DISC 2",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+    assert.deepEqual(parseStructuredBinding("&bootloader"), {
+      behavior: "&bootloader",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "A",
+      keypressModifiers: [],
+    });
+  });
+
+  it("round-trips all BT commands", () => {
+    for (const cmd of BT_COMMANDS) {
+      const raw = `&bt ${cmd.id}`;
+      const parsed = parseStructuredBinding(raw);
+      assert.equal(buildStructuredBinding(parsed), raw);
+    }
+    assert.equal(buildStructuredBinding(parseStructuredBinding("&bootloader")), "&bootloader");
+  });
+
+  it("falls back to BT_SEL 0 for unknown BT command in parse", () => {
+    const parsed = parseStructuredBinding("&bt BT_UNKNOWN 99");
+    assert.equal(parsed.behavior, "&bt");
+    assert.equal(parsed.btCommand, "BT_SEL 0");
+  });
+
+  it("rejects invalid BT command in build", () => {
+    assert.equal(validateStructuredBinding({ behavior: "&bt", btCommand: "BT_SEL 9" }).ok, false);
+    assert.equal(validateStructuredBinding({ behavior: "&bt", btCommand: "BT_SEL 0" }).ok, true);
+    assert.equal(validateStructuredBinding({ behavior: "&bt", btCommand: "BT_CLR" }).ok, true);
+    assert.equal(validateStructuredBinding({ behavior: "&bootloader" }).ok, true);
   });
 
   it("round-trips all keypress modifier toggles in stable order", () => {

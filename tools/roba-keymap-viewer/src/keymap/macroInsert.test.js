@@ -82,7 +82,7 @@ describe("macro insertion preview", () => {
         source,
         {
           nameRaw: "macro_test",
-          bindingsRaw: "&bt BT_SEL 0",
+          bindingsRaw: "&to 0",
           waitMsRaw: "",
           tapMsRaw: "",
           labelRaw: "",

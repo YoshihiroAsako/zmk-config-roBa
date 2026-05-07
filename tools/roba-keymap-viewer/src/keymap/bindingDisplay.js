@@ -138,7 +138,7 @@ export function describeBinding(raw, layerNames = []) {
   if (!value) return fallback("empty", "unknown", raw);
   if (value === "&trans") return fallback("trans", "transparent", value, "studio-direct");
   if (value === "&none") return fallback("none", "none", value, "studio-direct");
-  if (value === "&bootloader") return fallback("BOOT", "bootloader", value, "build-required");
+  if (value === "&bootloader") return fallback("BOOT", "bootloader", value, "studio-direct");
 
   let match = /^&kp (.+)$/.exec(value);
   if (match) {
@@ -204,7 +204,7 @@ export function describeBinding(raw, layerNames = []) {
       params: match[2] ? [match[1], match[2]] : [match[1]],
       kind: "bluetooth",
       display: match[2] ? `BT${match[2]}` : match[1].replace("BT_", "BT "),
-      editability: "build-required",
+      editability: "studio-direct",
       note: "Bluetooth behavior",
     };
   }

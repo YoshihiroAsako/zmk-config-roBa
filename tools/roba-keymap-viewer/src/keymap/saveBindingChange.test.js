@@ -98,7 +98,7 @@ describe("save binding change helper", () => {
           sourcePath: "config/roBa.keymap",
           range: selectedEntry.sourceRange,
           currentRaw: selectedEntry.raw,
-          nextRaw: "&bt BT_SEL 0",
+          nextRaw: "&to 0",
         }),
         /not supported/,
       );
@@ -273,7 +273,7 @@ describe("save binding change helper", () => {
             {
               range: selectedEntry.sourceRange,
               currentRaw: selectedEntry.raw,
-              nextRaw: "&bt BT_SEL 0",
+              nextRaw: "&to 0",
             },
           ],
         }),
@@ -438,7 +438,7 @@ describe("save binding change helper", () => {
               kind: "combo-binding",
               range: combo.bindingEntry.sourceRange,
               currentRaw: combo.binding,
-              nextRaw: "&bt BT_SEL 0",
+              nextRaw: "&to 0",
             },
           ],
         }),

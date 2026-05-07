@@ -11,6 +11,7 @@ import { buildNewComboPreviewState, createEmptyComboDraft } from "./keymap/combo
 import { buildNewMacroPreviewState, createEmptyMacroDraft } from "./keymap/macroInsert.js";
 import { buildEditorState } from "./keymap/editorPreview.js";
 import {
+  BT_COMMANDS,
   HOLD_TAP_MODIFIERS,
   KEY_PRESS_MODIFIERS,
   MOUSE_BUTTONS,
@@ -2843,7 +2844,20 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
               </select>
             </label>
           )}
-          {draft.behavior !== "&mkp" && (
+          {draft.behavior === "&bt" && (
+            <label>
+              <span>BT command</span>
+              <select
+                value={draft.btCommand ?? BT_COMMANDS[0].id}
+                onChange={(event) => setDraft((prev) => ({ ...prev, btCommand: event.target.value }))}
+              >
+                {BT_COMMANDS.map((cmd) => (
+                  <option key={cmd.id} value={cmd.id}>{cmd.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {draft.behavior !== "&mkp" && draft.behavior !== "&bt" && draft.behavior !== "&bootloader" && (
             <>
               <label>
                 <span>Tap keycode</span>
@@ -2882,7 +2896,7 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
             </button>
           </div>
         </div>
-        {draft.behavior !== "&mkp" && (
+        {draft.behavior !== "&mkp" && draft.behavior !== "&bt" && draft.behavior !== "&bootloader" && (
           <>
             <input
               ref={searchRef}

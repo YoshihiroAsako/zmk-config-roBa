@@ -24,7 +24,11 @@ describe("editor preview state", () => {
     assert.equal(isPhase2Editable("&mt LEFT_SHIFT Z"), true);
     assert.equal(isPhase2Editable("&mkp MB1"), true);
     assert.equal(isPhase2Editable("&mkp MB4"), true);
-    assert.equal(isPhase2Editable("&bt BT_SEL 0"), false);
+    assert.equal(isPhase2Editable("&bt BT_SEL 0"), true);
+    assert.equal(isPhase2Editable("&bt BT_CLR"), true);
+    assert.equal(isPhase2Editable("&bt BT_DISC 3"), true);
+    assert.equal(isPhase2Editable("&bootloader"), true);
+    assert.equal(isPhase2Editable("&to 0"), false);
   });
 
   it("allows editing existing &mkp bindings and replacing &trans with &mkp", async () => {
@@ -104,17 +108,16 @@ describe("editor preview state", () => {
     assert.equal(parseKeymap(modTap.nextSource).layers[0].bindings[22], "&mt LEFT_CONTROL X");
   });
 
-  it("keeps unsupported bindings read-only and leaves source unchanged", async () => {
+  it("allows editing BT bindings in Phase 2", async () => {
     const source = await readRepoFile("config/roBa.keymap");
     const parsed = parseKeymap(source);
     const selectedEntry = parsed.layers[6].bindingEntries[5];
-    const state = buildEditorState(source, selectedEntry, "&kp A", parsed.layers);
+    const state = buildEditorState(source, selectedEntry, "&bt BT_CLR", parsed.layers);
 
     assert.equal(selectedEntry.raw, "&bt BT_SEL 0");
-    assert.equal(state.canEdit, false);
-    assert.equal(state.changed, false);
-    assert.match(state.message, /outside the Phase 2 edit set/);
-    assert.equal(state.nextSource, source);
+    assert.equal(state.canEdit, true);
+    assert.equal(state.changed, true);
+    assert.match(state.message, /Preview ready/);
   });
 
   it("surfaces validation errors before building preview source", async () => {
@@ -122,7 +125,7 @@ describe("editor preview state", () => {
     const parsed = parseKeymap(source);
     const selectedEntry = parsed.layers[0].bindingEntries[0];
     const spaced = buildEditorState(source, selectedEntry, " &kp A", parsed.layers);
-    const unsupported = buildEditorState(source, selectedEntry, "&bt BT_SEL 0", parsed.layers);
+    const unsupported = buildEditorState(source, selectedEntry, "&to 0", parsed.layers);
 
     assert.match(spaced.message, /must not start or end with spaces/);
     assert.equal(spaced.nextSource, source);

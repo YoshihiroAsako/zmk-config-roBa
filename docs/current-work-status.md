@@ -41,6 +41,31 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-07: Bluetooth / Bootloader Picker 実装・検証済み
+
+実装済み:
+
+- **`structuredBinding.js` 拡張**: `STRUCTURED_BEHAVIORS` に `"&bt"` / `"&bootloader"` を追加。`STRUCTURED_BEHAVIOR_LABELS` に BT / BOOT エントリを追加。`BT_COMMANDS` 定数（BT_SEL 0-4 / BT_CLR / BT_CLR_ALL / BT_PRV / BT_NXT / BT_DISC 0-4 の 14 件）を追加。`parseStructuredBinding` に `&bt` / `&bootloader` の parse 分岐を追加（未知のコマンドは BT_SEL 0 にフォールバック）。`buildStructuredBinding` に `&bt` / `&bootloader` の build を追加（無効コマンドはエラー）。
+- **`bindingDisplay.js` 変更**: `&bt` の `editability` を `"build-required"` → `"studio-direct"` に変更。`&bootloader` も同様に変更。
+- **`App.jsx` 拡張**: `BT_COMMANDS` を import に追加。KeycodePicker 内に「BT command」select（BT_COMMANDS のドロップダウン）を `&bt` 選択時に表示。キーコード検索・カタログを `&bt` / `&bootloader` 選択時は非表示。Behavior ボタンに BT / BOOT を追加（restrictTo フィルタにより sensor 用途には表示されない）。
+- **テスト追加**: `structuredBinding.test.js` に build / parse / round-trip / fallback / invalid command の 5 ケースを追加。
+- **検証**: 202 tests / 26 suites 全パス。`npm run build` 成功。ブラウザ自動確認は `agent-browser` CLI 不在のため未実施。
+- **`parseKeymap.js` 修正追加**: `isEditableBindingExpression` に `"&bootloader"` / `/^&bt \S+$/` / `/^&bt \S+ \d+$/` を追加。これが抜けていたため canEdit が false のままになっていた不具合を修正。
+- **テスト修正**: `&bt BT_SEL 0` を "unsupported の例" として使っていた既存テスト4件を `&to 0`（まだ非対応）に差し替え。`isPhase2Editable` テストに BT / bootloader の `true` / `false` ケースを追加。
+- **再検証**: 202 tests / 26 suites 全パス。`npm run build` 成功。
+- **commit/push**: ユーザーが実施済み。
+
+### 2026-05-07: `&lt_to_layer_0` を `&lt` に置き換え・push 済み
+
+実施内容:
+
+- `behaviors { lt_to_layer_0 }` ブロックを削除（`to_layer_0` マクロはコンボで使用中のため残置）
+- `&lt_to_layer_0 6 INT_HENKAN` → `&lt 6 INT_HENKAN`、`&lt_to_layer_0 3 INT_MUHENKAN` → `&lt 3 INT_MUHENKAN`
+- `bindingDisplay.js` の source-only ハンドラを削除 → Viewer で `&lt` として編集可能になった
+- `keymap-drawer/roBa.yaml` と `roBa.svg` を更新
+- テスト期待値（binding 名・行番号）を修正。197 tests / 26 suites 全パス。`npm run build` 成功。
+- **push 済み**（`1ad82ad`）。
+
 ### 2026-05-07: Task F 実装・検証・push 済み（`&inc_dec_cp` behavior 対応）
 
 実装済み:
