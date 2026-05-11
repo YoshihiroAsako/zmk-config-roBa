@@ -41,6 +41,33 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 
 ## 最新チェックポイント
 
+### 2026-05-11: `docs/studio_alt_app.md` に追加レビュー反映
+
+実施内容:
+
+- Claude 追加レビューに対する Codex 再レビュー結果を `docs/studio_alt_app.md` へ反映。
+- M-1 完了条件を「比較」中心から **採用案を ADR / 本書節として決定する**形式へ変更。
+- ローカルプロキシ採用時の security 要件（`127.0.0.1` bind、token、origin、同時接続排他、ログ方針）を 3 章と ADR 候補に追加。
+- clean room policy とライセンス確認の意図を分離して記載。
+- 正本モデルは M-1 で正式決定することを明記し、現時点の有力案を **実機 settings と repo `.keymap` の同期レイヤー**として整理。
+- `settings_reset.uf2`、Restore Stock Settings、RPC `core.reset_settings` の使い分けを M-1 調査・復旧フロー対象に追加。
+- `zmk-studio-ts-client` の API / メンテ状態確認と、不採用時の Plan B（`zmk-studio-messages` から自前生成）を追加。
+- test harness の置き場・言語・fixture・責務分割を M-1 決定事項に追加。
+- `config/roBa.json`、`keymap-drawer/roBa.yaml`、`keymap-drawer/roBa.svg` の更新責務を M2 完了条件に追加。
+- 複数 PC / 複数ブラウザ / 公式 ZMK Studio との同時接続排他を ADR 候補へ格上げ。
+
+### 2026-05-11: `docs/studio_alt_app.md` に再レビュー結果を反映
+
+実施内容:
+
+- Claude レビューに対する Codex 再レビュー結果を `docs/studio_alt_app.md` へ反映。
+- **Studio 本体を主 UI にしない理由**を、既存 `tools/roba-keymap-viewer/` の `.keymap` 編集資産・roBa 固有 UI・Git 管理との同期方針として明文化。
+- **正本・永続化モデル**を新設。実機 Studio settings / repo `.keymap` / Restore Stock Settings の関係を整理し、「再ビルドすれば常に `.keymap` が勝つ」とは扱わない方針に修正。
+- M0 前の **M-1 設計確定フェーズ**を追加し、viewer 統合方針、RPC allowlist、protobuf/client 方針、正本モデルを M0 前に決める扱いに変更。
+- M0〜M3 の完了条件を、**実機テスト / モックテスト / 回帰テスト / 文書化**に分けて検証可能な形へ書き直し。
+- Web Serial の Chromium 系ブラウザ前提、`CONFIG_ZMK_STUDIO_LOCKING=n` のセキュリティ影響、clean room policy、同時接続、settings 寿命、`.keymap` 往復可逆性を調査・ADR 候補に追加。
+- 自前実装以外の代替設計として、公式 ZMK Studio + 軽量同期プロキシ、`zmk-studio-ts-client` 利用 viewer 拡張、ZMK Studio fork の 3 案を追加。
+
 ### 2026-05-07: Bluetooth / Bootloader Picker 実装・検証済み
 
 実装済み:
@@ -491,6 +518,7 @@ roBa Keymap Viewer:
 
 詳細資料:
 
+- `docs/studio_alt_app.md`（Studio 非使用・USB RPC・Git 逃がしの恒久方針・マイルストーン・UI 原則）
 - `docs/viewer-to-device-guide.md`
 - `docs/sensor-bindings-implementation-plan.md`
 - `docs/trackball-layer-settings-planning-prompt.md`
