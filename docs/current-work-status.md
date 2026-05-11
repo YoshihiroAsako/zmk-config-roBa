@@ -34,12 +34,22 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - `config/roBa.keymap` を正本として読み取る。
 - `config/roBa.json` を物理レイアウトの主な参照元として使う。
 - ZMK Studio の完全代替ではなく、公式 ZMK Studio と併用するローカル補助アプリとして扱う。
+- `docs/studio_alt_app.md` の Studio RPC / Studio 代替アプリ計画は **凍結中**。ユーザーが明示的に「やりたい」「再開したい」「M-1 に着手したい」と言うまでは、調査・ADR・PoC・実装を開始しない。
 - 初期 read-only MVP から、限定的な `.keymap` 編集・保存機能まで実装済み。
 - 現在は Phase 5.5 まで完了。主要機能は一通り揃っており、ユーザーは当面の追加実装を急いでいない。
 - Task D（Consumer code カタログ拡張）まで実装・検証・push 済み。189 tests / 26 suites 全パス。`npm run build` 成功。
 - **次候補**: Task F（`&inc_dec_cp` behavior 対応）。
 
 ## 最新チェックポイント
+
+### 2026-05-11: Studio RPC / Studio 代替アプリ計画を凍結扱いに変更
+
+実施内容:
+
+- `docs/studio_alt_app.md` の冒頭に **現在の状態: 凍結中** を追加。
+- この計画は将来のために残すが、ユーザーが明示的に「Studio 代替アプリを再開したい」「Studio RPC 連携を進めたい」「M-1 に着手したい」などと依頼するまで、調査・ADR・PoC・実装を開始しない方針に変更。
+- 再開する場合も、いきなり M0 実装へ進まず、まず M-1 設計確定フェーズから着手することを明記。
+- `docs/current-work-status.md` の現在テーマにも、Studio RPC / Studio 代替アプリ計画は凍結中で通常の viewer 改善とは別扱いにする旨を追記。
 
 ### 2026-05-11: `docs/studio_alt_app.md` に追加レビュー反映
 
