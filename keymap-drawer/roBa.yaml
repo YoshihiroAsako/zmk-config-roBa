@@ -12,7 +12,7 @@ layers:
     - H
     - J
     - K
-  - - L
+  - - {t: L, h: SCROLL}
     - {t: '-', h: RIGHT SHIFT}
     - {t: Z, h: LEFT SHIFT}
     - X
@@ -29,9 +29,9 @@ layers:
     - LCTRL
     - LEFT WIN
     - SCROLL
-    - {t: HENK, h: BT}
+    - {t: INT HENKAN, h: BT}
     - {t: SPACE, h: NUM}
-    - {t: MUHN, h: ARROW}
+    - {t: '`', h: ARROW}
   - - BACKSPACE
     - {t: ENTER, h: NUM}
     - DEL
@@ -81,9 +81,9 @@ layers:
     - F12
   NUM:
   - ['-', KP 7, KP 8, KP 9, ':', '=', ^, +, '*', (]
-  - [/, KP 4, KP 5, KP 6, '"', Ctl+Alt+KP 0, Sft+INT RO, '!', '[', '#']
-  - - $
-    - '%'
+  - [/, KP 4, KP 5, KP 6, '"', Ctl+Alt+KP 0, Sft+INT RO, '!', '[', LEFT ARROW]
+  - - RIGHT ARROW
+    - {t: '@', h: RIGHT SHIFT}
     - {t: KP 0, h: LEFT SHIFT}
     - KP 1
     - KP 2
@@ -95,7 +95,7 @@ layers:
   - - \
     - '}'
     - '|'
-    - INT YEN
+    - '!'
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
@@ -160,8 +160,8 @@ layers:
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
     - '&mkp MB1'
-    - '&mkp MB3'
-  - - '&mkp MB2'
+    - '&mkp MB2'
+  - - '&mkp MB3'
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
@@ -204,8 +204,8 @@ layers:
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
-    - {t: ▽, type: trans}
-  - - RIGHT CONTROL
+    - RIGHT CONTROL
+  - - {type: held}
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
@@ -221,7 +221,7 @@ layers:
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
-    - {type: held}
+    - {t: ▽, type: trans}
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
     - {t: ▽, type: trans}
