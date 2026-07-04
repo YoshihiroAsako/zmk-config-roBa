@@ -445,6 +445,7 @@ export function isEditableBindingExpression(raw) {
     raw === "&none" ||
     raw === "&bootloader" ||
     /^&kp \S+$/.test(raw) ||
+    /^&to_layer_0 \S+$/.test(raw) ||
     /^&mo \d+$/.test(raw) ||
     /^&lt \d+ \S+$/.test(raw) ||
     /^&mt \S+ \S+$/.test(raw) ||

@@ -1,3 +1,9 @@
+# Archive
+
+完了済み記録の退避場所(追記のみ・末尾へ。既存エントリの書き換え・並べ替え禁止)。
+
+## 2026-07-04 移行時スナップショット(旧 docs/current-work-status.md 全文)
+
 # Current Work Status
 
 このファイルは、新しいチャットで作業をすぐ再開するための最小メモです。
@@ -41,6 +47,16 @@ roBa 用 ZMK Studio 風ローカル補助アプリ、`tools/roba-keymap-viewer/`
 - **次候補**: Task F（`&inc_dec_cp` behavior 対応）。
 
 ## 最新チェックポイント
+
+### 2026-05-17: combo 11+10（muhennkann）の binding 編集不可を修正
+
+実施内容:
+
+- `muhennkann` combo（key positions `11 10`）の binding `&to_layer_0 INT_MUHENKAN` が viewer の編集可能 binding セットに含まれておらず、Combos タブの Binding draft / Pick / Capture が disabled になっていた。
+- `tools/roba-keymap-viewer/src/keymap/parseKeymap.js` の編集可能判定に `&to_layer_0 <keycode>` を追加。
+- `structuredBinding.js` に `TO0` picker behavior を追加し、`&to_layer_0 INT_MUHENKAN` や `&to_layer_0 LS(TAB)` を parse/build できるようにした。
+- combo preview / save の回帰テストを追加。既存の NUM レイヤー表示テストも現行 `config/roBa.keymap` の `&kp EXCL` に同期。
+- 検証: `tools/roba-keymap-viewer` で `npm test`（204 tests / 26 suites）と `npm run build` が成功。Vite dev server は `http://localhost:5173/` で HTTP 200 確認済み。`agent-browser` は PATH になく、ブラウザ自動確認は未実施。
 
 ### 2026-05-11: Studio RPC / Studio 代替アプリ計画を凍結扱いに変更
 

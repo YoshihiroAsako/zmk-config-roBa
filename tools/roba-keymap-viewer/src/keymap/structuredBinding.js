@@ -1,7 +1,8 @@
-export const STRUCTURED_BEHAVIORS = ["&kp", "&lt", "&mt", "&mkp", "&bt", "&bootloader"];
+export const STRUCTURED_BEHAVIORS = ["&kp", "&to_layer_0", "&lt", "&mt", "&mkp", "&bt", "&bootloader"];
 
 export const STRUCTURED_BEHAVIOR_LABELS = {
   "&kp": { short: "KP", long: "Key Press" },
+  "&to_layer_0": { short: "TO0", long: "to_layer_0 Macro" },
   "&lt": { short: "LT", long: "Layer-Tap" },
   "&mt": { short: "MT", long: "Mod-Tap" },
   "&mkp": { short: "MKP", long: "Mouse Button Press" },
@@ -95,6 +96,18 @@ export function parseStructuredBinding(raw, layerCount = 0) {
     };
   }
 
+  match = /^&to_layer_0 (\S+)$/.exec(value);
+  if (match) {
+    const parsedKeypress = parseKeypressValue(match[1]);
+    return {
+      behavior: "&to_layer_0",
+      layerIndex: 0,
+      modifier: HOLD_TAP_MODIFIERS[0].code,
+      keycode: parsedKeypress.keycode,
+      keypressModifiers: parsedKeypress.modifiers,
+    };
+  }
+
   match = /^&mkp (\S+)$/.exec(value);
   if (match) {
     const button = MOUSE_BUTTONS.some((b) => b.code === match[1]) ? match[1] : "MB1";
@@ -167,6 +180,10 @@ export function buildStructuredBinding({ behavior, layerIndex, modifier, keycode
   validateToken(keycode, "Keycode");
 
   if (behavior === "&kp") return `&kp ${buildKeypressValue(keycode, keypressModifiers)}`;
+
+  if (behavior === "&to_layer_0") {
+    return `&to_layer_0 ${buildKeypressValue(keycode, keypressModifiers)}`;
+  }
 
   if (behavior === "&lt") {
     if (!Number.isInteger(layerIndex)) {

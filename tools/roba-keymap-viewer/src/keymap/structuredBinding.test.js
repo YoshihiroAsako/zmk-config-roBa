@@ -32,6 +32,10 @@ describe("structured binding helpers", () => {
       "&mt LEFT_SHIFT SPACE",
     );
     assert.equal(
+      buildStructuredBinding({ behavior: "&to_layer_0", keycode: "INT_MUHENKAN" }, 7),
+      "&to_layer_0 INT_MUHENKAN",
+    );
+    assert.equal(
       buildStructuredBinding({ behavior: "&lt", layerIndex: 2, keycode: "A", keypressModifiers: ["LC"] }, 7),
       "&lt 2 LC(A)",
     );
@@ -65,6 +69,13 @@ describe("structured binding helpers", () => {
       modifier: "LEFT_SHIFT",
       keycode: "PSCRN",
       keypressModifiers: ["LC", "LS"],
+    });
+    assert.deepEqual(parseStructuredBinding("&to_layer_0 INT_MUHENKAN", 7), {
+      behavior: "&to_layer_0",
+      layerIndex: 0,
+      modifier: "LEFT_SHIFT",
+      keycode: "INT_MUHENKAN",
+      keypressModifiers: [],
     });
     assert.deepEqual(parseStructuredBinding("&lt 6 ESCAPE", 7), {
       behavior: "&lt",
@@ -108,6 +119,9 @@ describe("structured binding helpers", () => {
     const plainLt = "&lt 1 SPACE";
     assert.deepEqual(parseStructuredBinding(plainLt, 7).keypressModifiers, []);
     assert.equal(buildStructuredBinding(parseStructuredBinding(plainLt, 7), 7), plainLt);
+
+    const toLayerZeroBinding = "&to_layer_0 LS(TAB)";
+    assert.equal(buildStructuredBinding(parseStructuredBinding(toLayerZeroBinding, 7), 7), toLayerZeroBinding);
   });
 
   it("builds and parses mouse button press bindings", () => {

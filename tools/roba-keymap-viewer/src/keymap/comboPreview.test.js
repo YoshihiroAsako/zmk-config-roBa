@@ -41,13 +41,42 @@ describe("combo preview state", () => {
     assert.equal(reparsed.combos.length, parsed.combos.length);
   });
 
-  it("keeps unsupported combo bindings read-only while allowing position previews", async () => {
+  it("builds a preview for the roBa to_layer_0 combo binding", async () => {
     const source = await readRepoFile("config/roBa.keymap");
     const parsed = parseKeymap(source);
     const combo = parsed.combos.find((item) => item.name === "muhennkann");
+    const state = buildComboPreviewState(source, combo, {
+      bindingRaw: "&to_layer_0 INT_HENKAN",
+      positionsRaw: combo.positions.join(" "),
+    });
+
+    assert.equal(state.canEditBinding, true);
+    assert.equal(state.changed, true);
+    assert.equal(state.valid, true);
+    assert.equal(parseKeymap(state.nextSource).combos.find((item) => item.name === "muhennkann").binding, "&to_layer_0 INT_HENKAN");
+  });
+
+  it("keeps unsupported combo bindings read-only while allowing position previews", () => {
+    const source = `/
+{
+    combos {
+        compatible = "zmk,combos";
+        custom_combo {
+            bindings = <&custom_two A B>;
+            key-positions = <0 1>;
+        };
+    };
+    keymap {
+        compatible = "zmk,keymap";
+        default_layer { bindings = <&kp A &kp B>; };
+    };
+};
+`;
+    const parsed = parseKeymap(source);
+    const combo = parsed.combos.find((item) => item.name === "custom_combo");
     const positionsOnly = buildComboPreviewState(source, combo, {
       bindingRaw: combo.binding,
-      positionsRaw: "10 11",
+      positionsRaw: "1 0",
     });
     const bindingChange = buildComboPreviewState(source, combo, {
       bindingRaw: "&kp A",
@@ -56,7 +85,7 @@ describe("combo preview state", () => {
 
     assert.equal(positionsOnly.canEditBinding, false);
     assert.equal(positionsOnly.changed, true);
-    assert.equal(parseKeymap(positionsOnly.nextSource).combos.find((item) => item.name === "muhennkann").positions[0], 10);
+    assert.equal(parseKeymap(positionsOnly.nextSource).combos.find((item) => item.name === "custom_combo").positions[0], 1);
     assert.equal(bindingChange.changed, false);
     assert.match(bindingChange.message, /outside the Phase 2 edit set/);
     assert.equal(bindingChange.nextSource, source);

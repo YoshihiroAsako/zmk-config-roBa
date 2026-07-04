@@ -342,6 +342,32 @@ describe("save binding change helper", () => {
     });
   });
 
+  it("saves the roBa to_layer_0 combo binding", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const combo = parseKeymap(source).combos.find((item) => item.name === "muhennkann");
+
+    await withTempRepo(source, async (tempRoot) => {
+      const result = await saveBindingChanges({
+        repoRoot: tempRoot,
+        changes: [
+          {
+            kind: "combo-binding",
+            range: combo.bindingEntry.sourceRange,
+            currentRaw: combo.binding,
+            nextRaw: "&to_layer_0 INT_HENKAN",
+          },
+        ],
+        now: new Date(2026, 4, 5, 10, 30, 0),
+      });
+      const savedSource = await readTempKeymap(tempRoot);
+      const savedCombo = parseKeymap(savedSource).combos.find((item) => item.name === "muhennkann");
+
+      assert.equal(result.ok, true);
+      assert.equal(savedCombo.binding, "&to_layer_0 INT_HENKAN");
+      assert.equal(result.diagnostics.every((item) => item.ok), true);
+    });
+  });
+
   it("backs up once and saves combo layers-insert and timeout-ms-insert changes", async () => {
     const source = await readRepoFile("config/roBa.keymap");
     const parsed = parseKeymap(source);

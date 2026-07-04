@@ -45,7 +45,8 @@ describe("roBa keymap parser", () => {
     assert.equal(describeBinding(defaultLayer.bindings[36], layerNames).display, "SCROLL");
     assert.equal(defaultLayer.bindings[37], "&lt 6 INT_HENKAN");
     assert.equal(numLayer.bindings[29], "&kp RIGHT_BRACKET");
-    assert.equal(describeBinding(numLayer.bindings[33], layerNames).display, "\\");
+    assert.equal(numLayer.bindings[33], "&kp EXCL");
+    assert.equal(describeBinding(numLayer.bindings[33], layerNames).display, "EXCL");
   });
 
   it("shows known Windows JIS output labels for symbol keycodes", () => {

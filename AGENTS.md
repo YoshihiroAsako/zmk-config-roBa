@@ -1,144 +1,100 @@
-# AGENTS.md
+<!-- BEGIN:ai-common-rules v1.0 -->
+<!-- このブロックは ai-workspace-rules/AGENTS.common.md からの配布物。
+     編集は必ず原本(ai-workspace-rules)側で行い、各リポジトリ側では変更しないこと。
+     リポジトリ固有のルール(技術スタック・ドメイン知識)はブロックの外、下部の固有層セクションに書く。 -->
 
-This file is the single source of truth for AI coding agents working in this repository.
-Respond to the user in Japanese unless they explicitly ask otherwise.
+# 共通ルール(全リポジトリ同一)
 
-## Project Overview
+## 0. ファイル構成の標準
 
-`zmk-config-roBa` is a ZMK Firmware configuration repository for the roBa split keyboard.
+- AI エージェントへの指示の正本はこの `AGENTS.md`。`CLAUDE.md` と `.cursor/rules/*.mdc` は「`AGENTS.md` を読んで従うこと」という誘導のみを書き、内容を複製しない。
+- 本ファイルは共通層+固有層あわせて **150 行以内**を目標とする。超える内容は `.claude/skills/` または `docs/` へ移し、「必要なとき参照する」ポインタだけを残す。
+- 作業状態は `NextAction.md`(リポジトリ直下)、設計検討は `docs/design/`、完了済みの履歴は `Archive.md` に置く。
 
-- MCU: `seeeduino_xiao_ble` (nRF52840)
-- Firmware: ZMK Firmware, pinned to `v0.3-branch` in `config/west.yml`
-- Trackball driver: `kumamuk-git/zmk-pmw3610-driver`
-- Builds: GitHub Actions matrix in `build.yaml` builds `roBa_L`, `roBa_R`, and `settings_reset`
+## 1. NextAction.md の運用
 
-## Hardware And Side Roles
+- フォーマットは 4 部構成: **現在地 / 決定済み事項 / Next Actions / 保留・未決**。
+- 作業開始時に `NextAction.md` を読む。長い参照先は必要なセクションだけ辿る。
+- **【重要】AI が `NextAction.md` を自発的に更新することを禁止する。** 作業完了後も書き換えず、作業結果はチャットでの報告のみ行う。
+- 更新は、ユーザーが「**NextAction更新**」と明示的に指示したときのみ実施する。指示に含まれる承認/却下を反映し、**却下された作業は「保留・未決」へ移す**。
+- 更新は差分最小の**追記型**とする。「決定済み事項」の過去記録は書き換えない。訂正が必要な場合は新しい項目を追記して上書きする。
+- 「NextAction更新」の指示時にあわせて、クローズ済みの長い記録は `Archive.md`(またはリポジトリ固有の履歴ファイル)へ**末尾追記**で移す。Archive の既存エントリは書き換え・並べ替え・削除しない。
 
-Treat physical hardware placement and Kconfig flags as separate concepts.
+## 2. 設計ドキュメント分岐
 
-- Physically, `roBa_L` is the left half with the encoder.
-- Physically, `roBa_R` is the right half with the PMW3610 trackball and SPI wiring.
-- `CONFIG_EC11` and `CONFIG_ZMK_POINTING` intentionally appear in both side `.conf` files. Do not delete them just because only one physical half has the related hardware.
-- ZMK Studio is enabled on `roBa_R`. Keep `build.yaml`'s `snippet: studio-rpc-usb-uart` together with `boards/shields/roBa/roBa_R.conf` settings such as `CONFIG_ZMK_STUDIO=y` and `CONFIG_ZMK_STUDIO_LOCKING=n`.
+次のいずれかに該当する作業は、**実装前に** `docs/design/` に検討ドキュメントを作成し、**ユーザーの承認を待ってから**実装する:
 
-## Repository Map
+1. 3 ファイル以上の変更
+2. 新規外部依存(ライブラリ・サービス・ツール)の追加
+3. データ構造(スキーマ・保存形式・API 契約)の変更
+4. 実装方針の選択肢が複数ある場合
 
-- High-touch files:
-  - `config/roBa.keymap`: main ZMK keymap
-  - `keymap-drawer/roBa.yaml`: keymap-drawer source
-  - `keymap-drawer/roBa.svg`: generated visual keymap
-- Medium-touch files:
-  - `boards/shields/roBa/*.conf`
-  - `boards/shields/roBa/*.overlay`
-- Low-touch files:
-  - `build.yaml`
-  - `config/west.yml`
-  - `boards/shields/roBa/*.dtsi`
-- Avoid editing unless there is a clear reason:
-  - `zephyr/`
-  - `.west/`
-  - `boards/shields/roBa/Kconfig.*`
+検討ドキュメントの構成は「背景 / 選択肢と比較 / 推奨案 / 影響範囲 / 未決事項」とする(雛形: design-doc テンプレート)。
 
-## Work Resumption
+## 3. トークン節約原則
 
-When starting or resuming work, check whether `docs/current-work-status.md` exists.
+- ファイルを全読みする前に、grep・ディレクトリ一覧等で構造を把握してから必要箇所だけ読む。
+- 同一ファイルの不要な再読み込みをしない。
+- 指示されていないファイルの探索をしない(`NextAction.md` と作業対象から辿れる範囲に留める)。
+- 会話に長い引用を貼らず、要点とファイルパスで共有する。
 
-If it exists:
+## 4. 修正時の原則
 
-1. Read `docs/current-work-status.md`.
-2. Use it to understand the current task, progress, next actions, pending decisions, and relevant files.
-3. Continue from the next actionable step unless the user gives a newer conflicting instruction.
-4. After making progress, update `docs/current-work-status.md` so a future session can resume from the latest state.
+- バグ修正は、症状への対処の前に**根本原因を特定する**。
+- 修正方針を宣言してから、一貫して実施する。同じ箇所を行ったり来たりする試行錯誤の反復をしない。方針が誤りと判明したら、その時点で報告して方針を立て直す。
+- 検証(テスト・ビルド・実機確認)を実施できなかった場合は、その旨と理由を報告に明記する。
 
-If `docs/current-work-status.md` conflicts with the user's latest message, the user's latest message wins.
+## 5. 言語・様式
 
-### Minimal `@file` Resume Design
+- 応答・ドキュメントは**日本語**。コード・識別子は英語。**コミットメッセージは日本語**。
+- **結論を先に**述べ、根拠・詳細を後に添える。
+- 指示されていないスコープ拡大をしない(機能追加・リファクタリング・最適化・体裁の一括変更を含む)。
+- 不確実な内容は「推測」「要確認」と明記し、根拠のない数値・事実を提示しない。
 
-For a new chat, the preferred minimal context is:
+## 6. 安全
 
-1. `@AGENTS.md`
-2. `@docs/current-work-status.md`
+- ユーザーや他エージェントの未コミット変更を勝手に戻さない・上書きしない。
+- 秘密情報(鍵・トークン・パスワード・個人情報)をコミットしない。ローカル秘密は `.env` 系(Git 管理外)に置く。
+- 破壊的操作(ファイル削除、`git reset --hard`、force push 等)はユーザー承認を得てから行う。
+- `git commit` / `git push` はユーザーが指示したときのみ実施する。
 
-Only add more `@` files when the next task directly needs source, design, or verification details. Do not ask the user to attach every historical planning or review document by default.
+## 7. 報告フォーマット
 
-Historical design/review documents should be treated as reference material, not mandatory startup context. Read them lazily only when the current task needs the details.
+最終報告には次の 4 点を含める:
 
-If a task needs a concrete handoff prompt, keep that prompt as a short section inside `docs/current-work-status.md` instead of creating a separate prompt-only file.
+1. 今回やったこと
+2. 検証結果(未検証の場合はその理由)
+3. 次にやることの案(NextAction.md には書かず、報告として提示)
+4. ユーザーの確認・判断が必要な点
 
-Keep `docs/current-work-status.md` token-efficient:
+<!-- END:ai-common-rules -->
 
-- Keep the current task, latest checkpoint, next actions, blockers, verification status, and relevant files.
-- Prefer replacing stale detail with a short summary plus links to detailed docs.
-- Do not paste long review histories, command logs, generated output, or duplicated instructions from `AGENTS.md`.
-- Keep the file short enough that an AI can read it at startup without wasting context.
+# zmk-config-roBa — 固有ルール
 
-## Workflow
+## プロジェクト
 
-For keymap changes:
+- roBa 分割キーボードの ZMK Firmware 設定リポジトリ。MCU: `seeeduino_xiao_ble`(nRF52840)。ZMK は `config/west.yml` で `v0.3-branch` に固定。トラックボールドライバ: `kumamuk-git/zmk-pmw3610-driver`。
 
-1. Edit `config/roBa.keymap`.
-2. If the visible layout changes, update `keymap-drawer/roBa.yaml`.
-3. Regenerate `keymap-drawer/roBa.svg` and include it in the same commit.
+## ハードと設定の対応(誤解しやすい点)
 
-Example keymap-drawer commands:
+- 物理配置と Kconfig フラグは別概念。**roBa_L = エンコーダー側 / roBa_R = トラックボール(PMW3610・SPI)+ ZMK Studio 側**。
+- `CONFIG_EC11` と `CONFIG_ZMK_POINTING` は左右両方の `.conf` に**意図的に**存在する。片側にしかハードが無いことを理由に削除しない。
+- 左右対称にすべき設定(バッテリー報告・split BLE 等)と、片側専用の設定(PMW3610・SPI・Studio・エンコーダー)を区別する。
 
-```bash
-keymap parse -c 10 -z config/roBa.keymap > keymap-drawer/roBa.yaml
-keymap draw -d boards/shields/roBa/roBa.dtsi keymap-drawer/roBa.yaml > keymap-drawer/roBa.svg
-```
+## 変更禁止・維持事項
 
-`roBa` is a custom keyboard not in keymap-drawer's built-in database, so `keymap draw` requires `-d boards/shields/roBa/roBa.dtsi` to supply the physical layout.
+- `zephyr/` と `.west/` は編集しない。`config/west.yml` の revision は指示がない限り変更しない。
+- `build.yaml` の roBa_R `snippet: studio-rpc-usb-uart`、`roBa_R.conf` の `CONFIG_ZMK_STUDIO=y` / `CONFIG_ZMK_STUDIO_LOCKING=n` を維持する。
+- 既存の番号付きレイヤー(`layer_6` 等)を自動リネームしない。ピン番号は配線変更の意図がある時のみ変更。
 
-On Windows with PowerShell, `>` redirects as UTF-16 LE. Use `Out-File -Encoding utf8` or run via `python -c` with explicit UTF-8 file writes to avoid encoding errors.
+## ワークフロー
 
-Before overwriting `keymap-drawer/roBa.yaml`, check whether it contains manual adjustments and review the diff afterward.
+- keymap 変更: `config/roBa.keymap` 編集 → 見た目が変わる場合は `keymap-drawer/roBa.yaml` 更新+`roBa.svg` 再生成を同一コミットに含める(コマンドと DSL の詳細は `.cursor/rules/zmk-keymap.mdc` と `docs/viewer-to-device-guide.md`)。
+- 検証: ローカルビルドは前提にしない。push して GitHub Actions の成功を確認し、生成された `.uf2` で書き込む。DeviceTree ビルド成功は最低限の確認に過ぎない。
+- 環境: Windows + PowerShell 前提。`>` リダイレクトは UTF-16 になるため、他ツールが読むファイルは UTF-8 を明示する。
 
-For firmware validation:
+## 参照先(必要なときだけ読む)
 
-- Do not assume local hardware builds are available.
-- Prefer pushing and confirming the GitHub Actions build.
-- After Actions succeeds, use the generated `.uf2` artifacts for device flashing.
-- DeviceTree build success is only a minimum check; it does not prove real hardware behavior.
-
-## Editing Rules
-
-- Keep new layer names meaningful, such as `default_layer`, `lower`, `raise`, `adjust`, or `mouse`.
-- Do not automatically rename existing numbered layers such as `layer_6`; they may be referenced by `&lt`, `&mo`, keymap-drawer, or custom behaviors.
-- Add short comments for new non-obvious behavior definitions, especially hold-tap timing parameters.
-- Keep combos and macros in their own sections rather than scattering inline definitions.
-- Add comments to non-obvious `.conf` values, especially sensor tuning, sleep timing, power, and communication settings. Do not comment every self-explanatory Kconfig line.
-- Keep common L/R settings aligned when they are meant to be common, such as battery reporting and split BLE settings.
-- Do not make side-specific settings symmetrical by default. PMW3610, SPI, ZMK Studio, and encoder settings may intentionally live on only one side.
-- Treat `config/roBa.json` as keymap-editor metadata. When changing layout shape or key counts, check consistency with `config/roBa.keymap` and keymap-drawer files.
-
-## Dependency And Build Rules
-
-- Do not change `config/west.yml` revisions unless explicitly asked.
-- If changing the ZMK revision or `zmk-pmw3610-driver` revision, do it as a separate change from keymap or hardware edits.
-- Preserve the order of `build.yaml`'s `include` matrix unless there is a reason to reorder it.
-- Do not remove or move the `roBa_R` `snippet: studio-rpc-usb-uart` as a cleanup.
-
-## Commit And PR Guidance
-
-- Commit messages may be English or Japanese. Make the reason for the change clear.
-- Keep keymap changes, `.conf` setting changes, and shield/DeviceTree changes in separate commits when practical.
-- Include `keymap-drawer/roBa.svg` with visible keymap changes.
-- For `.conf` changes that alter physical behavior, such as sensor sensitivity, mention hardware verification status.
-- For side-specific changes, explain why only that side changed.
-
-## Do Not
-
-- Do not edit `zephyr/` or `.west/` generated/dependency directories.
-- Do not push unverified `.overlay` or `.dtsi` changes as "should work".
-- Do not change pin numbers unless the hardware wiring change is intentional.
-- Do not infer hardware placement from Kconfig flag presence alone.
-
-## Local Environment
-
-- The expected user environment is Windows with PowerShell.
-- Use native Windows Git rather than assuming WSL.
-- Prefer PowerShell-compatible commands in instructions and examples unless a tool specifically requires another shell.
-
-## Maintenance
-
-When ZMK, `zmk-pmw3610-driver`, keymap-editor, or keymap-drawer usage changes significantly, review this file and update the agent rules if the workflow or assumptions have changed.
+- keymap DSL・roBa 固有注意: `.cursor/rules/zmk-keymap.mdc`(config/*.keymap 編集時に自動適用)
+- ローカル viewer(tools/roba-keymap-viewer)の使い方: `docs/viewer-to-device-guide.md`
+- Studio 代替アプリ計画(**凍結中**・明示指示まで着手しない): `docs/studio_alt_app.md`

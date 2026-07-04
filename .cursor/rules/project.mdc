@@ -1,17 +1,8 @@
 ---
-description: Project-wide rules for zmk-config-roBa
+description: AGENTS.md を正本とするプロジェクト規約
 alwaysApply: true
 ---
 
-@AGENTS.md
+# プロジェクト規約(入口)
 
-# Project Rules
-
-Use `AGENTS.md` as the source of truth for project rules. If this rule and `AGENTS.md` disagree about project behavior, follow `AGENTS.md`.
-
-Cursor-specific guidance in this file takes precedence for Cursor behavior only.
-
-- Respond in Japanese unless the user explicitly requests another language.
-- Assume Windows + PowerShell for shell commands.
-- Keep edits scoped to the user's request and the ZMK config files involved.
-- When editing `config/roBa.keymap`, also consider whether `.cursor/rules/zmk-keymap.mdc` applies.
+このリポジトリの AI エージェントへの指示の正本はリポジトリ直下の `AGENTS.md`。作業前に `AGENTS.md` を読み、それに従うこと。内容をここに複製しない。
