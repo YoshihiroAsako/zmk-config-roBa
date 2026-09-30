@@ -15,7 +15,7 @@ description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び�
 - 使うのは、ユーザーが他 AI の呼び出し(その AI へのレビュー依頼を含む)を依頼したときだけ。エージェントから他 AI の利用・レビュー・次の回を提案しない。
 - 1 回の呼び出しごとに「承認の提示」を示し、ユーザーの明示承認を得る。「もう 1 回」は新しい承認とし、承認を次の回へ持ち越さない。
 - 対象は Codex(`codex`)・Claude Code(`claude`)・Cursor(`cursor-agent` / `agent`)の 3 つ。ほかの AI は、同じ条件の確かめ方を正本で決めるまで呼ばない。
-- 呼ばれる側にできるのは、正本の試験に合格した AI だけ(2026-09-30 時点: Claude Code は合格、Codex はサンドボックス復旧による再試験待ち、Cursor は不合格)。Codex は復旧前の「条件付き合格」を持ち越さず、再試験の全条件を機械的な記録で確認するまで呼ばない。
+- 呼ばれる側にできるのは、正本の試験に合格した AI だけ(2026-09-30 時点: Claude Code は合格、Codex と Cursor は不合格)。このため使える方向は Codex → Claude Code と Cursor → Claude Code の 2 つで、Claude Code から他 AI は呼ばない。
 
 ## サブスク内の確認(呼び出しの直前に毎回)
 
@@ -57,10 +57,10 @@ description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び�
 | AI | 起動形(試験の結果は正本の未決事項) | 根拠 |
 |---|---|---|
 | Claude Code | `claude -p --tools "" --strict-mcp-config --no-session-persistence --model <model> --settings '{"disableAllHooks":true,"autoMemoryEnabled":false,"pluginConfigs":{"agents-md@builtin":{"options":{"instructionFiles":"managed-only"}}}}'`(依頼文は標準入力) | `--tools ""` で全ツール無効(CLI ヘルプ)。`disableAllHooks` はその回のフックを止める(公式 hooks)。`autoMemoryEnabled` と `instructionFiles` は自動読込を止める(公式 memory) |
-| Codex | **再試験待ち。呼ばれる側には使わない。** 復旧前の試験形は `codex exec --ignore-user-config --sandbox read-only --skip-git-repo-check --ephemeral -C <一時フォルダ> -m <model> -o <保存先> -`(依頼文は標準入力) | `--ignore-user-config` が明示的に飛ばすのは `$CODEX_HOME/config.toml`(認証には `CODEX_HOME` を使う)。`read-only` はシェル実行そのものや作業フォルダ外の読み取りを禁止する設定ではない。通常の CLI ホームと Orca 用ホームを区別して再試験する |
+| Codex | **呼ばれる側にしない。**2026-09-30 のサンドボックス復旧後の再試験で、シェル・プラグイン・スキル・指示ファイルなどを止めた起動形でも、作業用エージェントを作るツール(`spawn_agent`)が残り、止める設定が無かった。試しに作らせると呼び出しまで進み、`--ephemeral` の副作用で失敗しただけだった | 正本の未決事項(試験の結果)。試験の起動形と記録は `ai-workspace-rules/reviews/20260930-cross-ai-codex-retest/` |
 | Cursor | **呼ばれる側にしない。**2026-09-30 の試験で、`--mode ask` でもワークスペースの外のファイルを読めた。Windows では Cursor のサンドボックスも使えない | 正本の未決事項(試験の結果) |
 
-- 試験の合格条件: 一時フォルダの外(リポジトリや `.env.local`)を読めない。フックと自動読込が止まる。シェルと他 AI の呼び出しができない。サブスク認証のまま返る。外を読めた AI は呼ばれる側から外す。
+- 試験の合格条件: 一時フォルダの外(リポジトリや `.env.local`)を読めない。フックと自動読込が止まる。シェルと他 AI の呼び出し(その AI 自身の作業用エージェントを含む)ができない。サブスク認証のまま返る。外を読めた AI と、作業用エージェントを止められない AI は呼ばれる側から外す。
 - 合否は機械の記録(起動時のツール一覧・ツール使用の記録・フックの記録・出力の中身)で判定する。呼ばれた AI の自己申告は使わない(試験で、使えないシェルを「実行できた」と答えた例がある)。
 - 試験の結果は、正本の未決事項に AI ごとに記録する。
 - Claude を呼ぶと、ユーザーが対話中の Claude と同じサブスク枠を使う。
@@ -81,7 +81,7 @@ description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び�
 | Cursor | CLI は `~/.cursor/cli-config.json` の `allow` に他の CLI を載せない。**Orca の管理下では、Orca のフックが常に許可を返すため確認は出ない**(2026-09-30 の試験。IDE・CLI とも) |
 
 - 設定が無い、または効かない方向は、チャットでの承認だけで運用する。その方向は承認の提示に「仕組みの確認なし」と書く。
-- 呼び出し側で確認が出る仕組みがあるのは Claude Code だけなので、他の AI はなるべく Claude Code のセッションから呼ぶ。
+- 呼び出し側で確認が出る仕組みがあるのは Claude Code だけだが、呼ばれる側が Claude Code だけのため、Claude Code から呼ぶ方向は無い。使える 2 方向(Codex → Claude Code、Cursor → Claude Code)はどちらも「仕組みの確認なし」で、チャットでの承認だけで運用する。
 
 ## しないこと
 
