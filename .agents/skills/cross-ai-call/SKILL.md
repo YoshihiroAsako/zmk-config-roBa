@@ -15,7 +15,7 @@ description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び�
 - 使うのは、ユーザーが他 AI の呼び出し(その AI へのレビュー依頼を含む)を依頼したときだけ。エージェントから他 AI の利用・レビュー・次の回を提案しない。
 - 1 回の呼び出しごとに「承認の提示」を示し、ユーザーの明示承認を得る。「もう 1 回」は新しい承認とし、承認を次の回へ持ち越さない。
 - 対象は Codex(`codex`)・Claude Code(`claude`)・Cursor(`cursor-agent` / `agent`)の 3 つ。ほかの AI は、同じ条件の確かめ方を正本で決めるまで呼ばない。
-- 呼ばれる側にできるのは、正本の試験に合格した AI だけ(2026-09-30 時点: Claude Code は合格、Codex は条件付き合格、Cursor は不合格)。条件付き合格は、条件が崩れたら(Codex はサンドボックスの状態が変わったら)再試験するまで呼ばない。
+- 呼ばれる側にできるのは、正本の試験に合格した AI だけ(2026-09-30 時点: Claude Code は合格、Codex はサンドボックス復旧による再試験待ち、Cursor は不合格)。Codex は復旧前の「条件付き合格」を持ち越さず、再試験の全条件を機械的な記録で確認するまで呼ばない。
 
 ## サブスク内の確認(呼び出しの直前に毎回)
 
@@ -57,7 +57,7 @@ description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び�
 | AI | 起動形(試験の結果は正本の未決事項) | 根拠 |
 |---|---|---|
 | Claude Code | `claude -p --tools "" --strict-mcp-config --no-session-persistence --model <model> --settings '{"disableAllHooks":true,"autoMemoryEnabled":false,"pluginConfigs":{"agents-md@builtin":{"options":{"instructionFiles":"managed-only"}}}}'`(依頼文は標準入力) | `--tools ""` で全ツール無効(CLI ヘルプ)。`disableAllHooks` はその回のフックを止める(公式 hooks)。`autoMemoryEnabled` と `instructionFiles` は自動読込を止める(公式 memory) |
-| Codex | `codex exec --ignore-user-config --sandbox read-only --skip-git-repo-check --ephemeral -C <一時フォルダ> -m <model> -o <保存先> -`(依頼文は標準入力) | `--ignore-user-config` でユーザー設定(プラグイン・MCP)を読まない(CLI ヘルプ)。sandbox に読み取りを止める値は無い |
+| Codex | **再試験待ち。呼ばれる側には使わない。** 復旧前の試験形は `codex exec --ignore-user-config --sandbox read-only --skip-git-repo-check --ephemeral -C <一時フォルダ> -m <model> -o <保存先> -`(依頼文は標準入力) | `--ignore-user-config` が明示的に飛ばすのは `$CODEX_HOME/config.toml`(認証には `CODEX_HOME` を使う)。`read-only` はシェル実行そのものや作業フォルダ外の読み取りを禁止する設定ではない。通常の CLI ホームと Orca 用ホームを区別して再試験する |
 | Cursor | **呼ばれる側にしない。**2026-09-30 の試験で、`--mode ask` でもワークスペースの外のファイルを読めた。Windows では Cursor のサンドボックスも使えない | 正本の未決事項(試験の結果) |
 
 - 試験の合格条件: 一時フォルダの外(リポジトリや `.env.local`)を読めない。フックと自動読込が止まる。シェルと他 AI の呼び出しができない。サブスク認証のまま返る。外を読めた AI は呼ばれる側から外す。
