@@ -1,6 +1,6 @@
 ---
 name: cross-ai-call
-description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び出しを依頼したとき、または他 AI レビューを直接呼び出しで行うと依頼したときに使用する。1 回ごとの明示承認・サブスク内の確認・呼ばれる側の制限・原文の保存・連鎖の中継の手順。エージェントから他 AI の利用を提案しない。
+description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び出しや直接レビューを依頼したときに使用する。各呼び出しの承認・サブスク内確認・ツール制限・原文保存を扱う。起案時の design-doc 案Fを除き、他 AI の利用を自発提案しない。
 ---
 
 <!-- 配布物。編集は必ず原本(ai-workspace-rules/skills/cross-ai-call)側で行い、
@@ -12,7 +12,7 @@ description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び�
 
 ## 前提
 
-- 使うのは、ユーザーが他 AI の呼び出し(その AI へのレビュー依頼を含む)を依頼したときだけ。エージェントから他 AI の利用・レビュー・次の回を提案しない。
+- 使うのは、ユーザーが他 AI の呼び出し(その AI へのレビュー依頼を含む)を依頼したときだけ。自発提案の例外は `design-doc` の起案時の案Fの1行だけで、他 AI の利用・レビュー・次の回を追加提案しない。案Fは起動承認ではない。
 - 1 回の呼び出しごとに「承認の提示」を示し、ユーザーの明示承認を得る。「もう 1 回」は新しい承認とし、承認を次の回へ持ち越さない。
 - 対象は Codex(`codex`)・Claude Code(`claude`)・Cursor(`cursor-agent` / `agent`)の 3 つ。ほかの AI は、同じ条件の確かめ方を正本で決めるまで呼ばない。
 - 呼ばれる側にできるのは、正本の試験に合格した AI だけ(2026-09-30 時点: Claude Code は合格、Codex と Cursor は不合格)。このため使える方向は Codex → Claude Code と Cursor → Claude Code の 2 つで、Claude Code から他 AI は呼ばない。
