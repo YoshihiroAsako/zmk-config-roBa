@@ -8,7 +8,7 @@ description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び�
 
 # 他 AI の直接呼び出し(cross-ai-call)
 
-正本は `ai-workspace-rules/docs/design/20260930-cross-ai-invoke.md`(承認済み。案 C)。本スキルは `AGENTS.md` §6 の「他 AI の呼び出し」の手順であり、矛盾したら正本と §6 が優先する。レビューの記録は `review-round` スキルに従う。
+正本は `../ai-workspace-rules/docs/design/20260930-cross-ai-invoke.md`(承認済み。案 C)。本スキルは `AGENTS.md` §6 の「他 AI の呼び出し」の手順であり、矛盾したら正本と §6 が優先する。レビューの記録は `review-round` スキルに従う。
 
 ## Orca との適用境界
 
@@ -65,7 +65,7 @@ description: ユーザーが他 AI(Codex / Claude Code / Cursor)の直接呼び�
 | AI | 起動形(試験の結果は正本の未決事項) | 根拠 |
 |---|---|---|
 | Claude Code | `claude -p --tools "" --strict-mcp-config --no-session-persistence --model <model> --settings '{"disableAllHooks":true,"autoMemoryEnabled":false,"pluginConfigs":{"agents-md@builtin":{"options":{"instructionFiles":"managed-only"}}}}'`(依頼文は標準入力) | `--tools ""` で全ツール無効(CLI ヘルプ)。`disableAllHooks` はその回のフックを止める(公式 hooks)。`autoMemoryEnabled` と `instructionFiles` は自動読込を止める(公式 memory) |
-| Codex | **呼ばれる側にしない。**2026-09-30 のサンドボックス復旧後の再試験で、シェル・プラグイン・スキル・指示ファイルなどを止めた起動形でも、作業用エージェントを作るツール(`spawn_agent`)が残り、止める設定が無かった。試しに作らせると呼び出しまで進み、`--ephemeral` の副作用で失敗しただけだった | 正本の未決事項(試験の結果)。試験の起動形と記録は `ai-workspace-rules/reviews/20260930-cross-ai-codex-retest/` |
+| Codex | **呼ばれる側にしない。**2026-09-30 のサンドボックス復旧後の再試験で、シェル・プラグイン・スキル・指示ファイルなどを止めた起動形でも、作業用エージェントを作るツール(`spawn_agent`)が残り、止める設定が無かった。試しに作らせると呼び出しまで進み、`--ephemeral` の副作用で失敗しただけだった | 正本の未決事項(試験の結果)。試験の起動形と記録は `../ai-workspace-rules/reviews/20260930-cross-ai-codex-retest/` |
 | Cursor | **呼ばれる側にしない。**2026-09-30 の試験で、`--mode ask` でもワークスペースの外のファイルを読めた。Windows では Cursor のサンドボックスも使えない | 正本の未決事項(試験の結果) |
 
 - 試験の合格条件: 一時フォルダの外(リポジトリや `.env.local`)を読めない。フックと自動読込が止まる。シェルと他 AI の呼び出し(その AI 自身の作業用エージェントを含む)ができない。サブスク認証のまま返る。外を読めた AI と、作業用エージェントを止められない AI は呼ばれる側から外す。

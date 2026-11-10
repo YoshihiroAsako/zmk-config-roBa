@@ -8,7 +8,7 @@ description: 定型句「構成検討」「資料の骨子」・`/doc-outline` �
 
 # doc-outline
 
-資料(スライド・文書)の構成・内容を検討する。設計根拠は `ai-workspace-rules/docs/design/skill-facilitation-modes.md`(起動・配布の改訂は `docs/design/skill-cross-agent-hybrid-invoke.md`)。
+資料(スライド・文書)の構成・内容を検討する。設計根拠は `../ai-workspace-rules/docs/design/skill-facilitation-modes.md`(起動・配布の改訂は `../ai-workspace-rules/docs/design/skill-cross-agent-hybrid-invoke.md`)。
 
 ## 前提
 

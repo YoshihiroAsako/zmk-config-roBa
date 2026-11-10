@@ -7,7 +7,7 @@ description: ユーザーが Orca orchestration で AI ワーカーに実装や�
 
 # Orca での作業委譲
 
-正本は対象リポジトリの `AGENTS.md` §6 と `ai-workspace-rules/docs/design/20260930-orca-orchestration-rule.md`。承認・範囲・安全・記録は §6 と本スキルを優先する。Orca 提供の `orchestration` スキルと `orca skills get orchestration` は現在の CLI 操作方法の参照であり、未承認の起動や作業継続を許可しない。Orca のバージョンやガイドが変わったら起動・停止・権限・ライフサイクルを再照合する。
+正本は対象リポジトリの `AGENTS.md` §6 と `../ai-workspace-rules/docs/design/20260930-orca-orchestration-rule.md`。承認・範囲・安全・記録は §6 と本スキルを優先する。Orca 提供の `orchestration` スキルと `orca skills get orchestration` は現在の CLI 操作方法の参照であり、未承認の起動や作業継続を許可しない。Orca のバージョンやガイドが変わったら起動・停止・権限・ライフサイクルを再照合する。
 
 ## 使う条件
 

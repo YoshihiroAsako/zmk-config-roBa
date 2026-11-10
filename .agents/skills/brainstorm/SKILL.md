@@ -8,7 +8,7 @@ description: 定型句「壁打ち」「壁打ちモード」・`/brainstorm` �
 
 # brainstorm
 
-開いた検討を進めるための会話ファシリテーション。設計根拠は `ai-workspace-rules/docs/design/skill-facilitation-modes.md`(起動・配布の改訂は `docs/design/skill-cross-agent-hybrid-invoke.md`)。
+開いた検討を進めるための会話ファシリテーション。設計根拠は `../ai-workspace-rules/docs/design/skill-facilitation-modes.md`(起動・配布の改訂は `../ai-workspace-rules/docs/design/skill-cross-agent-hybrid-invoke.md`)。
 
 ## 前提
 

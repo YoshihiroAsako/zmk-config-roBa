@@ -14,7 +14,7 @@ openpyxl を使って .xlsx を生成するスキル。仕様の正本は共通 
 - 層2(事業計画 PL のシート構成の型): `../ai-workspace-rules/design/xlsx/pl-spec.md`
 - 体裁(フォント・配色・命名): `../ai-workspace-rules/design/office-style.md`
 
-設計の経緯: `ai-workspace-rules/docs/design/xlsx-pl-format-standardization.md`
+設計の経緯: `../ai-workspace-rules/docs/design/xlsx-pl-format-standardization.md`
 
 ## 前提
 
