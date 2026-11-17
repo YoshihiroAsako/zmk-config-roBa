@@ -2,11 +2,35 @@
   color: #18202f;
   background: #f4f7fb;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
+
+[hidden] { display: none !important; }
+
+:focus-visible {
+  outline: 3px solid #165bcc;
+  outline-offset: 3px;
+}
+
+.keyCap:focus-visible { outline: none; }
+.keyCap:focus-visible rect { stroke: #165bcc; stroke-width: 4px; }
+
+.selectionNotice { padding: 8px 18px; background: #e9f7f8; color: #0d5963; overflow-wrap: anywhere; }
+.workspaceLinks { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 18px; }
+.workspaceLinks a { color: #0d5963; }
+.keyboardHelp { color: #52647b; font-size: 13px; margin: 10px 0; }
+.keyboardScroll { overflow-x: auto; padding: 5px; }
+.technicalDetails { margin: 12px 16px; overflow-wrap: anywhere; }
+.comboDetailPanel .technicalDetails { margin: 0; }
+summary { cursor: pointer; padding: 8px 0; color: #315b9b; }
+.emptySelection { margin: 16px; }
+#editor-heading { line-height: 1.5; overflow-wrap: anywhere; scroll-margin-top: 16px; }
+#viewer-sections { scroll-margin-top: 8px; }
+.rowSelect { color: #0d5963; background: #f0fbfc; border: 1px solid #9fcfd3; border-radius: 5px; min-width: 36px; min-height: 32px; cursor: pointer; font: inherit; }
+.rowSelect[aria-pressed="true"] { color: #fff; background: #087f8c; }
 
 * {
   box-sizing: border-box;
@@ -14,8 +38,8 @@
 
 body {
   margin: 0;
-  min-width: 1120px;
-  min-height: 760px;
+  min-width: 0;
+  min-height: 100vh;
   background: #f4f7fb;
 }
 
@@ -30,9 +54,7 @@ pre {
 }
 
 .appShell {
-  display: grid;
-  grid-template-rows: 56px 48px minmax(360px, 1fr) 270px;
-  height: 100vh;
+  min-height: 100vh;
   color: #18202f;
 }
 
@@ -152,7 +174,8 @@ pre {
 
 .workspace {
   display: grid;
-  grid-template-columns: 190px minmax(680px, 1fr) 280px;
+  grid-template-columns: 170px minmax(0, 1fr) minmax(300px, 360px);
+  align-items: start;
   min-height: 0;
   background: #f4f7fb;
 }
@@ -230,7 +253,7 @@ pre {
 
 .visualPane {
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   padding: 14px 18px 10px;
 }
 
@@ -279,7 +302,7 @@ pre {
 
 .keyboardSvg {
   width: 100%;
-  height: 100%;
+  height: auto;
   min-height: 300px;
   overflow: visible;
 }
@@ -370,7 +393,6 @@ pre {
 
 .detailPane {
   border-left: 1px solid #dfe6f0;
-  overflow: auto;
   padding-bottom: 16px;
 }
 
@@ -804,8 +826,7 @@ label.scrollLayerCheckbox {
 }
 
 .bottomPanel {
-  display: grid;
-  grid-template-rows: 42px minmax(0, 1fr);
+  display: block;
   border-top: 1px solid #dfe6f0;
 }
 
@@ -1328,24 +1349,20 @@ td code {
   line-height: 1.4;
 }
 
-.pickerOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: grid;
-  place-items: center;
+.pickerDialog::backdrop {
   background: rgba(24, 32, 47, 0.45);
 }
 
 .pickerDialog {
-  display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
-  width: 560px;
-  max-height: 620px;
+  width: min(620px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: 1px solid #c8d4e4;
   border-radius: 10px;
   background: #ffffff;
+  color: #18202f;
   box-shadow: 0 8px 32px rgba(24, 32, 47, 0.2);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .pickerHeader {
@@ -1603,3 +1620,55 @@ td code {
   color: #65758b;
   font-weight: 600;
 }
+
+/* 操作欄は折り返し、ページの縦スクロールで必ず到達可能にする。 */
+.topBar, .topBarActions, .tabBar, .legend, .previewHeader, .previewActions, .backupRestoreHeader { flex-wrap: wrap; }
+.topBarActions a, .topBarActions button, .tabBar button, .editorBox button, .comboPreviewBox button, .previewHeader button { height: auto; min-height: 32px; padding: 5px 10px; }
+.statusStrip { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.statusPill { gap: 8px; }
+.statusPill strong { white-space: normal; overflow-wrap: anywhere; }
+.detailPane .editorHeader, .paneHeader { flex-wrap: wrap; }
+.detailPane .editorStatus, .detailPane label span, .saveStatus, .previewSaveStatus, .captureHint { font-size: 13px; }
+.detailPane input, .detailPane select { font-size: 14px; }
+.previewSaveStatus { margin: 8px 18px; }
+.previewPanel, .previewPanel.hasStatus { display: block; height: auto; }
+.diffGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: auto; }
+.diffGrid > div, .diffGrid > div:last-child { display: block; }
+.diffPreview, .sourcePreview { max-height: 400px; }
+.tableWrap { max-height: 420px; }
+.tableSection, .splitPanel { height: auto; }
+.pendingList { max-height: 240px; }
+.tabBar input { max-width: 100%; margin-left: 0; }
+.layerRenameSection { padding: 8px 0; }
+.layerRenameRow input { max-width: 100%; }
+.pickerDialog .behaviorPicker { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.pickerDialog .behaviorPicker button { height: auto; min-height: 36px; padding: 6px; }
+.pickerDialog .pickerList { max-height: 300px; min-height: 80px; }
+.pickerDialog .pickerSearch { width: calc(100% - 24px); }
+.pickerDialog .pickerHeader { position: sticky; top: 0; background: #fff; z-index: 2; }
+
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: 150px minmax(0, 1fr); }
+  .detailPane { grid-column: 1 / -1; border-top: 1px solid #dfe6f0; border-left: 0; }
+  .detailPane .editorBox, .detailPane .comboDetailPanel { margin: 0 16px; }
+  .editorActions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .workspace { display: block; }
+  .layerRail { display: block; border-right: 0; }
+  .layerButton { display: inline-grid; width: auto; max-width: 100%; margin-right: 6px; }
+  .railNote { display: none; }
+  .visualPane { padding: 12px; }
+  .keyboardSvg { min-width: 560px; min-height: 0; }
+  .topBarActions { margin-left: 0; }
+  .statusStrip { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 12px; }
+  .diffGrid, .splitPanel { grid-template-columns: minmax(0, 1fr); }
+  .diagnosticsGrid { grid-template-columns: minmax(0, 1fr); }
+  .pendingMain { grid-template-columns: minmax(0, 1fr); }
+  .editorActions { grid-template-columns: minmax(0, 1fr); }
+}
+
+.editorStatus[role="alert"] { color: #a53543; border-left: 4px solid #c64f5f; padding: 6px 8px; background: #fff1f2; }
+[aria-invalid="true"] { border-color: #c64f5f !important; }
+.appShell > .previewSaveStatus { position: sticky; top: 0; z-index: 3; }
