@@ -23,6 +23,10 @@ export default defineConfig({
     react(),
     {
       name: "roba-dev-save-api",
+      handleHotUpdate({ file }) {
+        // The viewer reloads the keymap through its API so file writes preserve draft state.
+        if (path.resolve(file) === keymapPath) return [];
+      },
       configureServer(server) {
         server.middlewares.use("/__roba/keymap-source", async (request, response, next) => {
           if (request.method !== "GET") return next();
@@ -88,9 +92,10 @@ export default defineConfig({
               repoRoot,
               sourcePath: body.sourcePath,
               changes: body.changes,
+              expectedSource: body.expectedSource,
             });
-            const [source, fileStat] = await Promise.all([readFile(keymapPath, "utf8"), stat(keymapPath)]);
-            sendJson(response, 200, { ...result, source, mtime: fileStat.mtimeMs });
+            const fileStat = await stat(keymapPath);
+            sendJson(response, 200, { ...result, mtime: fileStat.mtimeMs });
           } catch (error) {
             sendJson(response, 400, { ok: false, message: error.message });
           }

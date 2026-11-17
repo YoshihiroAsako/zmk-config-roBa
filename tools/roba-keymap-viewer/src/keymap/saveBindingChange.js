@@ -65,6 +65,7 @@ export async function saveBindingChanges({
   repoRoot,
   sourcePath = CANONICAL_SOURCE_PATH,
   changes,
+  expectedSource,
   now = new Date(),
 }) {
   const root = path.resolve(repoRoot);
@@ -82,6 +83,9 @@ export async function saveBindingChanges({
   assertInsideRepo(root, sourceFile);
 
   const source = await readFile(sourceFile, "utf8");
+  if (expectedSource !== undefined && source !== expectedSource) {
+    throw new Error("ローカルファイルが外部で変更されました。保存前にファイルを再読み込みしてください。");
+  }
   for (const change of changes) {
     const currentSourceRaw = source.slice(change.range?.start, change.range?.end).trim();
     if (currentSourceRaw !== change.currentRaw) {
@@ -103,6 +107,9 @@ export async function saveBindingChanges({
   const tempPath = `${sourceFile}.${process.pid}.${Date.now()}.tmp`;
   try {
     await writeFile(tempPath, nextSource, "utf8");
+    if (await readFile(sourceFile, "utf8") !== source) {
+      throw new Error("保存中にローカルファイルが変更されました。変更を確認してから再読み込みしてください。");
+    }
     await rename(tempPath, sourceFile);
   } catch (error) {
     await removeTempFile(tempPath);
@@ -117,6 +124,7 @@ export async function saveBindingChanges({
   return {
     ok: true,
     message: `Saved ${changes.length} pending change${changes.length === 1 ? "" : "s"} with a backup.`,
+    source: savedSource,
     backupPath: toRepoRelativePath(root, backupPath),
     diagnostics,
   };

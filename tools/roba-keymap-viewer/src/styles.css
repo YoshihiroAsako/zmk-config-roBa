@@ -1672,3 +1672,49 @@ td code {
 .editorStatus[role="alert"] { color: #a53543; border-left: 4px solid #c64f5f; padding: 6px 8px; background: #fff1f2; }
 [aria-invalid="true"] { border-color: #c64f5f !important; }
 .appShell > .previewSaveStatus { position: sticky; top: 0; z-index: 3; }
+.layoutMode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.layoutMode button {
+  border: 1px solid #c6d4e1;
+  border-radius: 6px;
+  background: #f7fafc;
+  color: #153759;
+  min-height: 32px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.layoutMode button[aria-pressed="true"] {
+  background: #e5f1ff;
+  border-color: #2670b4;
+  box-shadow: inset 0 -2px #2670b4;
+  font-weight: 700;
+}
+
+.editState, .diagramChanges, .diagramError {
+  font-size: 0.875rem;
+  margin: 0.5rem 0;
+}
+
+.diagramError {
+  border-inline-start: 3px solid #bb4141;
+  padding-inline-start: 0.5rem;
+}
+
+.diagramChanges li {
+  overflow-wrap: anywhere;
+}
+
+.keyChangeMark {
+  fill: #974100;
+  font-size: 9px;
+  pointer-events: none;
+}
+
+.keyCap.changedKey rect {
+  stroke-dasharray: 4 2;
+}

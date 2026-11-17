@@ -1,3 +1,4 @@
+import { getKeyboardChanges, rebaseAfterKeySave, rebaseHistoryAfterKeySave } from "./keymap/viewerDrafts.js";
 import { nextKeyPosition, focusWrapTarget } from "./keyboardNavigation.js";
 import initialKeymapSource from "../../../config/roBa.keymap?raw";
 import roBaMetadata from "../../../config/roBa.json";
@@ -65,6 +66,46 @@ function editorMessage(message) {
   })[message] || message;
 }
 
+function useFormDraft(baseline) {
+  const [input, setInput] = useState(null);
+  const change = (value) => setInput((previous) => {
+    const next = typeof value === "function" ? value(previous ?? baseline) : value;
+    return formChanged(next, baseline) ? next : null;
+  });
+  return [input ?? baseline, change];
+}
+
+function comboForm(combo) {
+  return {
+    bindingRaw: combo?.binding ?? "",
+    positionsRaw: combo?.positions.join(" ") ?? "",
+    layersRaw: combo?.layers.join(" ") ?? "",
+    timeoutMsRaw: combo?.timeoutMsRange ? String(combo.timeoutMs) : "",
+  };
+}
+
+function macroForm(macro) {
+  return {
+    bindingDrafts: Object.fromEntries((macro?.bindingEntries || []).map((entry, index) => [index, entry.raw])),
+    fullBindingList: true,
+    waitMsRaw: macro?.waitMsRange ? String(macro.waitMs) : "",
+    tapMsRaw: macro?.tapMsRange ? String(macro.tapMs) : "",
+  };
+}
+
+function trackballForm(settings) {
+  return {
+    automouseLayerRaw: settings?.automouseLayer?.value.trim() ?? "",
+    scrollLayersRaw: settings?.scrollLayers?.raw.trim() ?? "",
+  };
+}
+
+function sensorForm(binding) {
+  return { behavior: binding.behavior, incKey: binding.incKey ?? "", decKey: binding.decKey ?? "" };
+}
+
+const formChanged = (input, baseline) => JSON.stringify(input) !== JSON.stringify(baseline);
+
 function App() {
   const [keymapSource, setKeymapSource] = useState(initialKeymapSource);
   const [saveStatus, setSaveStatus] = useState(EMPTY_SAVE_STATUS);
@@ -91,53 +132,36 @@ function App() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("Bindings");
   const [search, setSearch] = useState("");
-  const [draftBinding, setDraftBinding] = useState(null);
   const [pendingChanges, setPendingChanges] = useState([]);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const shortcutsRef = useRef(null);
   const [selectedComboName, setSelectedComboName] = useState("");
-  const [comboDraft, setComboDraft] = useState({
-    bindingRaw: "",
-    positionsRaw: "",
-    layersRaw: "",
-    timeoutMsRaw: "",
-  });
   const [isAddingCombo, setIsAddingCombo] = useState(false);
   const [newComboDraft, setNewComboDraft] = useState(() => createEmptyComboDraft([]));
+  const [newComboInitial, setNewComboInitial] = useState(newComboDraft);
   const [selectedMacroName, setSelectedMacroName] = useState("");
-  const [macroDraft, setMacroDraft] = useState({
-    bindingDrafts: {},
-    fullBindingList: true,
-    waitMsRaw: "",
-    tapMsRaw: "",
-  });
   const [isAddingMacro, setIsAddingMacro] = useState(false);
   const [newMacroDraft, setNewMacroDraft] = useState(() => createEmptyMacroDraft([]));
-  const [trackballDraft, setTrackballDraft] = useState({ automouseLayerRaw: "", scrollLayersRaw: "" });
-  const [sensorDrafts, setSensorDrafts] = useState({});
+  const [newMacroInitial, setNewMacroInitial] = useState(newMacroDraft);
+  const [sensorInputs, setSensorDrafts] = useState({});
   const [selectedSensorLayerIndex, setSelectedSensorLayerIndex] = useState(null);
   const [sensorInsertLayerIndex, setSensorInsertLayerIndex] = useState("");
   const [sensorInsertBehavior, setSensorInsertBehavior] = useState("&inc_dec_kp");
-  const [layerRenameDraft, setLayerRenameDraft] = useState("");
   const [captureMode, setCaptureMode] = useState(false);
   const [captureStatus, setCaptureStatus] = useState(null);
   const [captureContext, setCaptureContext] = useState({ type: "binding" });
   const [pickerContext, setPickerContext] = useState(null);
-  const [keymapMtime, setKeymapMtime] = useState(null);
+  const [pickerDirty, setPickerDirty] = useState(false);
+  const [showSavedLayout, setShowSavedLayout] = useState(false);
+  const lastValidLayout = useRef(null);
+  const [fileBusy, setFileBusy] = useState(saveEndpointAvailable);
+  const fileOperation = useRef(saveEndpointAvailable);
   const [keymapBackups, setKeymapBackups] = useState([]);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
   const selectedCombo = isAddingCombo ? null : document.combos.find((combo) => combo.name === selectedComboName);
-  const activeComboPositionsRaw = isAddingCombo ? newComboDraft.positionsRaw : comboDraft.positionsRaw;
-  const comboDraftPositionSet = editingKind === "combo" && (selectedCombo || isAddingCombo)
-    ? new Set(activeComboPositionsRaw.trim().split(/\s+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0))
-    : new Set();
-  const comboHighlightPositions = comboDraftPositionSet;
-  const comboSavedOnlyPositions = editingKind === "combo" && selectedCombo
-    ? new Set(selectedCombo.positions.filter((p) => !comboDraftPositionSet.has(p)))
-    : new Set();
   const selectedBinding = currentLayer.bindings[selectedPosition] || "&trans";
   const selectedEntry = currentLayer.bindingEntries?.[selectedPosition];
   const selectedDraftId = getDraftId(activeLayer, selectedPosition);
@@ -163,15 +187,50 @@ function App() {
   const selectedMacroPendingCount = pendingChanges.filter((change) => selectedMacroDraftIds.includes(change.id)).length;
   const selectedParsed = describeBinding(selectedBinding, layerNames);
   const selectedRange = selectedEntry?.sourceRange;
-  const effectiveDraftBinding = draftBinding ?? selectedPendingChange?.nextRaw ?? selectedEntry?.raw ?? selectedBinding;
+  const bindingBaseline = selectedPendingChange?.nextRaw ?? selectedEntry?.raw ?? selectedBinding;
+  const [effectiveDraftBinding, setDraftBinding] = useFormDraft(bindingBaseline);
+  const bindingDirty = effectiveDraftBinding !== bindingBaseline;
   const editorState = useMemo(
     () => buildEditorState(keymapSource, selectedEntry, effectiveDraftBinding, document.layers),
-    [selectedEntry, effectiveDraftBinding, document],
+    [keymapSource, selectedEntry, effectiveDraftBinding, document.layers],
   );
   const pendingState = useMemo(
     () => buildPendingChangesState(keymapSource, pendingChanges, document.layers, { keyCount: document.physicalLayout.length }),
     [keymapSource, pendingChanges, document.layers, document.physicalLayout.length],
   );
+  const queuedDocument = useMemo(
+    () => pendingState.valid ? parseKeymap(pendingState.nextSource) : document,
+    [pendingState, document],
+  );
+  const comboBaseline = comboForm(queuedDocument.combos.find((combo) => combo.name === selectedCombo?.name));
+  const [comboDraft, setComboDraft] = useFormDraft(comboBaseline);
+  const macroBaseline = macroForm(queuedDocument.macros.find((macro) => macro.name === selectedMacro?.name));
+  const [macroDraft, setMacroDraft] = useFormDraft(macroBaseline);
+  const trackballBaseline = trackballForm(queuedDocument.trackballSettings);
+  const [trackballDraft, setTrackballDraft] = useFormDraft(trackballBaseline);
+  const sensorBaseline = Object.fromEntries(document.layers.flatMap((layer) => {
+    const saved = layer.sensorBindings[0];
+    if (saved?.behavior !== "&inc_dec_kp" && saved?.behavior !== "&inc_dec_cp") return [];
+    const queued = queuedDocument.layers[layer.id]?.sensorBindings[0];
+    return [[layer.id, sensorForm(queued ?? saved)]];
+  }));
+  const sensorDrafts = { ...sensorBaseline, ...sensorInputs };
+  const layerRenameDraftId = `layer-${activeLayer}-rename`;
+  const layerRenamePending = pendingChanges.find((change) => change.id === layerRenameDraftId);
+  const layerRenameBaseline = layerRenamePending?.nextRaw ?? currentLayer.name;
+  const [layerRenameDraft, setLayerRenameDraft] = useFormDraft(layerRenameBaseline);
+  const layerNameDirty = layerRenameDraft !== layerRenameBaseline;
+  const comboDirty = isAddingCombo
+    ? formChanged(newComboDraft, newComboInitial)
+    : Boolean(selectedCombo && formChanged(comboDraft, comboBaseline));
+  const macroDirty = isAddingMacro
+    ? formChanged(newMacroDraft, newMacroInitial)
+    : Boolean(selectedMacro && formChanged(macroDraft, macroBaseline));
+  const editorDirty = editingKind === "binding" ? bindingDirty : editingKind === "combo" ? comboDirty : macroDirty;
+  const hasInput = editorDirty || layerNameDirty || pickerDirty || formChanged(trackballDraft, trackballBaseline) ||
+    Object.keys(sensorInputs).some((id) => formChanged(sensorInputs[id], sensorBaseline[id]));
+  const hasUnsaved = hasInput || pendingChanges.length > 0;
+
   const comboPreviewState = useMemo(
     () => buildComboPreviewState(
       keymapSource,
@@ -186,20 +245,96 @@ function App() {
     () => buildNewComboPreviewState(
       keymapSource,
       newComboDraft,
-      document.combos,
+      queuedDocument.combos,
       document.physicalLayout.length,
       document.layers.length,
     ),
-    [keymapSource, newComboDraft, document.combos, document.physicalLayout.length, document.layers.length],
+    [keymapSource, newComboDraft, queuedDocument.combos, document.physicalLayout.length, document.layers.length],
   );
   const macroPreviewState = useMemo(
     () => buildMacroPreviewState(keymapSource, selectedMacro, macroDraft),
     [keymapSource, selectedMacro, macroDraft],
   );
   const newMacroPreviewState = useMemo(
-    () => buildNewMacroPreviewState(keymapSource, newMacroDraft, document.macros),
-    [keymapSource, newMacroDraft, document.macros],
+    () => buildNewMacroPreviewState(keymapSource, newMacroDraft, queuedDocument.macros),
+    [keymapSource, newMacroDraft, queuedDocument.macros],
   );
+  const changeForBinding = () => buildDraftChange({
+    layerIndex: activeLayer, layerName: currentLayer.name, position: selectedPosition,
+    entry: selectedEntry, nextRaw: effectiveDraftBinding,
+  });
+  const keyInputState = editorState.changed
+    ? buildPendingChangesState(keymapSource, [changeForBinding()], document.layers)
+    : null;
+  const keyInputValid = editorState.canEdit && (keyInputState?.valid ?? effectiveDraftBinding === selectedEntry?.raw);
+
+  const comboChanges = () => buildComboDraftChanges({
+    source: keymapSource, combo: selectedCombo, ...comboDraft, layerCount: document.layers.length,
+  });
+  const macroChanges = () => buildMacroDraftChanges({ source: keymapSource, macro: selectedMacro, ...macroDraft });
+  const layerRenameChange = () => buildLayerRenameDraftChange({
+    layerIndex: activeLayer, currentName: currentLayer.name, nextName: layerRenameDraft.trim(),
+    nameRange: currentLayer.nameRange,
+  });
+
+  const liveChanges = pendingState.valid ? pendingChanges : [];
+  let diagramDrafts = liveChanges;
+  let diagramError = pendingChanges.length && !pendingState.valid ? pendingState.message : "";
+  if (editingKind === "binding" && bindingDirty) {
+    if (keyInputValid) diagramDrafts = upsertDraftChange(diagramDrafts, changeForBinding());
+    else diagramError = keyInputState?.message ?? editorState.message;
+  }
+  if (editingKind === "combo" && comboDirty) {
+    const preview = isAddingCombo ? newComboPreviewState : comboPreviewState;
+    if (preview.valid) {
+      diagramDrafts = isAddingCombo
+        ? upsertDraftChange(diagramDrafts, preview.change)
+        : upsertDraftChanges(diagramDrafts.filter((change) => !selectedComboDraftIds.includes(change.id)), comboChanges());
+    } else diagramError = preview.message;
+  }
+  if (editingKind === "macro" && macroDirty) {
+    const preview = isAddingMacro ? newMacroPreviewState : macroPreviewState;
+    if (preview.valid) {
+      diagramDrafts = isAddingMacro
+        ? upsertDraftChange(diagramDrafts, preview.change)
+        : upsertDraftChanges(diagramDrafts.filter((change) => !selectedMacroDraftIds.includes(change.id)), macroChanges());
+    } else diagramError = preview.message;
+  }
+  if (layerNameDirty) {
+    diagramDrafts = upsertDraftChange(diagramDrafts, layerRenameChange());
+  }
+
+  let editedDocument = queuedDocument;
+  if (diagramDrafts !== liveChanges) {
+    const preview = buildPendingChangesState(keymapSource, diagramDrafts, document.layers, {
+      keyCount: document.physicalLayout.length,
+    });
+    if (preview.valid || !diagramDrafts.length) editedDocument = parseKeymap(preview.nextSource);
+    else diagramError = preview.message;
+  }
+  const layoutContext = JSON.stringify([activeLayer, selectedPosition, editingKind, selectedComboName,
+    selectedMacroName, isAddingCombo, isAddingMacro]);
+  const previousLayout = lastValidLayout.current;
+  const showLastValidLayout = Boolean(diagramError && previousLayout?.source === keymapSource &&
+    previousLayout.changes === pendingChanges && previousLayout.context === layoutContext);
+  useEffect(() => {
+    if (!diagramError) {
+      lastValidLayout.current = { source: keymapSource, changes: pendingChanges, context: layoutContext, document: editedDocument };
+    }
+  }, [diagramError, keymapSource, pendingChanges, layoutContext, editedDocument]);
+  if (showLastValidLayout) editedDocument = previousLayout.document;
+  const layoutDocument = showSavedLayout ? document : editedDocument;
+  const layoutLayer = layoutDocument.layers[currentLayer.id];
+  const layoutLayerNames = layoutDocument.layers.map((layer) => layer.name);
+  const keyboardChanges = showSavedLayout ? new Map() : getKeyboardChanges(document, editedDocument, currentLayer.id);
+  const layoutCombo = editingKind === "combo" && layoutDocument.combos.find(
+    (combo) => combo.name === (isAddingCombo ? newComboDraft.nameRaw.trim() : selectedComboName),
+  );
+  const comboHighlightPositions = new Set(layoutCombo?.positions ?? []);
+  const comboSavedOnlyPositions = !showSavedLayout && editingKind === "combo" && selectedCombo
+    ? new Set(selectedCombo.positions.filter((position) => !comboHighlightPositions.has(position)))
+    : new Set();
+
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
 
@@ -216,55 +351,37 @@ function App() {
 
   useEffect(() => {
     if (!saveEndpointAvailable) return;
-    fetch("/__roba/keymap-source")
-      .then((r) => r.json())
-      .then((payload) => { if (payload.ok) setKeymapMtime(payload.mtime ?? null); })
-      .catch(() => {});
+    const controller = new AbortController();
+    const { signal } = controller;
+    fetch("/__roba/keymap-source", { signal })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (signal.aborted) return;
+        if (!payload.ok) throw new Error(payload.message || "読み込みに失敗しました。");
+        if (!parseKeymap(payload.source).layers.length) throw new Error("レイヤーを読み取れませんでした。");
+        setKeymapSource(payload.source);
+      })
+      .catch((error) => {
+        if (!signal.aborted) setSaveStatus({ tone: "error", title: "読み込み失敗", message: error.message });
+      })
+      .finally(() => {
+        if (signal.aborted) return;
+        fileOperation.current = false;
+        setFileBusy(false);
+      });
     loadKeymapBackups();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
-    setDraftBinding(selectedPendingChange?.nextRaw || selectedEntry?.raw || selectedBinding);
-    setCaptureStatus(null);
-  }, [selectedEntry, selectedBinding, selectedPendingChange]);
-
-  useEffect(() => {
-    setComboDraft({
-      bindingRaw: selectedCombo?.binding || "",
-      positionsRaw: selectedCombo?.positions.join(" ") || "",
-      layersRaw: selectedCombo?.layers.join(" ") || "",
-      timeoutMsRaw: selectedCombo?.timeoutMsRange ? String(selectedCombo.timeoutMs) : "",
-    });
-  }, [selectedCombo]);
-
-  useEffect(() => {
-    if (!isAddingCombo) {
-      setNewComboDraft((current) => ({
-        ...createEmptyComboDraft(document.combos),
-        bindingRaw: current.bindingRaw || "&kp A",
-      }));
-    }
-  }, [document.combos, isAddingCombo]);
-
-  useEffect(() => {
-    setMacroDraft({
-      bindingDrafts: Object.fromEntries(
-        (selectedMacro?.bindingEntries || []).map((entry, index) => [index, entry.raw]),
-      ),
-      fullBindingList: true,
-      waitMsRaw: selectedMacro?.waitMsRange ? String(selectedMacro.waitMs) : "",
-      tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
-    });
-  }, [selectedMacro]);
-
-  useEffect(() => {
-    if (!isAddingMacro) {
-      setNewMacroDraft((current) => ({
-        ...createEmptyMacroDraft(document.macros),
-        bindingsRaw: current.bindingsRaw || "&kp A",
-      }));
-    }
-  }, [document.macros, isAddingMacro]);
+    if (!hasUnsaved && !fileBusy) return;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = true;
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsaved, fileBusy]);
 
   useEffect(() => {
     if (!captureMode || pickerContext) return;
@@ -331,137 +448,63 @@ function App() {
     setCaptureStatus(null);
   }, [pickerContext, editingKind, activeLayer, selectedPosition]);
 
-  useEffect(() => {
-    const ts = document.trackballSettings;
-    setTrackballDraft({
-      automouseLayerRaw: ts?.automouseLayer ? ts.automouseLayer.value.trim() : "",
-      scrollLayersRaw: ts?.scrollLayers ? ts.scrollLayers.raw.trim() : "",
-    });
-    const drafts = {};
-    for (const layer of document.layers) {
-      const sb = layer.sensorBindings[0];
-      if (sb?.behavior === "&inc_dec_kp" || sb?.behavior === "&inc_dec_cp") {
-        drafts[layer.id] = { behavior: sb.behavior, incKey: sb.incKey ?? "", decKey: sb.decKey ?? "" };
-      }
-    }
-    setSensorDrafts(drafts);
-  }, [keymapSource]);
+  const applyLoadedSource = (source) => {
+    const layers = parseKeymap(source).layers;
+    const layer = layers[activeLayer] ?? layers[0];
+    if (!layer) throw new Error("レイヤーを読み取れませんでした。");
+    setKeymapSource(source);
+    setPendingChanges([]);
+    setUndoStack([]);
+    setRedoStack([]);
+    setDraftBinding(null);
+    setComboDraft(null);
+    setMacroDraft(null);
+    setLayerRenameDraft(null);
+    setTrackballDraft(null);
+    setSensorDrafts({});
+    setIsAddingCombo(false);
+    setIsAddingMacro(false);
+    setSelectedSensorLayerIndex(null);
+    setSensorInsertLayerIndex("");
+    setSensorInsertBehavior("&inc_dec_kp");
+    setActiveLayer(layer.id);
+    setSelectedPosition(Math.min(selectedPosition, layer.bindings.length - 1));
+    setCaptureMode(false);
+    setCaptureStatus(null);
+  };
 
-  const layerRenameDraftId = `layer-${activeLayer}-rename`;
-  const layerRenamePending = pendingChanges.find((change) => change.id === layerRenameDraftId);
-  useEffect(() => {
-    setLayerRenameDraft(layerRenamePending?.nextRaw ?? currentLayer.name);
-  }, [activeLayer, currentLayer.name, layerRenamePending?.nextRaw]);
-
-  const reloadKeymapSource = async () => {
-    if (!saveEndpointAvailable) {
-      setSaveStatus({
-        tone: "error",
-        title: "再読み込みできません",
-        message: "Reload is available only on the local dev server.",
-        backupPath: "",
-      });
-      return;
-    }
-
-    setSaveStatus({
-      tone: "saving",
-      title: "再読み込み中",
-      message: "config/roBa.keymap を読み込んでいます。",
-      backupPath: "",
-    });
+  const runFileOperation = async (operation) => {
+    if (fileOperation.current || !saveEndpointAvailable) return;
+    fileOperation.current = true;
+    setFileBusy(true);
+    setCaptureMode(false);
     try {
-      const response = await fetch("/__roba/keymap-source");
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.message || "Reload failed.");
-      }
-
-      setKeymapSource(payload.source);
-      setKeymapMtime(payload.mtime ?? null);
-      setDraftBinding(null);
-      setPendingChanges([]);
-      setIsAddingCombo(false);
-      setIsAddingMacro(false);
-      setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
-      setSensorDrafts({});
-      setSelectedSensorLayerIndex(null);
-      setSensorInsertLayerIndex("");
-      setSensorInsertBehavior("&inc_dec_kp");
-      setSaveStatus({
-        tone: "ok",
-        title: "再読み込み完了",
-        message: "config/roBa.keymap を読み込みました。",
-        backupPath: "",
-      });
-      loadKeymapBackups();
-    } catch (error) {
-      setSaveStatus({
-        tone: "error",
-        title: "再読み込み失敗",
-        message: error.message,
-        backupPath: "",
-      });
+      await operation();
+    } finally {
+      fileOperation.current = false;
+      setFileBusy(false);
     }
   };
 
-  const saveSelectedBinding = async () => {
-    if (!editorState.canEdit || !editorState.changed || !selectedEntry?.sourceRange) return;
-    if (!saveEndpointAvailable) {
-      setSaveStatus({
-        tone: "error",
-        title: "保存できません",
-        message: "Save is available only on the local dev server.",
-        backupPath: "",
-      });
-      return;
-    }
-
-    setSaveStatus({
-      tone: "saving",
-      title: "保存中",
-      message: "内容を確認し、バックアップを作成しています。",
-      backupPath: "",
-    });
+  const reloadKeymapSource = () => runFileOperation(async () => {
+    if (hasUnsaved && !window.confirm("再読み込みすると未追加の入力と追加済みの変更を破棄します。続けますか？")) return;
+    setSaveStatus({ tone: "saving", title: "再読み込み中", message: "config/roBa.keymap を読み込んでいます。" });
     try {
-      const response = await fetch("/__roba/save-binding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourcePath: "config/roBa.keymap",
-          range: selectedEntry.sourceRange,
-          currentRaw: selectedEntry.raw,
-          nextRaw: effectiveDraftBinding,
-        }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.message || "Save failed.");
-      }
-
-      setKeymapSource(payload.source);
-      setDraftBinding(effectiveDraftBinding);
-      setPendingChanges([]);
-      setSaveStatus({
-        tone: "ok",
-        title: "ローカルへ保存しました",
-        message: "バックアップを作成してから config/roBa.keymap へ保存しました。",
-        backupPath: payload.backupPath,
-        drawerMessage: "Updating keymap-drawer...",
-      });
-      setActiveTab("Preview");
-      const drawerMessage = await updateKeymapDrawerAfterSave();
-      setSaveStatus((current) => ({ ...current, drawerMessage }));
+      const response = await fetch("/__roba/keymap-source");
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.message || "Reload failed.");
+      applyLoadedSource(payload.source);
+      setSaveStatus({ tone: "ok", title: "再読み込み完了", message: "config/roBa.keymap を読み込みました。" });
       loadKeymapBackups();
     } catch (error) {
-      setSaveStatus({
-        tone: "error",
-        title: "保存失敗",
-        message: error.message,
-        backupPath: "",
-        drawerMessage: "",
-      });
+      setSaveStatus({ tone: "error", title: "再読み込み失敗", message: error.message });
     }
+  });
+
+  const saveSelectedBinding = () => {
+    if (!keyInputValid || !editorState.changed) return;
+    const change = changeForBinding();
+    return saveChanges([change], change);
   };
 
   const updateKeymapDrawerAfterSave = async () => {
@@ -480,117 +523,81 @@ function App() {
     }
   };
 
-  const saveAllPendingChanges = async ({ forceMtime = false, forceDrawer = false } = {}) => {
-    if (!pendingChanges.length || !pendingState.valid) return;
-    if (!saveEndpointAvailable) {
-      setSaveStatus({
-        tone: "error",
-        title: "保存できません",
-        message: "Save all is available only on the local dev server.",
-        backupPath: "",
-      });
-      return;
-    }
-
-    setSaveStatus({
-      tone: "saving",
-      title: "追加済みの変更を保存中",
-      message: "追加済みの変更を確認し、バックアップを作成しています。",
-      backupPath: "",
-    });
+  const saveChanges = (changes, single) => runFileOperation(async () => {
+    setSaveStatus({ tone: "saving", title: "保存中", message: "内容を確認し、バックアップを作成しています。" });
     try {
-      const response = await fetch("/__roba/save-bindings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourcePath: "config/roBa.keymap",
-          changes: pendingChanges.map((change) => ({
-            kind: change.kind,
-            layerIndex: change.layerIndex,
-            macroName: change.macroName,
-            range: change.range,
-            currentRaw: change.currentRaw,
-            nextRaw: change.nextRaw,
-          })),
-          expectedMtime: keymapMtime,
-          forceMtime,
-          forceDrawer,
-        }),
-      });
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok || !payload.ok) {
-        if (payload.error === "FILE_CHANGED") {
-          setSaveStatus(EMPTY_SAVE_STATUS);
-          const confirmed = window.confirm(
-            "config/roBa.keymap がロード後に外部で変更されています。\n\n上書きして保存しますか？",
-          );
-          if (confirmed) saveAllPendingChanges({ forceMtime: true, forceDrawer });
-          return;
+      const request = async (forceDrawer) => {
+        const response = await fetch("/__roba/save-bindings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourcePath: "config/roBa.keymap", changes, expectedSource: keymapSource, forceDrawer,
+          }),
+        });
+        const payload = await response.json();
+        if (payload.error === "DRAWER_DIRTY" && !forceDrawer) {
+          if (window.confirm(`次のファイルに未コミットの変更があります。保存後の図の生成で上書きされる可能性があります。続けますか？\n\n${payload.paths.join("\n")}`)) {
+            return request(true);
+          }
+          return null;
         }
-        if (payload.error === "DRAWER_DIRTY") {
-          setSaveStatus(EMPTY_SAVE_STATUS);
-          const confirmed = window.confirm(
-            `keymap-drawer ファイルに未コミットの変更があります:\n  ${payload.paths.join("\n  ")}\n\nSave all 後の自動更新で上書きされる可能性があります。続行しますか？`,
-          );
-          if (confirmed) saveAllPendingChanges({ forceMtime, forceDrawer: true });
-          return;
-        }
-        throw new Error(payload.message || "Save all failed.");
+        if (!response.ok || !payload.ok) throw new Error(payload.message || "Save failed.");
+        return payload;
+      };
+      const payload = await request(false);
+      if (!payload) {
+        setSaveStatus(EMPTY_SAVE_STATUS);
+        return;
       }
-
       setKeymapSource(payload.source);
-      setKeymapMtime(payload.mtime ?? null);
-      setDraftBinding(null);
-      setPendingChanges([]);
-      setIsAddingCombo(false);
-      setIsAddingMacro(false);
-      setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
-      setSensorDrafts({});
-      setSelectedSensorLayerIndex(null);
-      setSensorInsertLayerIndex("");
-      setSensorInsertBehavior("&inc_dec_kp");
+      if (single) {
+        const remaining = rebaseAfterKeySave(pendingChanges, single);
+        setPendingChanges(remaining);
+        setUndoStack(rebaseHistoryAfterKeySave(undoStack, remaining, single));
+        setRedoStack(rebaseHistoryAfterKeySave(redoStack, remaining, single));
+        setDraftBinding(null);
+      } else {
+        setPendingChanges([]);
+        setUndoStack([]);
+        setRedoStack([]);
+      }
       setSaveStatus({
         tone: "ok",
-        title: "追加済みの変更を保存しました",
-        message: payload.message || "バックアップを作成してから config/roBa.keymap へ保存しました。",
+        title: single ? "このキーをローカルへ保存しました" : "追加済みの変更を保存しました",
+        message: single ? "選択キーを保存しました。他の追加済み変更と未追加の入力は保持しています。"
+          : hasInput ? "追加済みの変更を保存しました。未追加の入力は引き続き編集できます。"
+            : "バックアップを作成して config/roBa.keymap へ保存しました。",
         backupPath: payload.backupPath,
-        drawerMessage: "Updating keymap-drawer...",
+        drawerMessage: "キーボード図を更新中…",
       });
-      setActiveTab("Preview");
       const drawerMessage = await updateKeymapDrawerAfterSave();
       setSaveStatus((current) => ({ ...current, drawerMessage }));
       loadKeymapBackups();
     } catch (error) {
-      setSaveStatus({
-        tone: "error",
-        title: "変更の保存に失敗しました",
-        message: error.message,
-        backupPath: "",
-        drawerMessage: "",
-      });
+      setSaveStatus({ tone: "error", title: "保存失敗", message: error.message });
     }
-  };
+  });
 
-  const restoreFromBackup = async (backup) => {
-    if (!saveEndpointAvailable) {
+  const saveAllPendingChanges = () => {
+    if (fileOperation.current || !saveEndpointAvailable) return;
+    if (!pendingChanges.length || !pendingState.valid) {
+      setActiveTab("Preview");
+      setPanelOpen(true);
       setSaveStatus({
-        tone: "error",
-        title: "復元できません",
-        message: "Backup restore is available only on the local dev server.",
-        backupPath: "",
-        drawerMessage: "",
+        tone: pendingChanges.length ? "error" : "idle",
+        title: "保存対象を確認してください",
+        message: pendingChanges.length ? pendingState.message
+          : hasInput ? "未追加の入力があります。一括保存するには「変更に追加」を押してください。"
+            : "追加済みの変更はありません。",
       });
       return;
     }
+    return saveChanges(pendingChanges);
+  };
 
-    const pendingNote = pendingChanges.length
-      ? `\n\n${pendingChanges.length} pending change(s) will be cleared.`
-      : "";
-    const confirmed = window.confirm(
-      `Restore config/roBa.keymap from this backup?\n\n${backup.path}${pendingNote}`,
-    );
-    if (!confirmed) return;
+  const restoreFromBackup = (backup) => runFileOperation(async () => {
+    const pendingNote = hasUnsaved ? "\n\n未追加の入力と追加済みの変更を破棄します。" : "";
+    if (!window.confirm(`このバックアップを復元しますか？\n\n${backup.path}${pendingNote}`)) return;
 
     setSaveStatus({
       tone: "saving",
@@ -611,19 +618,7 @@ function App() {
         throw new Error(payload.message || "Backup restore failed.");
       }
 
-      setKeymapSource(payload.source);
-      setKeymapMtime(payload.mtime ?? null);
-      setDraftBinding(null);
-      setPendingChanges([]);
-      setUndoStack([]);
-      setRedoStack([]);
-      setIsAddingCombo(false);
-      setIsAddingMacro(false);
-      setTrackballDraft({ automouseLayerRaw: "", scrollLayersRaw: "" });
-      setSensorDrafts({});
-      setSelectedSensorLayerIndex(null);
-      setSensorInsertLayerIndex("");
-      setSensorInsertBehavior("&inc_dec_kp");
+      applyLoadedSource(payload.source);
       setSaveStatus({
         tone: "ok",
         title: "復元完了",
@@ -644,9 +639,29 @@ function App() {
         drawerMessage: "",
       });
     }
+  });
+
+  const leaveEditor = (nextLayer = activeLayer, keepEditor = false) => {
+    if (fileOperation.current) return false;
+    const losesLayerName = nextLayer !== activeLayer && layerNameDirty;
+    if (((!keepEditor && editorDirty) || losesLayerName) &&
+        !window.confirm("未追加の入力があります。入力を破棄して移動しますか？")) return false;
+    if (!keepEditor) {
+      setDraftBinding(null);
+      setComboDraft(null);
+      setMacroDraft(null);
+      setIsAddingCombo(false);
+      setIsAddingMacro(false);
+      setCaptureMode(false);
+      setCaptureStatus(null);
+    }
+    if (nextLayer !== activeLayer) setLayerRenameDraft(null);
+    return true;
   };
 
   const selectBinding = (layerId, position) => {
+    const same = editingKind === "binding" && layerId === activeLayer && position === selectedPosition;
+    if (!leaveEditor(layerId, same)) return;
     setEditingKind("binding");
     setActiveLayer(layerId);
     setSelectedPosition(position);
@@ -654,6 +669,9 @@ function App() {
   };
 
   const selectCombo = (combo) => {
+    const layerId = combo.layers[0] ?? activeLayer;
+    const same = editingKind === "combo" && !isAddingCombo && selectedComboName === combo.name;
+    if (!leaveEditor(layerId, same)) return;
     setEditingKind("combo");
     setIsAddingCombo(false);
     setSelectedComboName(combo.name);
@@ -663,22 +681,26 @@ function App() {
   };
 
   const startNewCombo = () => {
+    if (!leaveEditor()) return;
     setEditingKind("combo");
     setIsAddingCombo(true);
     setSelectedComboName("");
-    setNewComboDraft(createEmptyComboDraft(document.combos));
+    const initial = createEmptyComboDraft(queuedDocument.combos);
+    setNewComboDraft(initial);
+    setNewComboInitial(initial);
     setActiveTab("Combos");
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
   const commitPendingChanges = (newChanges) => {
+    if (fileOperation.current || !formChanged(newChanges, pendingChanges)) return;
     setUndoStack((prev) => [...prev.slice(-49), pendingChanges]);
     setRedoStack([]);
     setPendingChanges(newChanges);
   };
 
   const undo = () => {
-    if (undoStack.length === 0) return;
+    if (fileOperation.current || undoStack.length === 0) return;
     setRedoStack((prev) => [...prev, pendingChanges]);
     setUndoStack((prev) => prev.slice(0, -1));
     setPendingChanges(undoStack[undoStack.length - 1]);
@@ -686,17 +708,22 @@ function App() {
   };
 
   const redo = () => {
-    if (redoStack.length === 0) return;
+    if (fileOperation.current || redoStack.length === 0) return;
     setUndoStack((prev) => [...prev, pendingChanges]);
     setRedoStack((prev) => prev.slice(0, -1));
     setPendingChanges(redoStack[redoStack.length - 1]);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
-  shortcutsRef.current = { undo, redo, saveAllPendingChanges, blocked: captureMode || Boolean(pickerContext) };
+  shortcutsRef.current = { undo, redo, saveAllPendingChanges, blocked: captureMode || Boolean(pickerContext), pickerOpen: Boolean(pickerContext) };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (!shortcutsRef.current?.pickerOpen) shortcutsRef.current?.saveAllPendingChanges();
+        return;
+      }
       if (shortcutsRef.current?.blocked) return;
       const tag = e.target?.tagName?.toLowerCase();
       const isEditable = tag === "input" || tag === "textarea" || e.target?.isContentEditable;
@@ -708,85 +735,56 @@ function App() {
         if (!isEditable) { e.preventDefault(); shortcutsRef.current?.redo(); }
         return;
       }
-      if (e.ctrlKey && e.key === "s") {
-        e.preventDefault();
-        shortcutsRef.current?.saveAllPendingChanges();
-      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const addSelectedDraft = () => {
-    if (!editorState.canEdit || !selectedEntry?.sourceRange) return;
-    const change = buildDraftChange({
-      layerIndex: activeLayer,
-      layerName: currentLayer.name,
-      position: selectedPosition,
-      entry: selectedEntry,
-      nextRaw: effectiveDraftBinding,
-    });
-    commitPendingChanges(upsertDraftChange(pendingChanges, change));
+    if (!keyInputValid || !bindingDirty) return;
+    commitPendingChanges(upsertDraftChange(pendingChanges, changeForBinding()));
+    setDraftBinding(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeSelectedDraft = () => {
     commitPendingChanges(removeDraftChange(pendingChanges, selectedDraftId));
-    setDraftBinding(selectedEntry?.raw || selectedBinding);
+    setDraftBinding(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
   const clearPendingChanges = () => {
     commitPendingChanges([]);
-    setDraftBinding(selectedEntry?.raw || selectedBinding);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
   const addLayerRenameDraft = () => {
-    const trimmed = layerRenameDraft.trim();
-    if (!currentLayer.nameRange || !trimmed || trimmed === currentLayer.name) return;
-    const change = buildLayerRenameDraftChange({
-      layerIndex: activeLayer,
-      currentName: currentLayer.name,
-      nextName: trimmed,
-      nameRange: currentLayer.nameRange,
-    });
-    commitPendingChanges(upsertDraftChange(pendingChanges, change));
+    if (!currentLayer.nameRange || !layerNameDirty) return;
+    commitPendingChanges(upsertDraftChange(pendingChanges, layerRenameChange()));
+    setLayerRenameDraft(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeLayerRenameDraft = () => {
     commitPendingChanges(removeDraftChange(pendingChanges, layerRenameDraftId));
-    setLayerRenameDraft(currentLayer.name);
+    setLayerRenameDraft(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
   const addSelectedComboDraft = () => {
-    if (!selectedCombo || !comboPreviewState.changed || !comboPreviewState.valid) return;
-    const changes = buildComboDraftChanges({
-      source: keymapSource,
-      combo: selectedCombo,
-      bindingRaw: comboDraft.bindingRaw,
-      positionsRaw: comboDraft.positionsRaw,
-      layersRaw: comboDraft.layersRaw,
-      timeoutMsRaw: comboDraft.timeoutMsRaw,
-      layerCount: document.layers.length,
-    });
-    commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
+    if (!selectedCombo || !comboDirty || !comboPreviewState.valid) return;
+    const rest = pendingChanges.filter((change) => !selectedComboDraftIds.includes(change.id));
+    commitPendingChanges(upsertDraftChanges(rest, comboChanges()));
+    setComboDraft(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeSelectedComboDraft = () => {
     commitPendingChanges(pendingChanges.filter((change) => !selectedComboDraftIds.includes(change.id)));
-    setComboDraft({
-      bindingRaw: selectedCombo?.binding || "",
-      positionsRaw: selectedCombo?.positions.join(" ") || "",
-      layersRaw: selectedCombo?.layers.join(" ") || "",
-      timeoutMsRaw: selectedCombo?.timeoutMsRange ? String(selectedCombo.timeoutMs) : "",
-    });
+    setComboDraft(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -795,11 +793,12 @@ function App() {
     const changes = buildNewComboDraftChanges({
       source: keymapSource,
       draft: newComboDraft,
-      existingCombos: document.combos,
+      existingCombos: queuedDocument.combos,
       keyCount: document.physicalLayout.length,
       layerCount: document.layers.length,
     });
     commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
+    setIsAddingCombo(false);
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
@@ -807,11 +806,13 @@ function App() {
   const removeNewComboDraft = () => {
     const id = `combo-${newComboDraft.nameRaw.trim()}-node-insert`;
     commitPendingChanges(removeDraftChange(pendingChanges, id));
-    setNewComboDraft(createEmptyComboDraft(document.combos));
+    setNewComboDraft(newComboInitial);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
   const selectMacro = (macro) => {
+    const same = editingKind === "macro" && !isAddingMacro && selectedMacroName === macro.name;
+    if (!leaveEditor(activeLayer, same)) return;
     setEditingKind("macro");
     setIsAddingMacro(false);
     setSelectedMacroName(macro.name);
@@ -819,10 +820,13 @@ function App() {
   };
 
   const startNewMacro = () => {
+    if (!leaveEditor()) return;
     setEditingKind("macro");
     setIsAddingMacro(true);
     setSelectedMacroName("");
-    setNewMacroDraft(createEmptyMacroDraft(document.macros));
+    const initial = createEmptyMacroDraft(queuedDocument.macros);
+    setNewMacroDraft(initial);
+    setNewMacroInitial(initial);
     setActiveTab("Macros");
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
@@ -843,30 +847,17 @@ function App() {
   };
 
   const addSelectedMacroDraft = () => {
-    if (!selectedMacro || !macroPreviewState.changed || !macroPreviewState.valid) return;
-    const changes = buildMacroDraftChanges({
-      source: keymapSource,
-      macro: selectedMacro,
-      bindingDrafts: macroDraft.bindingDrafts,
-      fullBindingList: macroDraft.fullBindingList,
-      waitMsRaw: macroDraft.waitMsRaw,
-      tapMsRaw: macroDraft.tapMsRaw,
-    });
-    commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
+    if (!selectedMacro || !macroDirty || !macroPreviewState.valid) return;
+    const rest = pendingChanges.filter((change) => !selectedMacroDraftIds.includes(change.id));
+    commitPendingChanges(upsertDraftChanges(rest, macroChanges()));
+    setMacroDraft(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
 
   const removeSelectedMacroDraft = () => {
     commitPendingChanges(pendingChanges.filter((change) => !selectedMacroDraftIds.includes(change.id)));
-    setMacroDraft({
-      bindingDrafts: Object.fromEntries(
-        (selectedMacro?.bindingEntries || []).map((entry, index) => [index, entry.raw]),
-      ),
-      fullBindingList: true,
-      waitMsRaw: selectedMacro?.waitMsRange ? String(selectedMacro.waitMs) : "",
-      tapMsRaw: selectedMacro?.tapMsRange ? String(selectedMacro.tapMs) : "",
-    });
+    setMacroDraft(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -875,9 +866,10 @@ function App() {
     const changes = buildNewMacroDraftChanges({
       source: keymapSource,
       draft: newMacroDraft,
-      existingMacros: document.macros,
+      existingMacros: queuedDocument.macros,
     });
     commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
+    setIsAddingMacro(false);
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
@@ -885,7 +877,7 @@ function App() {
   const removeNewMacroDraft = () => {
     const id = `macro-${newMacroDraft.nameRaw.trim()}-node-insert`;
     commitPendingChanges(removeDraftChange(pendingChanges, id));
-    setNewMacroDraft(createEmptyMacroDraft(document.macros));
+    setNewMacroDraft(newMacroInitial);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -898,6 +890,12 @@ function App() {
     ? String(sensorLayersWithoutBindings[0].id)
     : sensorInsertLayerIndex;
 
+  const clearSensorInput = (layerIndex) => setSensorDrafts((previous) => {
+    const next = { ...previous };
+    delete next[layerIndex];
+    return next;
+  });
+
   const addSensorDraft = (layerIndex) => {
     const layer = document.layers.find((l) => l.id === layerIndex);
     if (!layer) return;
@@ -908,6 +906,7 @@ function App() {
     const effectiveSensorBinding = { ...sb, behavior: draft.behavior || sb.behavior };
     const change = buildSensorBindingDraftChange({ layer, sensorBinding: effectiveSensorBinding, incKey: draft.incKey, decKey: draft.decKey });
     commitPendingChanges(upsertDraftChange(pendingChanges, change));
+    clearSensorInput(layerIndex);
     setSaveStatus(EMPTY_SAVE_STATUS);
     setActiveTab("Preview");
   };
@@ -939,14 +938,7 @@ function App() {
   const removeSensorDraft = (layerIndex) => {
     const draftId = `layer-${layerIndex}-sensor-binding`;
     commitPendingChanges(pendingChanges.filter((change) => change.id !== draftId));
-    const layer = document.layers.find((l) => l.id === layerIndex);
-    const sb = layer?.sensorBindings[0];
-    if (sb?.behavior === "&inc_dec_kp" || sb?.behavior === "&inc_dec_cp") {
-      setSensorDrafts((prev) => ({
-        ...prev,
-        [layerIndex]: { behavior: sb.behavior, incKey: sb.incKey ?? "", decKey: sb.decKey ?? "" },
-      }));
-    }
+    clearSensorInput(layerIndex);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -970,24 +962,18 @@ function App() {
       nextRaw: trackballDraft.scrollLayersRaw,
     });
     if (scrollChange) changes.push(scrollChange);
-    if (changes.length) {
-      commitPendingChanges(upsertDraftChanges(pendingChanges, changes));
-      setSaveStatus(EMPTY_SAVE_STATUS);
-      setActiveTab("Preview");
-    }
+    const rest = pendingChanges.filter((change) => ![trackballAutomousePendingId, trackballScrollPendingId].includes(change.id));
+    commitPendingChanges(upsertDraftChanges(rest, changes));
+    setTrackballDraft(null);
+    setSaveStatus(EMPTY_SAVE_STATUS);
+    setActiveTab("Preview");
   };
 
   const removeTrackballDraft = () => {
-    commitPendingChanges(
-      pendingChanges.filter(
-        (change) => change.id !== trackballAutomousePendingId && change.id !== trackballScrollPendingId,
-      ),
-    );
-    const ts = document.trackballSettings;
-    setTrackballDraft({
-      automouseLayerRaw: ts?.automouseLayer ? ts.automouseLayer.value.trim() : "",
-      scrollLayersRaw: ts?.scrollLayers ? ts.scrollLayers.raw.trim() : "",
-    });
+    commitPendingChanges(pendingChanges.filter(
+      (change) => change.id !== trackballAutomousePendingId && change.id !== trackballScrollPendingId,
+    ));
+    setTrackballDraft(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
   };
 
@@ -1016,7 +1002,7 @@ function App() {
           <p>キー配置の確認・編集</p>
         </div>
         <div className="topBarActions">
-          <button type="button" disabled={!saveEndpointAvailable} onClick={reloadKeymapSource}>
+          <button type="button" disabled={!saveEndpointAvailable || fileBusy} onClick={reloadKeymapSource}>
             ファイルを再読み込み
           </button>
           <a href="https://zmk.studio/" target="_blank" rel="noreferrer">ZMK Studio</a>
@@ -1027,6 +1013,7 @@ function App() {
       <section className="statusStrip" aria-label="status">
         <StatusPill label="ファイル" value="config/roBa.keymap" tone="ok" />
         <StatusPill label="キー数" value={`${document.physicalLayout.length} キー`} tone="ok" />
+        <StatusPill label="未追加の入力" value={hasInput ? "あり（未保存）" : "なし"} tone={hasInput ? "warn" : "info"} />
         <StatusPill label="追加済み" value={`${pendingChanges.length} 件`} tone={pendingChanges.length ? "warn" : "info"} />
         <StatusPill label="Studio" value="公式アプリを使用" tone="warn" />
         <StatusPill label="処理結果" value={saveStatus.title || "操作できます"} tone={getStatusTone(saveStatus)} />
@@ -1040,7 +1027,7 @@ function App() {
         <a href="#editor-heading">選択項目を編集</a>
         <a href="#viewer-sections" onClick={() => setPanelOpen(true)}>一覧・変更・保存へ</a>
       </nav>
-      <main className="workspace">
+      <main className="workspace" inert={fileBusy}>
         <aside className="layerRail">
           <div className="railTitle">レイヤー</div>
           {document.layers.map((layer) => (
@@ -1048,12 +1035,7 @@ function App() {
               className={layer.id === activeLayer ? "layerButton active" : "layerButton"}
               aria-pressed={layer.id === activeLayer}
               key={layer.name}
-              onClick={() => {
-                setEditingKind("binding");
-                setActiveLayer(layer.id);
-                setSelectedPosition((position) => Math.min(position, layer.bindings.length - 1));
-                setSaveStatus(EMPTY_SAVE_STATUS);
-              }}
+              onClick={() => selectBinding(layer.id, Math.min(selectedPosition, layer.bindings.length - 1))}
             >
               <span>{layer.id}</span>
               <strong>{layer.name}</strong>
@@ -1064,7 +1046,7 @@ function App() {
             <summary>レイヤー名を変更</summary>
             <span className="eyebrow">Layer {currentLayer.id} · {currentLayer.name}</span>
             <LayerRenameRow
-              currentName={currentLayer.name}
+              currentName={layerRenameBaseline}
               draft={layerRenameDraft}
               pending={Boolean(layerRenamePending)}
               disabled={!currentLayer.nameRange}
@@ -1087,7 +1069,7 @@ function App() {
           <div className="paneHeader">
             <div>
               <span className="eyebrow">Layer {currentLayer.id}</span>
-              <h2>{currentLayer.name}</h2>
+              <h2>{layoutLayer.name}</h2>
             </div>
             <div className="legend">
               <span><i className="editDirect" /> Studio direct</span>
@@ -1096,11 +1078,23 @@ function App() {
             </div>
           </div>
           <p className="keyboardHelp" id="keyboard-help">矢印キーで移動、Enter / Space で選択。Tab で編集欄へ進みます。</p>
+          <div className="layoutMode" role="group" aria-label="配置の比較">
+            <button type="button" aria-pressed={!showSavedLayout} onClick={() => setShowSavedLayout(false)}>編集中の配置</button>
+            <button type="button" aria-pressed={showSavedLayout} onClick={() => setShowSavedLayout(true)}>ローカル保存済みの配置</button>
+          </div>
+          <p className="keyboardHelp">ローカルファイルの配置を表示しています。実機の現在の配置は ZMK Studio で確認してください。</p>
+          {diagramError && (
+            <p className="diagramError" role="alert">
+              図へ反映できない変更があります。{editorMessage(diagramError)}
+              {showLastValidLayout && !showSavedLayout && " 直前に確認できた配置を表示しています。"}
+            </p>
+          )}
           <div className="keyboardScroll">
           <KeyboardSvg
             keys={document.physicalLayout}
-            bindings={currentLayer.bindings}
-            layerNames={layerNames}
+            bindings={layoutLayer.bindings}
+            layerNames={layoutLayerNames}
+            changes={keyboardChanges}
             selectedPosition={selectedPosition}
             highlightedPositions={comboHighlightPositions}
             savedOnlyPositions={comboSavedOnlyPositions}
@@ -1108,6 +1102,16 @@ function App() {
             comboMode={editingKind === "combo"}
           />
           </div>
+          {keyboardChanges.size > 0 && (
+            <details className="diagramChanges">
+              <summary>◆ 変更したキーの内容（{keyboardChanges.size} キー）</summary>
+              <ul>
+                {[...keyboardChanges].sort(([a], [b]) => a - b).map(([position, messages]) => (
+                  <li key={position}>キー {position}　{messages.join(" / ")}</li>
+                ))}
+              </ul>
+            </details>
+          )}
         </section>
 
         <aside className="detailPane">
@@ -1117,13 +1121,19 @@ function App() {
               <h2 id="editor-heading" tabIndex={-1}>{editingKind === "combo" ? (isAddingCombo ? "新しいコンボ" : `コンボ: ${selectedCombo?.name || "未選択"}`) : editingKind === "macro" ? (isAddingMacro ? "新しいマクロ" : `マクロ: ${selectedMacro?.name || "未選択"}`) : `${currentLayer.name} · キー ${selectedPosition} · ${selectedParsed.display}`}</h2>
             </div>
           </div>
+          <p className="editState" role="status">
+            {editorDirty ? "未追加の入力あり。一括保存するには「変更に追加」または「変更を更新」を押してください。"
+              : (selectedPendingChange && editingKind === "binding") || (editingKind === "combo" && selectedComboPendingCount) || (editingKind === "macro" && selectedMacroPendingCount)
+                ? "追加済みの変更あり。一括保存の対象です。"
+                : "選択項目に未保存の変更はありません。"}
+          </p>
           {editingKind === "combo" && !selectedCombo && !isAddingCombo && <p className="emptySelection">コンボ一覧から選ぶか、新しいコンボを作成してください。</p>}
           {editingKind === "macro" && !selectedMacro && !isAddingMacro && <p className="emptySelection">マクロ一覧から選ぶか、新しいマクロを作成してください。</p>}
           {editingKind === "combo" && selectedCombo && (
             <ComboDetailPanel
               combo={selectedCombo}
               draft={comboDraft}
-              previewState={comboPreviewState}
+              previewState={{ ...comboPreviewState, changed: comboDirty }}
               pendingCount={selectedComboPendingCount}
               onAddDraft={addSelectedComboDraft}
               onRemoveDraft={removeSelectedComboDraft}
@@ -1164,7 +1174,7 @@ function App() {
             <MacroDetailPanel
               macro={selectedMacro}
               draft={macroDraft}
-              previewState={macroPreviewState}
+              previewState={{ ...macroPreviewState, changed: macroDirty }}
               pendingCount={selectedMacroPendingCount}
               onAddDraft={addSelectedMacroDraft}
               onRemoveDraft={removeSelectedMacroDraft}
@@ -1233,8 +1243,8 @@ function App() {
               <span>割り当てコード</span>
               <input
                 aria-label="割り当てコード"
-                aria-describedby="binding-validation"
-                aria-invalid={editorState.canEdit && effectiveDraftBinding !== selectedEntry?.raw && !editorState.changed}
+                aria-describedby={bindingDirty || !editorState.canEdit ? "binding-validation" : undefined}
+                aria-invalid={bindingDirty && !keyInputValid}
                 disabled={!editorState.canEdit}
                 value={effectiveDraftBinding}
                 onChange={(event) => {
@@ -1276,18 +1286,22 @@ function App() {
                 </span>
               )}
             </div>
-            <div id="binding-validation" className="editorStatus" role={editorState.canEdit && effectiveDraftBinding !== selectedEntry?.raw && !editorState.changed ? "alert" : "status"}>{editorMessage(editorState.message)}</div>
+            {(bindingDirty || !editorState.canEdit) && (
+              <div id="binding-validation" className="editorStatus" role={bindingDirty && !keyInputValid ? "alert" : "status"}>
+                {editorMessage(keyInputState && !keyInputState.valid ? keyInputState.message : editorState.message)}
+              </div>
+            )}
             <div className="editorActions">
               <button
                 type="button"
-                disabled={!editorState.canEdit || !editorState.changed}
+                disabled={!keyInputValid || !bindingDirty}
                 onClick={addSelectedDraft}
               >
                 {selectedPendingChange ? "変更を更新" : "変更に追加"}
               </button>
               <button
                 type="button"
-                disabled={!selectedPendingChange && !editorState.changed}
+                disabled={!selectedPendingChange && !bindingDirty}
                 onClick={removeSelectedDraft}
               >
                 変更を取り除く
@@ -1295,10 +1309,10 @@ function App() {
             </div>
             <button
               type="button"
-              disabled={!saveEndpointAvailable || !editorState.canEdit || !editorState.changed || saveStatus.tone === "saving"}
+              disabled={!saveEndpointAvailable || !keyInputValid || !editorState.changed || fileBusy}
               onClick={saveSelectedBinding}
             >
-              {saveStatus.tone === "saving" ? "保存中…" : "このキーをローカルへ保存"}
+              {saveStatus.tone === "saving" ? "保存中…" : "このキーだけローカルへ保存"}
             </button>
           </div>
           <details className="technicalDetails"><summary>キーの詳細・ソース位置</summary>
@@ -1339,6 +1353,7 @@ function App() {
           layerNames={layerNames}
           restrictTo={pickerContext.type === "sensor-inc" || pickerContext.type === "sensor-dec" ? ["&kp"] : null}
           initialCategory={pickerContext.initialCategory ?? ""}
+          onDirtyChange={setPickerDirty}
           onSelect={(binding) => {
             if (pickerContext.type === "binding") {
               setDraftBinding(binding);
@@ -1359,7 +1374,7 @@ function App() {
               const field = pickerContext.type === "sensor-inc" ? "incKey" : "decKey";
               setSensorDrafts((prev) => ({
                 ...prev,
-                [pickerContext.layerIndex]: { ...prev[pickerContext.layerIndex], [field]: keycode },
+                [pickerContext.layerIndex]: { ...sensorDrafts[pickerContext.layerIndex], [field]: keycode },
               }));
             }
             setSaveStatus(EMPTY_SAVE_STATUS);
@@ -1369,10 +1384,18 @@ function App() {
         />
       )}
 
-      <section className="bottomPanel" id="viewer-sections" tabIndex={-1}>
+      <section className="bottomPanel" id="viewer-sections" tabIndex={-1} inert={fileBusy}>
         <nav className="tabBar" aria-label="一覧と変更">
           {TABS.map((tab) => (
-            <button type="button" aria-pressed={activeTab === tab} className={activeTab === tab ? "active" : ""} key={tab} onClick={() => { setActiveTab(tab); setPanelOpen(true); if (tab === "Combos") setEditingKind("combo"); if (tab === "Macros") setEditingKind("macro"); if (tab === "Bindings") setEditingKind("binding"); }}>
+            <button type="button" aria-pressed={activeTab === tab} className={activeTab === tab ? "active" : ""} key={tab} onClick={() => {
+              const kind = { Bindings: "binding", Combos: "combo", Macros: "macro" }[tab];
+              if (kind && kind !== editingKind) {
+                if (!leaveEditor()) return;
+                setEditingKind(kind);
+              }
+              setActiveTab(tab);
+              setPanelOpen(true);
+            }}>
               {TAB_LABELS[tab]}
             </button>
           ))}
@@ -1395,9 +1418,6 @@ function App() {
           search={search}
           markdown={markdown}
           diagnostics={diagnostics}
-          editorState={editorState}
-          comboPreviewState={comboPreviewState}
-          macroPreviewState={macroPreviewState}
           pendingChanges={pendingChanges}
           pendingState={pendingState}
           saveStatus={saveStatus}
@@ -1426,6 +1446,8 @@ function App() {
           onAddTrackballDraft={addTrackballDraft}
           onRemoveTrackballDraft={removeTrackballDraft}
           sensorDrafts={sensorDrafts}
+          sensorBaseline={sensorBaseline}
+          trackballBaseline={trackballBaseline}
           sensorLayersWithBindings={sensorLayersWithBindings}
           sensorLayersWithoutBindings={sensorLayersWithoutBindings}
           selectedSensorLayerIndex={selectedSensorLayerIndex}
@@ -1435,7 +1457,7 @@ function App() {
           onSelectSensorInsertLayer={setSensorInsertLayerIndex}
           onSelectSensorInsertBehavior={setSensorInsertBehavior}
           onSensorDraftChange={(layerIndex, field, value) => {
-            setSensorDrafts((prev) => ({ ...prev, [layerIndex]: { ...prev[layerIndex], [field]: value } }));
+            setSensorDrafts((prev) => ({ ...prev, [layerIndex]: { ...sensorDrafts[layerIndex], [field]: value } }));
             setSaveStatus(EMPTY_SAVE_STATUS);
           }}
           onSensorPickInc={(layerIndex) => setPickerContext({
@@ -1450,7 +1472,7 @@ function App() {
           })}
           onSensorSwap={(layerIndex) => {
             setSensorDrafts((prev) => {
-              const d = prev[layerIndex];
+              const d = sensorDrafts[layerIndex];
               if (!d) return prev;
               return { ...prev, [layerIndex]: { behavior: d.behavior, incKey: d.decKey, decKey: d.incKey } };
             });
@@ -1971,7 +1993,7 @@ function MacroDetailPanel({
   );
 }
 
-function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlightedPositions, savedOnlyPositions, onSelect, comboMode }) {
+function KeyboardSvg({ keys, bindings, layerNames, changes, selectedPosition, highlightedPositions, savedOnlyPositions, onSelect, comboMode }) {
   const [focusedPosition, setFocusedPosition] = useState(selectedPosition);
   const keyRefs = useRef(new Map());
   useEffect(() => { setFocusedPosition(selectedPosition); }, [selectedPosition]);
@@ -2019,6 +2041,7 @@ function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlighted
             onNavigate={moveFocus}
             comboMode={comboMode}
             parsed={parsed}
+            changes={changes.get(key.position)}
             selected={selectedPosition === key.position}
             highlighted={highlightedPositions.has(key.position)}
             savedOnly={savedOnlyPositions.has(key.position)}
@@ -2030,23 +2053,25 @@ function KeyboardSvg({ keys, bindings, layerNames, selectedPosition, highlighted
   );
 }
 
-function KeyCap({ keyDef, parsed, selected, highlighted, savedOnly, onSelect, tabIndex, keyRef, onFocus, onNavigate, comboMode }) {
+function KeyCap({ keyDef, parsed, changes, selected, highlighted, savedOnly, onSelect, tabIndex, keyRef, onFocus, onNavigate, comboMode }) {
   const x = keyDef.x * UNIT;
   const y = keyDef.y * UNIT;
   const rotate = keyDef.r ? ` rotate(${keyDef.r}, ${(keyDef.rx - keyDef.x) * UNIT}, ${(keyDef.ry - keyDef.y) * UNIT})` : "";
-  const className = ["keyCap", highlighted ? "comboHighlighted" : "", savedOnly ? "comboSavedOnly" : "", selected ? "selected" : "", keyDef.thumb ? "thumb" : "", parsed.kind].filter(Boolean).join(" ");
+  const className = ["keyCap", changes ? "changedKey" : "", highlighted ? "comboHighlighted" : "", savedOnly ? "comboSavedOnly" : "", selected ? "selected" : "", keyDef.thumb ? "thumb" : "", parsed.kind].filter(Boolean).join(" ");
 
   return (
     <g ref={keyRef} role="button" tabIndex={tabIndex} onFocus={onFocus}
-      aria-label={`キー ${keyDef.position}: ${parsed.display}${comboMode ? " / コンボ対象を切り替え" : ""}`}
+      aria-label={`キー ${keyDef.position}: ${parsed.display}${changes ? ` / 変更: ${changes.join(" / ")}` : ""}${comboMode ? " / コンボ対象を切り替え" : ""}`}
       aria-pressed={comboMode ? highlighted : selected}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (!event.repeat) onSelect(keyDef.position); }
         else onNavigate(event, keyDef.position);
       }} className={className} transform={`translate(${x}, ${y})${rotate}`} onClick={() => onSelect(keyDef.position)}>
+      {changes && <title>{changes.join(" / ")}</title>}
       <rect width={KEY_SIZE} height={KEY_SIZE} rx="6" />
       <text className="keyDisplay" x={KEY_SIZE / 2} y="18">{shorten(parsed.display, 6)}</text>
       <text className="keyRaw" x={KEY_SIZE / 2} y="35">{parsed.behavior.replace("&", "") || parsed.kind}</text>
+      {changes && <text className="keyChangeMark" x="4" y="10" aria-hidden="true">◆</text>}
       <text className="keyIndex" x={KEY_SIZE - 4} y={KEY_SIZE - 4}>{keyDef.position}</text>
     </g>
   );
@@ -2060,9 +2085,6 @@ function PanelContent({
   search,
   markdown,
   diagnostics,
-  editorState,
-  comboPreviewState,
-  macroPreviewState,
   pendingChanges,
   pendingState,
   saveStatus,
@@ -2091,6 +2113,8 @@ function PanelContent({
   onAddTrackballDraft,
   onRemoveTrackballDraft,
   sensorDrafts,
+  sensorBaseline,
+  trackballBaseline,
   sensorLayersWithBindings,
   sensorLayersWithoutBindings,
   selectedSensorLayerIndex,
@@ -2180,12 +2204,7 @@ function PanelContent({
     const sensorDraft = selectedSensorLayerIndex != null ? sensorDrafts[selectedSensorLayerIndex] : null;
     const sensorPendingId = selectedSensorLayerIndex != null ? `layer-${selectedSensorLayerIndex}-sensor-binding` : null;
     const sensorPending = pendingChanges.find((c) => c.id === sensorPendingId);
-    const savedBehavior = selectedSensorLayer?.sensorBindings[0]?.behavior ?? "&inc_dec_kp";
-    const sensorChanged = sensorDraft && selectedSensorLayer
-      ? sensorDraft.incKey !== (selectedSensorLayer.sensorBindings[0]?.incKey ?? "")
-        || sensorDraft.decKey !== (selectedSensorLayer.sensorBindings[0]?.decKey ?? "")
-        || (sensorDraft.behavior || savedBehavior) !== savedBehavior
-      : false;
+    const sensorChanged = sensorDraft && formChanged(sensorDraft, sensorBaseline[selectedSensorLayerIndex]);
     return (
       <div className="splitPanel">
         <div className="tableSection sensorTableSection">
@@ -2260,6 +2279,7 @@ function PanelContent({
         trackballSettings={document.trackballSettings}
         layerNames={layerNames}
         draft={trackballDraft}
+        baseline={trackballBaseline}
         pendingCount={trackballPendingCount}
         onDraftChange={onTrackballDraftChange}
         onAddDraft={onAddTrackballDraft}
@@ -2275,9 +2295,6 @@ function PanelContent({
   if (tab === "Preview") {
     return (
       <PreviewPanel
-        editorState={editorState}
-        comboPreviewState={comboPreviewState}
-        macroPreviewState={macroPreviewState}
         pendingChanges={pendingChanges}
         pendingState={pendingState}
         saveStatus={saveStatus}
@@ -2385,9 +2402,6 @@ function BindingsTable({ document, activeLayer, layerNames, search, selectedPosi
 }
 
 function PreviewPanel({
-  editorState,
-  comboPreviewState,
-  macroPreviewState,
   pendingChanges,
   pendingState,
   saveStatus,
@@ -2404,15 +2418,7 @@ function PreviewPanel({
   onRedo,
   saveEndpointAvailable,
 }) {
-  const activeSinglePreview = comboPreviewState?.changed
-    ? comboPreviewState
-    : macroPreviewState?.changed
-      ? macroPreviewState
-      : editorState;
-  const previewSource = pendingChanges.length ? pendingState.nextSource : activeSinglePreview.nextSource;
-  const contextDiff = pendingChanges.length
-    ? pendingState.contextDiff || pendingState.message
-    : activeSinglePreview.contextDiff || activeSinglePreview.diff || activeSinglePreview.message || "No change.";
+  const contextDiff = pendingState.contextDiff || pendingState.message;
 
   return (
     <div className={saveStatus.message ? "previewPanel hasStatus" : "previewPanel"}>
@@ -2425,7 +2431,7 @@ function PreviewPanel({
                 type="button"
                 disabled={!saveEndpointAvailable || !pendingChanges.length || !pendingState.valid || saveStatus.tone === "saving"}
                 onClick={onSavePendingChanges}
-                title="Save all (Ctrl+S)"
+                title="追加済みの変更を保存（Ctrl+S）"
               >
                 {saveStatus.tone === "saving" ? "保存中…" : "追加済みの変更をローカルへ保存"}
               </button>
@@ -2434,6 +2440,7 @@ function PreviewPanel({
               <button type="button" disabled={!canRedo} onClick={onRedo} title="Redo (Ctrl+Shift+Z)">やり直す</button>
             </div>
           </div>
+          <p className="keyboardHelp">Ctrl+S で一覧の変更を保存します。未追加の入力は編集欄に残ります。</p>
           <PendingChangesList
             changes={pendingChanges}
             message={pendingState.message}
@@ -2451,8 +2458,10 @@ function PreviewPanel({
           <pre className="diffPreview">{editorMessage(contextDiff)}</pre>
         </div>
         <div>
-          <h3>保存内容のプレビュー</h3>
-          <pre className="sourcePreview">{previewSource}</pre>
+          <h3>一括保存する内容</h3>
+          {pendingState.valid
+            ? <pre className="sourcePreview">{pendingState.nextSource}</pre>
+            : <p>{editorMessage(pendingState.message)}</p>}
         </div>
       </div>
     </div>
@@ -2695,6 +2704,7 @@ function TrackballSettingsPanel({
   trackballSettings,
   layerNames,
   draft,
+  baseline,
   pendingCount,
   onDraftChange,
   onAddDraft,
@@ -2735,8 +2745,8 @@ function TrackballSettingsPanel({
     onDraftChange({ ...draft, scrollLayersRaw: sorted });
   };
 
-  const currentAutomouseRaw = automouseLayer?.value.trim() ?? "";
-  const currentScrollRaw = scrollLayers?.raw.trim() ?? "";
+  const currentAutomouseRaw = baseline.automouseLayerRaw;
+  const currentScrollRaw = baseline.scrollLayersRaw;
   const automouseChanged = draft.automouseLayerRaw !== currentAutomouseRaw;
   const scrollChanged = draft.scrollLayersRaw !== currentScrollRaw;
   const anyChanged = automouseChanged || scrollChanged;
@@ -2816,7 +2826,7 @@ function formatRange(range) {
   return range ? `${range.start}..${range.end}` : "Unavailable";
 }
 
-function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose, restrictTo = null, initialCategory = "" }) {
+function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose, onDirtyChange, restrictTo = null, initialCategory = "" }) {
   const initialDraft = useMemo(
     () => parseStructuredBinding(initialBinding, layerNames.length),
     [initialBinding, layerNames.length],
@@ -2827,6 +2837,10 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
   const searchRef = useRef(null);
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
+  useEffect(() => {
+    onDirtyChange(formChanged(draft, initialDraft));
+    return () => onDirtyChange(false);
+  }, [draft, initialDraft, onDirtyChange]);
   useEffect(() => {
     const opener = document.activeElement;
     const dialog = dialogRef.current;
@@ -2840,7 +2854,7 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
   const handleDialogKeyDown = (event) => {
     // 保存/Undo と実キー入力が背景の編集状態に届かないようにする。
     event.stopPropagation();
-    if (event.ctrlKey && event.key.toLowerCase() === "s") event.preventDefault();
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") event.preventDefault();
     if (event.key !== "Tab") return;
     const elements = [...dialogRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')]
       .filter((element) => element.getClientRects().length > 0);

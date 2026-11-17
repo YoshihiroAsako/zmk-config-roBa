@@ -41,6 +41,24 @@ async function readTempKeymap(tempRoot) {
 }
 
 describe("save binding change helper", () => {
+  it("rejects a source changed outside the edited ranges when expectedSource is supplied", async () => {
+    const source = await readRepoFile("config/roBa.keymap");
+    const entry = parseKeymap(source).layers[0].bindingEntries[0];
+    const changed = `${source}\n// external change\n`;
+    await withTempRepo(changed, async (tempRoot) => {
+      await assert.rejects(
+        () => saveBindingChanges({
+          repoRoot: tempRoot,
+          expectedSource: source,
+          changes: [{ range: entry.sourceRange, currentRaw: entry.raw, nextRaw: "&kp B" }],
+        }),
+        /外部で変更/,
+      );
+      assert.equal(await readTempKeymap(tempRoot), changed);
+      assert.deepEqual(await listKeymapBackups({ repoRoot: tempRoot }), []);
+    });
+  });
+
   it("backs up and saves one editable binding change", async () => {
     const source = await readRepoFile("config/roBa.keymap");
     const parsed = parseKeymap(source);
