@@ -12,6 +12,7 @@ import { buildMacroBindingsChange } from "./macroPreview.js";
 import {
   buildSaveDiagnostics,
   listKeymapBackups,
+  readKeymapBackup,
   replaceKeymapChanges,
   restoreKeymapBackup,
   saveBindingChange,
@@ -653,6 +654,27 @@ describe("keymap backup restore helper", () => {
       assert.equal(result.backupPath, "config/.roBa.keymap.bak/20260506-093000.roBa.keymap");
       assert.equal(await readTempKeymap(tempRoot), "restored keymap");
       assert.equal(await readFile(path.join(tempRoot, result.backupPath), "utf8"), "current keymap");
+    });
+  });
+
+  it("reads a backup without changing the current keymap", async () => {
+    await withTempRepo("current keymap", async (tempRoot) => {
+      const backupDir = path.join(tempRoot, "config", ".roBa.keymap.bak");
+      await mkdir(backupDir, { recursive: true });
+      await writeFile(path.join(backupDir, "20260504-120000.roBa.keymap"), "older keymap", "utf8");
+
+      const result = await readKeymapBackup({
+        repoRoot: tempRoot,
+        backupPath: "config/.roBa.keymap.bak/20260504-120000.roBa.keymap",
+      });
+
+      assert.equal(result.source, "older keymap");
+      assert.equal(result.path, "config/.roBa.keymap.bak/20260504-120000.roBa.keymap");
+      assert.equal(await readTempKeymap(tempRoot), "current keymap");
+      await assert.rejects(
+        () => readKeymapBackup({ repoRoot: tempRoot, backupPath: "config/roBa.keymap" }),
+        /Backup path must point/,
+      );
     });
   });
 

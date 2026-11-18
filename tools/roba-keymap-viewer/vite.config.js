@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import {
   listKeymapBackups,
+  readKeymapBackup,
   restoreKeymapBackup,
   saveBindingChange,
   saveBindingChanges,
@@ -112,6 +113,22 @@ export default defineConfig({
           }
         });
 
+        server.middlewares.use("/__roba/keymap-backup", async (request, response, next) => {
+          if (request.method !== "GET") return next();
+
+          try {
+            const backupPath = new URL(request.url, "http://localhost").searchParams.get("path") || "";
+            sendJson(response, 200, await readKeymapBackup({ repoRoot, backupPath }));
+          } catch (error) {
+            sendJson(response, 400, { ok: false, message: error.message });
+          }
+        });
+
+        server.middlewares.use("/__roba/repo-status", async (request, response, next) => {
+          if (request.method !== "GET") return next();
+          sendJson(response, 200, await readRepoStatus());
+        });
+
         server.middlewares.use("/__roba/restore-keymap-backup", async (request, response, next) => {
           if (request.method !== "POST") return next();
 
@@ -147,6 +164,25 @@ export default defineConfig({
     },
   },
 });
+
+// 実機反映の案内用。Git は読み取りのみで、ステージ・コミット等は行わない。
+async function readRepoStatus() {
+  const files = ["config/roBa.keymap", "keymap-drawer/roBa.yaml", "keymap-drawer/roBa.svg"];
+  try {
+    const { stdout } = await execFileAsync("git", ["-C", repoRoot, "status", "--porcelain", "--", ...files], { timeout: 5000 });
+    const changed = stdout.split(/\r?\n/).filter(Boolean).map((line) => line.slice(3).trim());
+    let ahead = null;
+    try {
+      const { stdout: count } = await execFileAsync("git", ["-C", repoRoot, "rev-list", "--count", "@{u}..HEAD"], { timeout: 5000 });
+      ahead = Number(count.trim());
+    } catch {
+      ahead = null;
+    }
+    return { ok: true, changed, ahead };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
 
 async function checkDrawerDirty() {
   try {

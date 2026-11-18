@@ -1,3 +1,36 @@
+import { buildDraftChange, upsertDraftChanges } from "./pendingChanges.js";
+import { isEditableBindingExpression } from "./parseKeymap.js";
+
+/**
+ * 同じレイヤー内のキー割り当ての貼り付け・交換を、追加済みの変更として作る。
+ * savedLayer は保存済み(元ファイルの位置を持つ)、queuedLayer は追加済み変更を反映した値。
+ * 返り値の changes をまとめて登録すると、元に戻す操作 1 回で取り消せる。
+ */
+export function buildKeyTransferChanges({ savedLayer, queuedLayer, mode, sourcePosition, targetPosition, sourceRaw }) {
+  const entry = (position) => savedLayer.bindingEntries?.[position];
+  const editable = (position) => Boolean(entry(position)?.sourceRange) && isEditableBindingExpression(entry(position).raw);
+  const change = (position, nextRaw) => buildDraftChange({
+    layerIndex: savedLayer.id, layerName: savedLayer.name, position, entry: entry(position), nextRaw,
+  });
+  if (!editable(targetPosition)) return { ok: false, message: "このキーは編集に対応していないため、貼り付け・交換できません。" };
+  if (mode === "paste") {
+    if (!isEditableBindingExpression(sourceRaw)) return { ok: false, message: "コピーした割り当ては、この画面で編集できる形式ではありません。" };
+    return { ok: true, changes: [change(targetPosition, sourceRaw)] };
+  }
+  if (mode === "swap") {
+    if (sourcePosition === targetPosition) return { ok: false, message: "コピー元と同じキーです。別のキーを選んでください。" };
+    if (!editable(sourcePosition)) return { ok: false, message: "コピー元のキーは編集に対応していないため、交換できません。" };
+    const a = queuedLayer.bindings[sourcePosition];
+    const b = queuedLayer.bindings[targetPosition];
+    return { ok: true, changes: [change(sourcePosition, b), change(targetPosition, a)] };
+  }
+  return { ok: false, message: "未対応の操作です。" };
+}
+
+export function applyKeyTransfer(pendingChanges, transfer) {
+  return transfer.ok ? upsertDraftChanges(pendingChanges, transfer.changes) : pendingChanges;
+}
+
 export function rebaseAfterKeySave(changes, saved) {
   const offset = saved.nextRaw.length - (saved.range.end - saved.range.start);
   return changes.filter((change) => change.id !== saved.id).map((change) => {

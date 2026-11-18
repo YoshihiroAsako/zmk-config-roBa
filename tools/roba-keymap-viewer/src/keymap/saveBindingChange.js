@@ -162,6 +162,17 @@ export async function listKeymapBackups({ repoRoot, limit = 10 }) {
     .slice(0, Math.max(0, limit));
 }
 
+/** バックアップの本文を読むだけの処理。復元前の差分表示に使う。 */
+export async function readKeymapBackup({ repoRoot, backupPath }) {
+  const root = path.resolve(repoRoot);
+  const resolvedBackupPath = resolveBackupPath(root, backupPath);
+  return {
+    ok: true,
+    path: toRepoRelativePath(root, resolvedBackupPath),
+    source: await readFile(resolvedBackupPath, "utf8"),
+  };
+}
+
 export async function restoreKeymapBackup({
   repoRoot,
   backupPath,

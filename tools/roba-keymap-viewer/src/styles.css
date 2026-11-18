@@ -2,8 +2,8 @@
   color: #18202f;
   background: #f4f7fb;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 15px;
+  line-height: 1.5;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -21,7 +21,7 @@
 .selectionNotice { padding: 8px 18px; background: #e9f7f8; color: #0d5963; overflow-wrap: anywhere; }
 .workspaceLinks { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 18px; }
 .workspaceLinks a { color: #0d5963; }
-.keyboardHelp { color: #52647b; font-size: 13px; margin: 10px 0; }
+.keyboardHelp { color: #52647b; font-size: 14px; margin: 10px 0; }
 .keyboardScroll { overflow-x: auto; padding: 5px; }
 .technicalDetails { margin: 12px 16px; overflow-wrap: anywhere; }
 .comboDetailPanel .technicalDetails { margin: 0; }
@@ -90,7 +90,7 @@ pre {
 .topBar p {
   margin: 4px 0 0;
   color: #65758b;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .topBarActions {
@@ -124,7 +124,7 @@ pre {
 
 .statusStrip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 10px;
   padding: 8px 18px;
   background: #edf3f9;
@@ -144,14 +144,14 @@ pre {
 
 .statusPill span {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
 }
 
 .statusPill strong {
   overflow: hidden;
   color: #263247;
-  font-size: 12px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -174,7 +174,7 @@ pre {
 
 .workspace {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: 196px minmax(0, 1fr) minmax(300px, 380px);
   align-items: start;
   min-height: 0;
   background: #f4f7fb;
@@ -200,7 +200,7 @@ pre {
 .railTitle,
 .eyebrow {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -208,7 +208,7 @@ pre {
 
 .layerButton {
   display: grid;
-  grid-template-columns: 22px 1fr 34px;
+  grid-template-columns: 22px 1fr;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -248,7 +248,7 @@ pre {
   padding-top: 12px;
   border-top: 1px solid #dfe6f0;
   color: #65758b;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .visualPane {
@@ -273,7 +273,7 @@ pre {
   display: flex;
   gap: 12px;
   color: #65758b;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .legend span {
@@ -372,7 +372,7 @@ pre {
 
 .keyDisplay {
   fill: #202b3d;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   text-anchor: middle;
 }
@@ -410,7 +410,7 @@ pre {
 
 .detailList dt {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -445,7 +445,7 @@ pre {
   border-radius: 6px;
   background: #ffffff;
   color: #6b4b12;
-  font-size: 11px;
+  font-size: 12px;
   white-space: pre;
 }
 
@@ -470,7 +470,7 @@ pre {
 
 .comboPreviewBox label span {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -485,7 +485,7 @@ pre {
   background: #ffffff;
   color: #18202f;
   font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .comboPreviewBox input:disabled {
@@ -510,7 +510,7 @@ pre {
 
 .fieldLabel {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -531,7 +531,7 @@ pre {
   background: #ffffff;
   color: #18202f;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .sensorTableSection {
@@ -611,7 +611,7 @@ label.scrollLayerCheckbox {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .scrollLayerCheckbox input[type="checkbox"] {
@@ -637,7 +637,7 @@ label.scrollLayerCheckbox {
   flex-shrink: 0;
   height: 30px;
   padding: 0 10px;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid #c8d4e4;
   border-radius: 6px;
   background: #eef2f7;
@@ -697,12 +697,12 @@ label.scrollLayerCheckbox {
 .editorBox label span,
 .editorStatus {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .editorNote {
   color: #8a6d3b;
-  font-size: 11px;
+  font-size: 12px;
   background: #fdf6e3;
   border: 1px solid #f3e1b7;
   border-radius: 4px;
@@ -715,12 +715,12 @@ label.scrollLayerCheckbox {
   display: grid;
   gap: 4px;
   overflow-wrap: anywhere;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .saveStatus strong,
 .previewSaveStatus strong {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .saveStatus span,
@@ -796,7 +796,7 @@ label.scrollLayerCheckbox {
   background: #ffffff;
   color: #18202f;
   font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .editorBox input:disabled {
@@ -912,7 +912,7 @@ th {
   z-index: 1;
   background: #f8fbff;
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
 }
 
@@ -939,7 +939,7 @@ tbody tr.clickableRow {
 
 td code {
   color: #315b9b;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .splitPanel {
@@ -1040,7 +1040,7 @@ td code {
   margin: 0;
   padding: 8px 10px 0;
   color: #52647b;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0;
 }
 
@@ -1051,7 +1051,7 @@ td code {
   padding: 10px;
   overflow: auto;
   color: #263247;
-  font-size: 12px;
+  font-size: 13px;
   white-space: pre;
 }
 
@@ -1106,7 +1106,7 @@ td code {
 
 .pendingMain span {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
 }
 
@@ -1182,18 +1182,18 @@ td code {
 
 .backupMeta strong {
   color: #263247;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .backupMeta code {
   color: #315b9b;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .backupMeta span,
 .backupEmpty {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .markdownPreview {
@@ -1203,7 +1203,7 @@ td code {
   overflow: auto;
   background: #fbfdff;
   color: #263247;
-  font-size: 12px;
+  font-size: 13px;
   white-space: pre;
 }
 
@@ -1225,7 +1225,7 @@ td code {
 
 .diagnostic span {
   color: #65758b;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .diagnostic strong {
@@ -1268,7 +1268,7 @@ td code {
   border: 1px solid #cfd8e3;
   border-radius: 4px;
   font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 12px;
+  font-size: 13px;
   color: #18202f;
   background: #ffffff;
 }
@@ -1290,7 +1290,7 @@ td code {
   border-radius: 5px;
   background: #eef2f7;
   color: #7d8da3;
-  font-size: 12px;
+  font-size: 13px;
   cursor: default;
 }
 
@@ -1302,7 +1302,7 @@ td code {
 }
 
 .layerRenameNote {
-  font-size: 11px;
+  font-size: 12px;
   color: #65758b;
   flex-basis: 100%;
 }
@@ -1323,7 +1323,7 @@ td code {
   border-radius: 6px;
   background: #eef2f7;
   color: #7d8da3;
-  font-size: 12px;
+  font-size: 13px;
   cursor: default;
   white-space: nowrap;
 }
@@ -1345,7 +1345,7 @@ td code {
 .captureHint {
   flex-basis: 100%;
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
@@ -1412,7 +1412,7 @@ td code {
   background: #f8fbff;
   color: #52647b;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -1430,7 +1430,7 @@ td code {
 
 .structuredPicker label span {
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .structuredPicker input,
@@ -1444,7 +1444,7 @@ td code {
   background: #ffffff;
   color: #18202f;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .keypressModifierGroup {
@@ -1462,7 +1462,7 @@ td code {
   background: #f8fbff;
   color: #52647b;
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -1499,7 +1499,7 @@ td code {
   background: #087f8c;
   color: #ffffff;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -1519,7 +1519,7 @@ td code {
   background: #f8fbff;
   color: #18202f;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .pickerSearch:focus {
@@ -1545,7 +1545,7 @@ td code {
   background: #ffffff;
   color: #52647b;
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -1584,7 +1584,7 @@ td code {
 .pickerItemLabel {
   min-width: 110px;
   color: #18202f;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .pickerItemCode {
@@ -1593,19 +1593,19 @@ td code {
   background: #eef2f7;
   color: #315b9b;
   font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .pickerItemNote {
   margin-left: auto;
   color: #65758b;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .pickerEmpty {
   padding: 16px;
   color: #65758b;
-  font-size: 12px;
+  font-size: 13px;
   text-align: center;
 }
 
@@ -1613,7 +1613,7 @@ td code {
   display: flex;
   gap: 6px;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .drawerStatusLabel {
@@ -1628,7 +1628,7 @@ td code {
 .statusPill { gap: 8px; }
 .statusPill strong { white-space: normal; overflow-wrap: anywhere; }
 .detailPane .editorHeader, .paneHeader { flex-wrap: wrap; }
-.detailPane .editorStatus, .detailPane label span, .saveStatus, .previewSaveStatus, .captureHint { font-size: 13px; }
+.detailPane .editorStatus, .detailPane label span, .saveStatus, .previewSaveStatus, .captureHint { font-size: 14px; }
 .detailPane input, .detailPane select { font-size: 14px; }
 .previewSaveStatus { margin: 8px 18px; }
 .previewPanel, .previewPanel.hasStatus { display: block; height: auto; }
@@ -1718,3 +1718,104 @@ td code {
 .keyCap.changedKey rect {
   stroke-dasharray: 4 2;
 }
+
+/* ---- 2026-11-18: キーの種類の色分け・2 段表示・透過キー ---- */
+.legend { flex-wrap: wrap; gap: 6px 12px; margin: 0; padding: 0; list-style: none; }
+.legend li { display: inline-flex; align-items: center; gap: 5px; }
+.legend .swatch { width: 14px; height: 14px; border: 1px solid #c7d3e3; border-radius: 4px; background: #fbfdff; }
+.swatch.tone-modifier, .keyCap.tone-modifier:not(.selected):not(.comboHighlighted):not(.comboSavedOnly) rect { fill: #f3effc; background: #f3effc; stroke: #b9a7e0; border-color: #b9a7e0; }
+.swatch.tone-hold-modifier, .keyCap.tone-hold-modifier:not(.selected):not(.comboHighlighted):not(.comboSavedOnly) rect { fill: #fbf0f7; background: #fbf0f7; stroke: #d39bbf; border-color: #d39bbf; }
+.swatch.tone-layer, .keyCap.tone-layer:not(.selected):not(.comboHighlighted):not(.comboSavedOnly) rect { fill: #e8f1fd; background: #e8f1fd; stroke: #8fb3e6; border-color: #8fb3e6; }
+.swatch.tone-mouse, .keyCap.tone-mouse:not(.selected):not(.comboHighlighted):not(.comboSavedOnly) rect { fill: #e9f7ee; background: #e9f7ee; stroke: #8cc9a2; border-color: #8cc9a2; }
+.swatch.tone-system, .keyCap.tone-system:not(.selected):not(.comboHighlighted):not(.comboSavedOnly) rect { fill: #fff3e6; background: #fff3e6; stroke: #e2b27a; border-color: #e2b27a; }
+.swatch.tone-transparent { background: #f3f6fa; border-color: #e0e7f0; border-style: dashed; }
+.keyCap.tone-custom:not(.selected):not(.comboHighlighted):not(.comboSavedOnly) rect { fill: #f5f6f8; stroke: #b8c0cc; }
+.keyCap.layerOpener:not(.selected):not(.comboHighlighted):not(.comboSavedOnly) rect { stroke: #165bcc; stroke-width: 2px; stroke-dasharray: 3 2; }
+.keySub { fill: #4f5f76; font-size: 7.5px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+.keyFallback { fill: #94a3b8; font-weight: 600; font-style: italic; }
+.keyDisplay, .keyIndex { pointer-events: none; }
+
+/* ---- 上部の状態表示・保存バー ---- */
+button.statusPill { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+button.statusPill:hover { background: #f5f9ff; }
+.appShell.withSaveBar { padding-bottom: 72px; }
+.saveBar {
+  position: fixed; inset: auto 0 0 0; z-index: 20;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: 10px 18px; background: #fffaf0; border-top: 2px solid #d18b21;
+  box-shadow: 0 -4px 14px rgba(24, 32, 47, 0.12);
+}
+.saveBarText { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-right: auto; color: #5c3b00; }
+.saveBarText strong { padding: 2px 8px; border-radius: 999px; background: #d18b21; color: #fff; font-size: 13px; }
+.saveBar button, .syncGuideHeader button, .issueTargets button, .layerJump button, .clipboardActions button, .backupPreview button {
+  min-height: 34px; padding: 0 12px; border: 1px solid #c8d4e4; border-radius: 6px; background: #fff; color: #0f6571; font: inherit; font-weight: 650; cursor: pointer;
+}
+.saveBar button:disabled, .clipboardActions button:disabled, .syncGuideHeader button:disabled { cursor: default; opacity: 0.5; }
+.primaryAction { background: #087f8c !important; border-color: #087f8c !important; color: #fff !important; }
+.dangerAction { background: #fff4f4 !important; border-color: #c64f5f !important; color: #9c2b3a !important; }
+.linkButton { margin-left: 6px; padding: 0; border: 0; background: none; color: #165bcc; font: inherit; text-decoration: underline; cursor: pointer; }
+.deviceNote { display: block; margin-top: 4px; color: #5c3b00; }
+
+/* ---- 編集欄の補足（透過・移動先・コピー） ---- */
+.keyInsight { margin: 10px 16px 0; padding: 8px 10px; border-left: 3px solid #8fb3e6; background: #f2f7fe; overflow-wrap: anywhere; }
+.layerJump { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.clipboardBox { margin: 10px 16px 0; padding: 10px; border: 1px dashed #c8d4e4; border-radius: 8px; }
+.clipboardActions { display: flex; flex-wrap: wrap; gap: 6px; }
+.clipboardState { margin: 8px 0 0; color: #52647b; font-size: 14px; overflow-wrap: anywhere; }
+
+/* ---- コンボのレイヤー選択・マクロの順番 ---- */
+.layerCheckboxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 4px 10px; margin: 0; padding: 8px 10px; border: 1px solid #d7e0ec; border-radius: 6px; }
+.layerCheckboxes legend { padding: 0 4px; color: #52647b; font-size: 14px; }
+.layerCheckboxes label { display: flex; align-items: center; gap: 6px; min-height: 28px; }
+.layerCheckboxes .allLayers { grid-column: 1 / -1; font-weight: 650; }
+.unknownLayers { grid-column: 1 / -1; margin: 4px 0 0; color: #9c2b3a; }
+.macroSteps { padding: 8px 10px; border-radius: 6px; background: #f6f8fb; }
+.macroSteps ol { margin: 6px 0 0; padding-left: 22px; }
+.macroSteps li, .macroSteps p { overflow-wrap: anywhere; }
+.macroSteps p { margin: 6px 0 0; color: #52647b; font-size: 14px; }
+
+/* ---- 設定チェック ---- */
+.diagnosticsPanel { padding: 12px 18px; }
+.diagnosticsPanel > h3 { margin: 18px 0 8px; }
+.keymapCheck h3 { margin: 0 0 4px; }
+.checkOk { padding: 8px 10px; border-left: 4px solid #2a9d8f; background: #eefaf7; }
+.checkList { display: grid; gap: 8px; margin: 8px 0; padding: 0; list-style: none; }
+.checkIssue { display: flex; gap: 10px; padding: 10px 12px; border: 1px solid #d7e0ec; border-left-width: 4px; border-radius: 6px; background: #fff; }
+.checkIssue p { margin: 4px 0; color: #3c4a5e; overflow-wrap: anywhere; }
+.checkIssue.error { border-left-color: #c64f5f; }
+.checkIssue.warn { border-left-color: #d18b21; }
+.checkIssue.info { border-left-color: #4277c8; }
+.issueLevel { flex: none; align-self: flex-start; padding: 2px 8px; border-radius: 999px; background: #eef2f7; font-size: 13px; font-weight: 700; }
+.checkIssue.error .issueLevel { background: #c64f5f; color: #fff; }
+.checkIssue.warn .issueLevel { background: #d18b21; color: #fff; }
+.issueTargets { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- 実機へ反映するまで ---- */
+.syncGuide { margin: 0 0 16px; padding: 12px 14px; border: 1px solid #d7e0ec; border-radius: 8px; background: #fff; }
+.syncGuideHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.syncGuideHeader h3 { margin: 0; }
+.syncGuide ol { display: grid; gap: 6px; margin: 8px 0 0; padding-left: 24px; }
+.syncStep { padding: 6px 10px; border-left: 4px solid #4277c8; background: #f7f9fc; overflow-wrap: anywhere; }
+.syncStep strong { display: block; }
+.syncStep.ok { border-left-color: #2a9d8f; }
+.syncStep.warn { border-left-color: #d18b21; background: #fffaf0; }
+.syncStep.fail { border-left-color: #c64f5f; background: #fff4f4; }
+.syncStep pre { margin: 4px 0 0; padding: 8px; overflow-x: auto; background: #18202f; color: #f4f7fb; border-radius: 6px; }
+
+/* ---- バックアップの差分 ---- */
+.backupItem.open { flex-wrap: wrap; }
+.backupPreview { flex-basis: 100%; margin-top: 8px; padding: 10px; border: 1px solid #e2b27a; border-radius: 6px; background: #fffaf0; }
+.backupPreview ul { max-height: 240px; margin: 6px 0; padding-left: 20px; overflow-y: auto; }
+.backupPreview li { overflow-wrap: anywhere; }
+
+/* ---- キー選択: 出したい文字から ---- */
+.jisResults { display: grid; gap: 6px; margin: 8px 0; padding: 10px; border: 1px solid #8fb3e6; border-radius: 8px; background: #f2f7fe; }
+.jisItem { border-color: #8fb3e6 !important; }
+.backupItem { grid-template-columns: minmax(0, 1fr) auto; }
+.backupItem button { height: auto; min-height: 32px; padding: 0 10px; }
+.backupItem.open .backupPreview { grid-column: 1 / -1; }
+.backupList:has(.backupItem.open) { max-height: none; }
+.comboPreviewBox .layerCheckboxes label { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.comboPreviewBox .layerCheckboxes input { width: 18px; height: 18px; flex: none; padding: 0; }
+.comboPreviewBox .layerCheckboxes legend { text-transform: none; }
+.comboPreviewBox .unknownLayers { display: block; }

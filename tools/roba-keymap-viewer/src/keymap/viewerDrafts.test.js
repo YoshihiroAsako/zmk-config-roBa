@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { buildComboDraftChanges, buildDraftChange, buildMacroDraftChanges, buildPendingChangesState } from "./pendingChanges.js";
 import { parseKeymap } from "./parseKeymap.js";
-import { getKeyboardChanges, rebaseAfterKeySave, rebaseHistoryAfterKeySave } from "./viewerDrafts.js";
+import { applyKeyTransfer, buildKeyTransferChanges, getKeyboardChanges, rebaseAfterKeySave, rebaseHistoryAfterKeySave } from "./viewerDrafts.js";
 
 const source = readFileSync(new URL("../../../../config/roBa.keymap", import.meta.url), "utf8");
 const original = parseKeymap(source);
@@ -48,5 +48,29 @@ describe("保存後の下書きとキーボード図", () => {
     assert.ok(base.get(macroCombo.positions[0])?.includes(`コンボ ${macroCombo.name} のマクロ ${macro.name} を変更`));
     assert.ok(getKeyboardChanges(original, edited, 1).get(0)?.some((message) => message.endsWith("→ &kp F2")));
     assert.equal(getKeyboardChanges(original, original, 0).size, 0);
+  });
+});
+
+describe("キー割り当ての貼り付け・交換", () => {
+  const layer = original.layers[0];
+
+  it("交換は 2 キー分の変更をまとめて作り、もう一度交換すると元に戻る", () => {
+    const swap = buildKeyTransferChanges({ savedLayer: layer, queuedLayer: layer, mode: "swap", sourcePosition: 0, targetPosition: 1 });
+    assert.equal(swap.ok, true);
+    const pending = applyKeyTransfer([], swap);
+    assert.deepEqual(pending.map((change) => [change.position, change.nextRaw]), [[0, "&kp W"], [1, "&kp Q"]]);
+    const state = buildPendingChangesState(source, pending, original.layers);
+    assert.equal(state.valid, true);
+    const queued = parseKeymap(state.nextSource).layers[0];
+    const back = buildKeyTransferChanges({ savedLayer: layer, queuedLayer: queued, mode: "swap", sourcePosition: 0, targetPosition: 1 });
+    assert.deepEqual(applyKeyTransfer(pending, back), [], "保存済みと同じ値の変更は残らない");
+  });
+
+  it("貼り付けは追加済みの他の変更を保持し、編集非対応のキーは拒否する", () => {
+    const paste = buildKeyTransferChanges({ savedLayer: layer, queuedLayer: layer, mode: "paste", targetPosition: 2, sourceRaw: "&lt 5 L" });
+    const pending = applyKeyTransfer([otherKeys[1]], paste);
+    assert.deepEqual(pending.map((change) => change.id), ["layer-0-pos-2", "layer-1-pos-0"]);
+    assert.equal(buildKeyTransferChanges({ savedLayer: layer, queuedLayer: layer, mode: "paste", targetPosition: 2, sourceRaw: "&custom 1 2 3" }).ok, false);
+    assert.equal(buildKeyTransferChanges({ savedLayer: layer, queuedLayer: layer, mode: "swap", sourcePosition: 3, targetPosition: 3 }).ok, false);
   });
 });

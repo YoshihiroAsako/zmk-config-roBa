@@ -1,4 +1,6 @@
-import { getKeyboardChanges, rebaseAfterKeySave, rebaseHistoryAfterKeySave } from "./keymap/viewerDrafts.js";
+import { applyKeyTransfer, buildKeyTransferChanges, getKeyboardChanges, rebaseAfterKeySave, rebaseHistoryAfterKeySave } from "./keymap/viewerDrafts.js";
+import { checkKeymap, countIssues, findLayerOpenerPositions, layerReferences, resolveTransparent } from "./keymap/keymapChecks.js";
+import { compareKeymaps } from "./keymap/keymapCompare.js";
 import { nextKeyPosition, focusWrapTarget } from "./keyboardNavigation.js";
 import initialKeymapSource from "../../../config/roBa.keymap?raw";
 import roBaMetadata from "../../../config/roBa.json";
@@ -7,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORIES, searchCatalog } from "./keymap/keycodeCatalog.js";
 import { buildMarkdown } from "./export/markdown.js";
 import { captureKeyToBinding } from "./keymap/keyCapture.js";
-import { describeBinding } from "./keymap/bindingDisplay.js";
+import { describeBinding, describeKeyFace, findBindingsForCharacter } from "./keymap/bindingDisplay.js";
 import { buildComboPreviewState } from "./keymap/comboPreview.js";
 import { buildNewComboPreviewState, createEmptyComboDraft } from "./keymap/comboInsert.js";
 import { buildNewMacroPreviewState, createEmptyMacroDraft } from "./keymap/macroInsert.js";
@@ -52,6 +54,27 @@ const TABS = ["Bindings", "Combos", "Macros", "Behaviors", "Sensors", "Settings"
 const TAB_LABELS = { Bindings: "キー一覧", Combos: "コンボ", Macros: "マクロ", Behaviors: "動作定義", Sensors: "エンコーダー", Settings: "設定", Preview: "変更・保存", Markdown: "Markdown", Diagnostics: "診断" };
 const BEHAVIOR_LABELS_JA = { "&kp": "キー入力", "&lt": "長押しでレイヤー", "&mt": "長押しで修飾キー", "&to_layer_0": "レイヤー0へ", "&mkp": "マウスボタン", "&bt": "Bluetooth", "&bootloader": "書き込みモード" };
 const EMPTY_SAVE_STATUS = { tone: "idle", title: "", message: "", backupPath: "", drawerMessage: "" };
+const KIND_LABELS_JA = {
+  keypress: "キー入力", "mod-tap": "長押しで修飾キー", "layer-tap": "長押しでレイヤー", momentary: "押す間レイヤー",
+  bluetooth: "Bluetooth", "mouse-button": "マウスボタン", macro: "マクロ", transparent: "透過", none: "無効",
+  bootloader: "書き込みモード", custom: "独自の動作", unknown: "不明",
+};
+const EDITABILITY_LABELS_JA = {
+  "studio-direct": "ZMK Studio でも変更可", "build-required": "再ビルドが必要", "source-only": "ファイル編集のみ", unknown: "不明",
+};
+const CATEGORY_LABELS_JA = {
+  Letters: "英字", Numbers: "数字", "Function keys": "ファンクション", Navigation: "移動", Editing: "編集",
+  Symbols: "記号", "Shifted Symbols": "Shift 記号", Modifiers: "修飾キー", Consumer: "メディア", International: "日本語・国際",
+};
+const KEY_TONES = [
+  ["key", "キー入力"], ["modifier", "修飾キー"], ["hold-modifier", "長押しで修飾"], ["layer", "レイヤー"],
+  ["mouse", "マウス"], ["system", "Bluetooth・書き込み"], ["transparent", "透過"],
+];
+const LAYER_REF_LABELS = {
+  momentary: "押している間有効にします", toggle: "押すたびに有効・解除を切り替えます",
+  to: "切り替えます（他のレイヤーは解除）", sticky: "次の 1 キーだけ有効にします",
+};
+const ISSUE_LEVEL_LABELS = { error: "エラー", warn: "注意", info: "参考" };
 
 function editorMessage(message) {
   return ({
@@ -63,6 +86,14 @@ function editorMessage(message) {
     "No macro draft change.": "マクロの変更はありません。",
     "No pending changes.": "追加済みの変更はありません。",
     "Preview ready. Binding counts remain stable.": "変更内容を確認できます。「変更に追加」で保存対象に加えます。",
+    "Combo preview ready. Combo and layer counts remain stable.": "変更内容を確認できます。「変更に追加」で保存対象に加えます。",
+    "Macro preview ready. Macro and layer counts remain stable.": "変更内容を確認できます。「変更に追加」で保存対象に加えます。",
+    "New combo preview ready. Combo count will increase by 1.": "新しいコンボを確認できます。「変更に追加」で保存対象に加えます。",
+    "New macro preview ready. Macro count will increase by 1.": "新しいマクロを確認できます。「変更に追加」で保存対象に加えます。",
+    "Preview generated, but combo or layer diagnostics changed.": "コンボまたはレイヤーの数が変わってしまうため、この変更は追加できません。",
+    "Preview generated, but macro or layer diagnostics changed.": "マクロまたはレイヤーの数が変わってしまうため、この変更は追加できません。",
+    "Preview generated, but binding counts changed.": "キーの数が変わってしまうため、この変更は追加できません。",
+    "Select a macro to preview macro edits.": "マクロを選ぶと変更内容を確認できます。",
   })[message] || message;
 }
 
@@ -158,6 +189,9 @@ function App() {
   const [fileBusy, setFileBusy] = useState(saveEndpointAvailable);
   const fileOperation = useRef(saveEndpointAvailable);
   const [keymapBackups, setKeymapBackups] = useState([]);
+  const [keyClipboard, setKeyClipboard] = useState(null);
+  const [repoStatus, setRepoStatus] = useState(null);
+  const [backupPreview, setBackupPreview] = useState(null);
 
   const layerNames = document.layers.map((layer) => layer.name);
   const currentLayer = document.layers[activeLayer] || document.layers[0];
@@ -337,6 +371,50 @@ function App() {
 
   const markdown = useMemo(() => buildMarkdown(document), [document]);
   const diagnostics = getDiagnostics(document);
+  // 図と同じ「編集中の配置」を対象にする。保存は止めない。
+  const keymapIssues = useMemo(
+    () => checkKeymap(editedDocument, { keyCount: document.physicalLayout.length, source: keymapSource }),
+    [editedDocument, document.physicalLayout.length, keymapSource],
+  );
+  const issueCounts = countIssues(keymapIssues);
+  const transparentFallbacks = new Map(layoutLayer.bindings.flatMap((_, position) => {
+    const resolved = resolveTransparent(layoutDocument, currentLayer.id, position);
+    return resolved ? [[position, resolved]] : [];
+  }));
+  const layerOpeners = new Set(findLayerOpenerPositions(layoutDocument, currentLayer.id));
+  const baseLayerName = document.layers[0]?.name ?? "default_layer";
+  const selectedLayerRefs = editingKind === "binding"
+    ? layerReferences(effectiveDraftBinding, queuedDocument.macros).filter((ref) => ref.layer < document.layers.length && ref.layer !== activeLayer)
+    : [];
+  const selectedFallback = editingKind === "binding" && transparentFallbacks.get(selectedPosition);
+
+  const loadRepoStatus = async () => {
+    if (!saveEndpointAvailable) return;
+    try {
+      const response = await fetch("/__roba/repo-status");
+      setRepoStatus(await response.json());
+    } catch (error) {
+      setRepoStatus({ ok: false, message: error.message });
+    }
+  };
+
+  const previewBackup = async (backup) => {
+    setBackupPreview({ path: backup.path, loading: true });
+    try {
+      const response = await fetch(`/__roba/keymap-backup?path=${encodeURIComponent(backup.path)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.message || "バックアップを読み込めませんでした。");
+      setBackupPreview({ path: backup.path, items: compareKeymaps(document, parseKeymap(payload.source)) });
+    } catch (error) {
+      setBackupPreview({ path: backup.path, error: error.message });
+    }
+  };
+
+  const showChangesPanel = () => {
+    setActiveTab("Preview");
+    setPanelOpen(true);
+    requestAnimationFrame(() => window.document.getElementById("viewer-sections")?.scrollIntoView({ block: "start" }));
+  };
 
   const loadKeymapBackups = async () => {
     if (!saveEndpointAvailable) return;
@@ -370,6 +448,7 @@ function App() {
         setFileBusy(false);
       });
     loadKeymapBackups();
+    loadRepoStatus();
     return () => controller.abort();
   }, []);
 
@@ -471,6 +550,7 @@ function App() {
     setSelectedPosition(Math.min(selectedPosition, layer.bindings.length - 1));
     setCaptureMode(false);
     setCaptureStatus(null);
+    setBackupPreview(null);
   };
 
   const runFileOperation = async (operation) => {
@@ -496,6 +576,7 @@ function App() {
       applyLoadedSource(payload.source);
       setSaveStatus({ tone: "ok", title: "再読み込み完了", message: "config/roBa.keymap を読み込みました。" });
       loadKeymapBackups();
+      loadRepoStatus();
     } catch (error) {
       setSaveStatus({ tone: "error", title: "再読み込み失敗", message: error.message });
     }
@@ -512,14 +593,14 @@ function App() {
       const response = await fetch("/__roba/update-keymap-drawer", { method: "POST" });
       const payload = await response.json().catch(() => ({}));
       if (payload.ok) {
-        return `keymap-drawer regenerated (${payload.yamlPath}, ${payload.svgPath}).`;
+        return `キーボード図を更新しました（${payload.yamlPath}、${payload.svgPath}）。`;
       }
       if (payload.available === false) {
-        return "keymap CLI not found on PATH. Update keymap-drawer manually.";
+        return "keymap コマンドが見つからないため、キーボード図を更新できませんでした。手順書の方法で更新してください。";
       }
-      return payload.message || "keymap-drawer update failed.";
+      return payload.message || "キーボード図の更新に失敗しました。";
     } catch (error) {
-      return `keymap-drawer update failed: ${error.message}`;
+      return `キーボード図の更新に失敗しました: ${error.message}`;
     }
   };
 
@@ -573,6 +654,7 @@ function App() {
       const drawerMessage = await updateKeymapDrawerAfterSave();
       setSaveStatus((current) => ({ ...current, drawerMessage }));
       loadKeymapBackups();
+      loadRepoStatus();
     } catch (error) {
       setSaveStatus({ tone: "error", title: "保存失敗", message: error.message });
     }
@@ -597,12 +679,12 @@ function App() {
 
   const restoreFromBackup = (backup) => runFileOperation(async () => {
     const pendingNote = hasUnsaved ? "\n\n未追加の入力と追加済みの変更を破棄します。" : "";
-    if (!window.confirm(`このバックアップを復元しますか？\n\n${backup.path}${pendingNote}`)) return;
+    if (!window.confirm(`このバックアップの内容に戻しますか？\n\n${backup.path}\n\n今のファイルは復元前に別のバックアップとして保存します。${pendingNote}`)) return;
 
     setSaveStatus({
       tone: "saving",
       title: "復元中",
-      message: "Backing up the current keymap, then restoring the selected backup.",
+      message: "今のファイルをバックアップしてから、選んだバックアップの内容に戻しています。",
       backupPath: "",
       drawerMessage: "",
     });
@@ -615,21 +697,22 @@ function App() {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.message || "Backup restore failed.");
+        throw new Error(payload.message || "バックアップの復元に失敗しました。");
       }
 
       applyLoadedSource(payload.source);
       setSaveStatus({
         tone: "ok",
         title: "復元完了",
-        message: `Restored ${payload.restoredPath}. Current file was backed up before restore.`,
+        message: `${payload.restoredPath} の内容に戻しました。復元前のファイルもバックアップしています。`,
         backupPath: payload.backupPath,
-        drawerMessage: "Updating keymap-drawer...",
+        drawerMessage: "キーボード図を更新中…",
       });
       setActiveTab("Preview");
       const drawerMessage = await updateKeymapDrawerAfterSave();
       setSaveStatus((current) => ({ ...current, drawerMessage }));
       loadKeymapBackups();
+      loadRepoStatus();
     } catch (error) {
       setSaveStatus({
         tone: "error",
@@ -752,6 +835,43 @@ function App() {
     commitPendingChanges(removeDraftChange(pendingChanges, selectedDraftId));
     setDraftBinding(null);
     setSaveStatus(EMPTY_SAVE_STATUS);
+  };
+
+  const copySelectedBinding = () => {
+    const raw = bindingDirty && keyInputValid ? effectiveDraftBinding : bindingBaseline;
+    setKeyClipboard({ raw, layerId: activeLayer, layerName: currentLayer.name, position: selectedPosition });
+    setSaveStatus({ tone: "ok", title: "割り当てをコピーしました", message: `${currentLayer.name} キー ${selectedPosition} の ${raw}。同じレイヤーの別のキーを選んで「ここへ貼り付け」か「コピー元と交換」を押します。` });
+  };
+
+  const transferBinding = (mode) => {
+    if (!keyClipboard || editorDirty || keyClipboard.layerId !== activeLayer) return;
+    const transfer = buildKeyTransferChanges({
+      savedLayer: currentLayer,
+      queuedLayer: queuedDocument.layers[activeLayer],
+      mode,
+      sourcePosition: keyClipboard.position,
+      targetPosition: selectedPosition,
+      sourceRaw: keyClipboard.raw,
+    });
+    const title = mode === "swap" ? "交換できませんでした" : "貼り付けできませんでした";
+    if (!transfer.ok) {
+      setSaveStatus({ tone: "error", title, message: transfer.message });
+      return;
+    }
+    const next = applyKeyTransfer(pendingChanges, transfer);
+    const state = buildPendingChangesState(keymapSource, next, document.layers, { keyCount: document.physicalLayout.length });
+    if (!state.valid) {
+      setSaveStatus({ tone: "error", title, message: editorMessage(state.message) });
+      return;
+    }
+    commitPendingChanges(next);
+    setDraftBinding(null);
+    setSaveStatus({
+      tone: "ok",
+      title: mode === "swap" ? `キー ${keyClipboard.position} と ${selectedPosition} を交換しました` : `キー ${selectedPosition} へ貼り付けました`,
+      message: "追加済みの変更に登録しました（まだ保存していません）。「元に戻す」（Ctrl+Z）で取り消せます。",
+    });
+    if (mode === "swap") setKeyClipboard(null);
   };
 
   const clearPendingChanges = () => {
@@ -994,7 +1114,7 @@ function App() {
         : "";
 
   return (
-    <div className="appShell">
+    <div className={hasUnsaved && saveEndpointAvailable ? "appShell withSaveBar" : "appShell"}>
       <header className="topBar">
         <div className="brandMark">rB</div>
         <div>
@@ -1010,19 +1130,24 @@ function App() {
         </div>
       </header>
 
-      <section className="statusStrip" aria-label="status">
+      <section className="statusStrip" aria-label="状態">
         <StatusPill label="ファイル" value="config/roBa.keymap" tone="ok" />
-        <StatusPill label="キー数" value={`${document.physicalLayout.length} キー`} tone="ok" />
         <StatusPill label="未追加の入力" value={hasInput ? "あり（未保存）" : "なし"} tone={hasInput ? "warn" : "info"} />
-        <StatusPill label="追加済み" value={`${pendingChanges.length} 件`} tone={pendingChanges.length ? "warn" : "info"} />
-        <StatusPill label="Studio" value="公式アプリを使用" tone="warn" />
+        <StatusPill label="追加済み" value={`${pendingChanges.length} 件（未保存）`} tone={pendingChanges.length ? "warn" : "info"} />
+        <StatusPill
+          label="設定チェック"
+          value={issueCounts.error ? `エラー ${issueCounts.error} 件` : issueCounts.warn ? `注意 ${issueCounts.warn} 件` : "問題なし"}
+          tone={issueCounts.error ? "fail" : issueCounts.warn ? "warn" : "ok"}
+          onClick={() => { setActiveTab("Diagnostics"); setPanelOpen(true); }}
+          title="診断タブで内容を確認"
+        />
         <StatusPill label="処理結果" value={saveStatus.title || "操作できます"} tone={getStatusTone(saveStatus)} />
       </section>
 
       <div className="selectionNotice" role="status" aria-atomic="true">
         {editingKind === "binding" ? `選択中: ${currentLayer.name} / キー ${selectedPosition} / ${selectedParsed.display}` : editingKind === "combo" ? `選択中: コンボ ${isAddingCombo ? newComboDraft.nameRaw : selectedComboName} / 対象キー ${isAddingCombo ? newComboDraft.positionsRaw : comboDraft.positionsRaw}` : `選択中: マクロ ${isAddingMacro ? newMacroDraft.nameRaw : selectedMacroName}`}
       </div>
-      <SaveStatusPanel status={saveStatus} />
+      <SaveStatusPanel status={saveStatus} onShowGuide={showChangesPanel} />
       <nav className="workspaceLinks" aria-label="操作領域へ移動">
         <a href="#editor-heading">選択項目を編集</a>
         <a href="#viewer-sections" onClick={() => setPanelOpen(true)}>一覧・変更・保存へ</a>
@@ -1039,7 +1164,6 @@ function App() {
             >
               <span>{layer.id}</span>
               <strong>{layer.name}</strong>
-              <small>{layer.bindings.length}</small>
             </button>
           ))}
           <details className="layerRenameSection">
@@ -1059,7 +1183,7 @@ function App() {
             />
           </details>
           <div className="railNote">
-            <strong>Canonical</strong>
+            <strong>正本のファイル</strong>
             <span>config/roBa.keymap</span>
             <span>config/roBa.json</span>
           </div>
@@ -1071,13 +1195,14 @@ function App() {
               <span className="eyebrow">Layer {currentLayer.id}</span>
               <h2>{layoutLayer.name}</h2>
             </div>
-            <div className="legend">
-              <span><i className="editDirect" /> Studio direct</span>
-              <span><i className="editBuild" /> Build required</span>
-              <span><i className="editSource" /> Source only</span>
-            </div>
+            <ul className="legend" aria-label="キーの色の意味">
+              {KEY_TONES.map(([tone, label]) => <li key={tone}><i className={`swatch tone-${tone}`} aria-hidden="true" />{label}</li>)}
+            </ul>
           </div>
-          <p className="keyboardHelp" id="keyboard-help">矢印キーで移動、Enter / Space で選択。Tab で編集欄へ進みます。</p>
+          <p className="keyboardHelp" id="keyboard-help">
+            上段は短押し、下段は長押し・種類。矢印キーで移動、Enter / Space で選択。Tab で編集欄へ進みます。
+            {currentLayer.id > 0 && ` 透過キーには ${baseLayerName} の割り当てを薄く表示しています（${baseLayerName} だけが有効な場合）。点線の枠はこのレイヤーを開くキーです。`}
+          </p>
           <div className="layoutMode" role="group" aria-label="配置の比較">
             <button type="button" aria-pressed={!showSavedLayout} onClick={() => setShowSavedLayout(false)}>編集中の配置</button>
             <button type="button" aria-pressed={showSavedLayout} onClick={() => setShowSavedLayout(true)}>ローカル保存済みの配置</button>
@@ -1098,6 +1223,8 @@ function App() {
             selectedPosition={selectedPosition}
             highlightedPositions={comboHighlightPositions}
             savedOnlyPositions={comboSavedOnlyPositions}
+            fallbacks={transparentFallbacks}
+            openers={layerOpeners}
             onSelect={handleSvgKeyClick}
             comboMode={editingKind === "combo"}
           />
@@ -1132,6 +1259,7 @@ function App() {
           {editingKind === "combo" && selectedCombo && (
             <ComboDetailPanel
               combo={selectedCombo}
+              layerNames={layerNames}
               draft={comboDraft}
               previewState={{ ...comboPreviewState, changed: comboDirty }}
               pendingCount={selectedComboPendingCount}
@@ -1153,6 +1281,7 @@ function App() {
           {editingKind === "combo" && isAddingCombo && (
             <NewComboDetailPanel
               draft={newComboDraft}
+              layerNames={layerNames}
               previewState={newComboPreviewState}
               pending={pendingChanges.some((change) => change.id === `combo-${newComboDraft.nameRaw.trim()}-node-insert`)}
               onAddDraft={addNewComboDraft}
@@ -1204,6 +1333,25 @@ function App() {
                 });
                 setSaveStatus(EMPTY_SAVE_STATUS);
               }}
+              onMoveBindingRow={(index, delta) => {
+                setMacroDraft((current) => {
+                  const bindings = macroDraftEntries(current.bindingDrafts);
+                  const target = index + delta;
+                  if (target < 0 || target >= bindings.length) return current;
+                  [bindings[index], bindings[target]] = [bindings[target], bindings[index]];
+                  return { ...current, fullBindingList: true, bindingDrafts: Object.fromEntries(bindings.map((value, row) => [row, value])) };
+                });
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
+              onDuplicateBindingRow={(index) => {
+                setMacroDraft((current) => {
+                  const bindings = macroDraftEntries(current.bindingDrafts);
+                  bindings.splice(index + 1, 0, bindings[index]);
+                  return { ...current, fullBindingList: true, bindingDrafts: Object.fromEntries(bindings.map((value, row) => [row, value])) };
+                });
+                setSaveStatus(EMPTY_SAVE_STATUS);
+              }}
+              layerNames={layerNames}
               onPickBinding={(index) => setPickerContext({ type: "macro", index })}
               captureActiveIndex={captureMode && captureContext?.type === "macro" ? captureContext.index : null}
               onCaptureBinding={(index) => {
@@ -1315,31 +1463,65 @@ function App() {
               {saveStatus.tone === "saving" ? "保存中…" : "このキーだけローカルへ保存"}
             </button>
           </div>
+          {selectedFallback && (
+            <p className="keyInsight">このレイヤーでは透過です。{baseLayerName} の <code>{selectedFallback}</code> が効きます（{baseLayerName} だけが有効な場合）。</p>
+          )}
+          {selectedLayerRefs.map((ref) => (
+            <div className="keyInsight layerJump" key={`${ref.kind}-${ref.layer}`}>
+              <span>このキーは {layerNames[ref.layer]}（レイヤー {ref.layer}）を{LAYER_REF_LABELS[ref.kind]}。</span>
+              <button type="button" onClick={() => selectBinding(ref.layer, selectedPosition)}>{layerNames[ref.layer]} を表示</button>
+            </div>
+          ))}
+          <div className="clipboardBox" role="group" aria-label="割り当てのコピー・貼り付け・交換">
+            <div className="clipboardActions">
+              <button type="button" onClick={copySelectedBinding}>割り当てをコピー</button>
+              <button
+                type="button"
+                disabled={!keyClipboard || editorDirty || keyClipboard.layerId !== activeLayer || !editorState.canEdit}
+                onClick={() => transferBinding("paste")}
+              >
+                ここへ貼り付け
+              </button>
+              <button
+                type="button"
+                disabled={!keyClipboard || editorDirty || keyClipboard.layerId !== activeLayer || keyClipboard.position === selectedPosition || !editorState.canEdit}
+                onClick={() => transferBinding("swap")}
+              >
+                コピー元と交換
+              </button>
+            </div>
+            <p className="clipboardState">
+              {!keyClipboard ? "コピーすると、同じレイヤーの別のキーへ貼り付け・交換できます。"
+                : `コピー中: ${keyClipboard.layerName} キー ${keyClipboard.position}（${keyClipboard.raw}）`}
+              {keyClipboard && keyClipboard.layerId !== activeLayer && " ／ 貼り付け・交換は同じレイヤー内だけです。"}
+              {keyClipboard && editorDirty && keyClipboard.layerId === activeLayer && " ／ 未追加の入力を「変更に追加」するか取り除くと使えます。"}
+            </p>
+          </div>
           <details className="technicalDetails"><summary>キーの詳細・ソース位置</summary>
           <dl className="detailList">
             <div>
-              <dt>Display</dt>
+              <dt>表示</dt>
               <dd>{selectedParsed.display}</dd>
             </div>
             <div>
-              <dt>Binding</dt>
+              <dt>割り当てコード（保存済み）</dt>
               <dd><code>{selectedBinding}</code></dd>
             </div>
             <div>
-              <dt>Source range</dt>
-              <dd>{selectedRange ? `${selectedRange.start}..${selectedRange.end}` : "Unavailable"}</dd>
+              <dt>ファイル内の位置</dt>
+              <dd>{selectedRange ? `${selectedRange.start}..${selectedRange.end}` : "取得できません"}</dd>
             </div>
             <div>
-              <dt>Kind</dt>
-              <dd>{selectedParsed.kind}</dd>
+              <dt>種類</dt>
+              <dd>{KIND_LABELS_JA[selectedParsed.kind] || selectedParsed.kind}</dd>
             </div>
             <div>
-              <dt>Editability</dt>
-              <dd>{selectedParsed.editability}</dd>
+              <dt>変更方法</dt>
+              <dd>{EDITABILITY_LABELS_JA[selectedParsed.editability] || selectedParsed.editability}</dd>
             </div>
             <div>
-              <dt>Notes</dt>
-              <dd>{selectedParsed.note || "No special note."}</dd>
+              <dt>メモ</dt>
+              <dd>{selectedParsed.note || "特になし"}</dd>
             </div>
           </dl>
           </details>
@@ -1435,6 +1617,21 @@ function App() {
           onSavePendingChanges={saveAllPendingChanges}
           onRefreshBackups={loadKeymapBackups}
           onRestoreBackup={restoreFromBackup}
+          backupPreview={backupPreview}
+          onPreviewBackup={previewBackup}
+          onCancelBackupPreview={() => setBackupPreview(null)}
+          keymapIssues={keymapIssues}
+          guide={(
+            <DeviceSyncGuide
+              hasInput={hasInput}
+              pendingCount={pendingChanges.length}
+              saveStatus={saveStatus}
+              repoStatus={repoStatus}
+              available={saveEndpointAvailable}
+              issueCounts={issueCounts}
+              onRefresh={loadRepoStatus}
+            />
+          )}
           canUndo={undoStack.length > 0}
           canRedo={redoStack.length > 0}
           onUndo={undo}
@@ -1485,12 +1682,34 @@ function App() {
         />
         </div>
       </section>
+
+      {hasUnsaved && saveEndpointAvailable && (
+        <div className="saveBar" role="region" aria-label="未保存の変更" inert={fileBusy}>
+          <span className="saveBarText">
+            <strong>未保存</strong>
+            {hasInput && "未追加の入力あり"}{hasInput && pendingChanges.length > 0 && "・"}
+            {pendingChanges.length > 0 && `追加済み ${pendingChanges.length} 件`}
+            {pendingChanges.length > 0 && !pendingState.valid && "（適用できない変更あり）"}
+          </span>
+          <button type="button" onClick={showChangesPanel}>変更を確認</button>
+          <button
+            type="button"
+            className="primaryAction"
+            disabled={!pendingChanges.length || !pendingState.valid || fileBusy}
+            onClick={saveAllPendingChanges}
+            title="追加済みの変更を保存（Ctrl+S）"
+          >
+            追加済みをローカルへ保存
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 function ComboDetailPanel({
   combo,
+  layerNames,
   draft,
   previewState,
   pendingCount,
@@ -1502,7 +1721,7 @@ function ComboDetailPanel({
   onCaptureBinding,
 }) {
   return (
-    <section className="comboDetailPanel" aria-label="selected combo details">
+    <section className="comboDetailPanel" aria-label="選択中のコンボの編集">
       <div className="editorHeader">
         <strong>コンボ</strong>
         <span>{combo.name}</span>
@@ -1513,7 +1732,7 @@ function ComboDetailPanel({
           <span>割り当てコード</span>
           <div className="comboPickerRow">
             <input
-              aria-label="Combo binding draft"
+              aria-label="コンボの割り当てコード"
               disabled={!previewState.canEditBinding}
               value={draft.bindingRaw}
               onChange={(event) => onDraftChange({ ...draft, bindingRaw: event.target.value })}
@@ -1539,24 +1758,20 @@ function ComboDetailPanel({
         <label>
           <span>対象キー（図で選択・解除）</span>
           <input
-            aria-label="Combo positions draft"
+            aria-label="コンボの対象キー"
             value={draft.positionsRaw}
             onChange={(event) => onDraftChange({ ...draft, positionsRaw: event.target.value })}
           />
         </label>
-        <label>
-          <span>対象レイヤー番号</span>
-          <input
-            aria-label="Combo layers draft"
-            placeholder="空欄はすべてのレイヤー"
-            value={draft.layersRaw}
-            onChange={(event) => onDraftChange({ ...draft, layersRaw: event.target.value })}
-          />
-        </label>
+        <LayerCheckboxes
+          layerNames={layerNames}
+          value={draft.layersRaw}
+          onChange={(layersRaw) => onDraftChange({ ...draft, layersRaw })}
+        />
         <label>
           <span>判定時間 (ms)</span>
           <input
-            aria-label="Combo timeout-ms draft"
+            aria-label="コンボの判定時間"
             placeholder="空欄は既定値 50ms"
             value={draft.timeoutMsRaw}
             onChange={(event) => onDraftChange({ ...draft, timeoutMsRaw: event.target.value })}
@@ -1619,6 +1834,7 @@ function ComboDetailPanel({
 
 function NewComboDetailPanel({
   draft,
+  layerNames,
   previewState,
   pending,
   onAddDraft,
@@ -1629,25 +1845,25 @@ function NewComboDetailPanel({
   onCaptureBinding,
 }) {
   return (
-    <section className="comboDetailPanel" aria-label="new combo details">
+    <section className="comboDetailPanel" aria-label="新しいコンボの作成">
       <div className="editorHeader">
         <strong>コンボを作成</strong>
-        <span>{draft.nameRaw || "unnamed"}</span>
+        <span>{draft.nameRaw || "名前なし"}</span>
       </div>
       <div className="comboPreviewBox active">
         <label>
-          <span>Node name</span>
+          <span>名前（英数字）</span>
           <input
-            aria-label="New combo node name"
+            aria-label="新しいコンボの名前"
             value={draft.nameRaw}
             onChange={(event) => onDraftChange({ ...draft, nameRaw: event.target.value })}
           />
         </label>
         <label>
-          <span>Binding</span>
+          <span>割り当てコード</span>
           <div className="comboPickerRow">
             <input
-              aria-label="New combo binding"
+              aria-label="新しいコンボの割り当てコード"
               value={draft.bindingRaw}
               onChange={(event) => onDraftChange({ ...draft, bindingRaw: event.target.value })}
             />
@@ -1666,24 +1882,20 @@ function NewComboDetailPanel({
         <label>
           <span>対象キー（図で選択・解除）</span>
           <input
-            aria-label="New combo positions"
+            aria-label="新しいコンボの対象キー"
             value={draft.positionsRaw}
             onChange={(event) => onDraftChange({ ...draft, positionsRaw: event.target.value })}
           />
         </label>
+        <LayerCheckboxes
+          layerNames={layerNames}
+          value={draft.layersRaw}
+          onChange={(layersRaw) => onDraftChange({ ...draft, layersRaw })}
+        />
         <label>
-          <span>レイヤー</span>
+          <span>判定時間 (ms)</span>
           <input
-            aria-label="New combo layers"
-            placeholder="空欄はすべてのレイヤー"
-            value={draft.layersRaw}
-            onChange={(event) => onDraftChange({ ...draft, layersRaw: event.target.value })}
-          />
-        </label>
-        <label>
-          <span>Timeout (ms)</span>
-          <input
-            aria-label="New combo timeout-ms"
+            aria-label="新しいコンボの判定時間"
             placeholder="空欄は既定値 50ms"
             value={draft.timeoutMsRaw}
             onChange={(event) => onDraftChange({ ...draft, timeoutMsRaw: event.target.value })}
@@ -1708,7 +1920,7 @@ function NewComboDetailPanel({
         </div>
       </div>
       <details className="technicalDetails"><summary>生成するソースの詳細</summary>
-      <pre className="rawNodePreview">{previewState.change?.nextRaw || "Fill in a valid new combo draft."}</pre>
+      <pre className="rawNodePreview">{previewState.change?.nextRaw || "入力内容が正しくなると、ここに生成するソースを表示します。"}</pre>
       </details>
     </section>
   );
@@ -1720,21 +1932,21 @@ function LayerRenameRow({ currentName, draft, pending, disabled, onChange, onAdd
   const changed = trimmed !== currentName;
   const canAdd = !disabled && validIdentifier && changed;
   const note = !disabled && trimmed && !validIdentifier
-    ? "Invalid identifier."
-    : "&lt N uses index, not name.";
+    ? "英字・数字・_・- だけが使えます（先頭は英字か _）。"
+    : "名前を変えても、レイヤー切替キー（&lt N など）は番号で指定するため影響しません。";
 
   return (
     <div className="layerRenameRow">
       <input
-        aria-label="Layer name draft"
+        aria-label="新しいレイヤー名"
         disabled={disabled}
         value={draft}
-        placeholder="Layer name draft"
+        placeholder="新しいレイヤー名"
         onChange={(event) => onChange(event.target.value)}
       />
       <div className="layerRenameActions">
         <button type="button" disabled={!canAdd} onClick={onAdd}>
-          {pending ? "Update" : "Add"}
+          {pending ? "変更を更新" : "変更に追加"}
         </button>
         <button type="button" disabled={!pending && !changed} onClick={onRemove}>
           取り除く
@@ -1757,25 +1969,25 @@ function NewMacroDetailPanel({
   onCaptureBinding,
 }) {
   return (
-    <section className="comboDetailPanel" aria-label="new macro details">
+    <section className="comboDetailPanel" aria-label="新しいマクロの作成">
       <div className="editorHeader">
         <strong>マクロを作成</strong>
-        <span>{draft.nameRaw || "unnamed"}</span>
+        <span>{draft.nameRaw || "名前なし"}</span>
       </div>
       <div className="comboPreviewBox active">
         <label>
-          <span>Node name</span>
+          <span>名前（英数字）</span>
           <input
-            aria-label="New macro node name"
+            aria-label="新しいマクロの名前"
             value={draft.nameRaw}
             onChange={(event) => onDraftChange({ ...draft, nameRaw: event.target.value })}
           />
         </label>
         <label>
-          <span>Bindings</span>
+          <span>実行する割り当て（上から順に実行）</span>
           <div className="comboPickerRow">
             <input
-              aria-label="New macro bindings"
+              aria-label="新しいマクロの割り当て"
               value={draft.bindingsRaw}
               onChange={(event) => onDraftChange({ ...draft, bindingsRaw: event.target.value })}
             />
@@ -1792,28 +2004,28 @@ function NewMacroDetailPanel({
           </div>
         </label>
         <label>
-          <span>wait-ms</span>
+          <span>各操作の間の待ち時間 wait-ms</span>
           <input
-            aria-label="New macro wait-ms"
-            placeholder="empty = no wait-ms property"
+            aria-label="新しいマクロの待ち時間"
+            placeholder="空欄は指定なし（既定値）"
             value={draft.waitMsRaw}
             onChange={(event) => onDraftChange({ ...draft, waitMsRaw: event.target.value })}
           />
         </label>
         <label>
-          <span>tap-ms</span>
+          <span>キーを押している時間 tap-ms</span>
           <input
-            aria-label="New macro tap-ms"
-            placeholder="empty = no tap-ms property"
+            aria-label="新しいマクロの押下時間"
+            placeholder="空欄は指定なし（既定値）"
             value={draft.tapMsRaw}
             onChange={(event) => onDraftChange({ ...draft, tapMsRaw: event.target.value })}
           />
         </label>
         <label>
-          <span>Label</span>
+          <span>表示名 label</span>
           <input
-            aria-label="New macro label"
-            placeholder="optional"
+            aria-label="新しいマクロの表示名"
+            placeholder="省略できます"
             value={draft.labelRaw}
             onChange={(event) => onDraftChange({ ...draft, labelRaw: event.target.value })}
           />
@@ -1837,10 +2049,33 @@ function NewMacroDetailPanel({
         </div>
       </div>
       <details className="technicalDetails"><summary>生成するソースの詳細</summary>
-      <pre className="rawNodePreview">{previewState.change?.nextRaw || "Fill in a valid new macro draft."}</pre>
+      <pre className="rawNodePreview">{previewState.change?.nextRaw || "入力内容が正しくなると、ここに生成するソースを表示します。"}</pre>
       </details>
     </section>
   );
+}
+
+function describeMacroStep(raw, previous, layerNames) {
+  const value = String(raw ?? "").trim();
+  if (previous?.trim() === "&macro_param_1to1" && value === "&kp MACRO_PLACEHOLDER") return "呼び出し時に渡されたキーを入力";
+  const layer = /^&(to|mo|tog) (\d+)$/.exec(value);
+  if (layer) {
+    const name = layerNames[Number(layer[2])] || `レイヤー ${layer[2]}`;
+    return `${name} へ${{ to: "切り替え", mo: "押す間切り替え", tog: "切り替え／解除" }[layer[1]]}`;
+  }
+  const fixed = {
+    "&macro_param_1to1": "呼び出し時の 1 番目の値を次の行へ渡す",
+    "&macro_param_1to2": "呼び出し時の 1 番目の値を次の行の 2 番目へ渡す",
+    "&macro_tap": "以降の行を「押して離す」",
+    "&macro_press": "以降の行を「押したまま」にする",
+    "&macro_release": "以降の行を「離す」",
+    "&macro_pause_for_release": "マクロのキーを離すまで待つ",
+  }[value];
+  if (fixed) return fixed;
+  const timed = /^&macro_(wait|tap)_time (\d+)$/.exec(value);
+  if (timed) return timed[1] === "wait" ? `${timed[2]}ms 待つ` : `押す時間を ${timed[2]}ms にする`;
+  const parsed = describeBinding(value, layerNames);
+  return parsed.kind === "keypress" ? `${parsed.display} を入力` : KIND_LABELS_JA[parsed.kind] || parsed.display;
 }
 
 function macroDraftEntries(bindingDrafts) {
@@ -1859,17 +2094,23 @@ function MacroDetailPanel({
   onDraftChange,
   onAddBindingRow,
   onRemoveBindingRow,
+  onMoveBindingRow,
+  onDuplicateBindingRow,
   onPickBinding,
   captureActiveIndex,
   onCaptureBinding,
+  layerNames = [],
 }) {
   const editableSet = new Set(previewState.editableIndices || []);
   const bindingDrafts = draft.bindingDrafts || {};
   const bindingRows = macroDraftEntries(bindingDrafts);
   const existingCount = macro.bindingEntries?.length || 0;
+  // 編集非対応の行は位置を変えない。移動・複製・削除は、それを崩さない場合だけ許可する。
+  const rowEditable = (index) => index >= existingCount || editableSet.has(index);
+  const laterRowsEditable = (index) => bindingRows.every((_, row) => row <= index || rowEditable(row));
 
   return (
-    <section className="comboDetailPanel" aria-label="selected macro details">
+    <section className="comboDetailPanel" aria-label="選択中のマクロの編集">
       <div className="editorHeader">
         <strong>マクロ</strong>
         <span>{macro.name}</span>
@@ -1878,14 +2119,14 @@ function MacroDetailPanel({
       <div className={previewState.changed ? "comboPreviewBox active" : "comboPreviewBox"}>
         {bindingRows.map((value, index) => {
           const editable = index >= existingCount || editableSet.has(index);
-          const removable = editable && bindingRows.length > 1;
+          const removable = editable && bindingRows.length > 1 && laterRowsEditable(index);
           const captureActive = captureActiveIndex === index;
           return (
             <label key={index}>
-              <span>{`割り当て ${index}${editable ? "" : "（編集非対応）"}`}</span>
+              <span>{`${index + 1} 番目に実行${editable ? "" : "（編集非対応）"}`}</span>
               <div className="comboPickerRow">
                 <input
-                  aria-label={`Macro binding ${index} draft`}
+                  aria-label={`マクロの ${index + 1} 番目の割り当て`}
                   disabled={!editable}
                   value={value}
                   onChange={(event) => onDraftChange({
@@ -1911,6 +2152,33 @@ function MacroDetailPanel({
                 </button>
                 <button
                   type="button"
+                  disabled={!editable || index === 0 || !rowEditable(index - 1)}
+                  className="pickerInlineBtn"
+                  aria-label={`${index + 1} 番目を上へ`}
+                  onClick={() => onMoveBindingRow(index, -1)}
+                >
+                  ↑ 上へ
+                </button>
+                <button
+                  type="button"
+                  disabled={!editable || index === bindingRows.length - 1 || !rowEditable(index + 1)}
+                  className="pickerInlineBtn"
+                  aria-label={`${index + 1} 番目を下へ`}
+                  onClick={() => onMoveBindingRow(index, 1)}
+                >
+                  ↓ 下へ
+                </button>
+                <button
+                  type="button"
+                  disabled={!editable || !laterRowsEditable(index)}
+                  className="pickerInlineBtn"
+                  aria-label={`${index + 1} 番目を複製`}
+                  onClick={() => onDuplicateBindingRow(index)}
+                >
+                  複製
+                </button>
+                <button
+                  type="button"
                   disabled={!removable}
                   className="pickerInlineBtn"
                   onClick={() => onRemoveBindingRow(index)}
@@ -1921,23 +2189,30 @@ function MacroDetailPanel({
             </label>
           );
         })}
+        <div className="macroSteps">
+          <strong>実行の順番</strong>
+          <ol>
+            {bindingRows.map((value, index) => <li key={index}><code>{value}</code> … {describeMacroStep(value, bindingRows[index - 1], layerNames)}</li>)}
+          </ol>
+          {bindingRows.some((_, index) => !rowEditable(index)) && <p>編集非対応の行は位置を変えられません。移動・複製・取り除く操作は、その行の位置が変わらない場合だけ使えます。</p>}
+        </div>
         <button type="button" className="secondaryAction" onClick={onAddBindingRow}>
           割り当て行を追加
         </button>
         <label>
-          <span>wait-ms draft</span>
+          <span>各操作の間の待ち時間 wait-ms</span>
           <input
-            aria-label="Macro wait-ms draft"
-            placeholder="empty = no wait-ms property"
+            aria-label="マクロの待ち時間"
+            placeholder="空欄は指定なし（既定値）"
             value={draft.waitMsRaw}
             onChange={(event) => onDraftChange({ ...draft, waitMsRaw: event.target.value })}
           />
         </label>
         <label>
-          <span>tap-ms draft</span>
+          <span>キーを押している時間 tap-ms</span>
           <input
-            aria-label="Macro tap-ms draft"
-            placeholder="empty = no tap-ms property"
+            aria-label="マクロの押下時間"
+            placeholder="空欄は指定なし（既定値）"
             value={draft.tapMsRaw}
             onChange={(event) => onDraftChange({ ...draft, tapMsRaw: event.target.value })}
           />
@@ -1993,7 +2268,7 @@ function MacroDetailPanel({
   );
 }
 
-function KeyboardSvg({ keys, bindings, layerNames, changes, selectedPosition, highlightedPositions, savedOnlyPositions, onSelect, comboMode }) {
+function KeyboardSvg({ keys, bindings, layerNames, changes, selectedPosition, highlightedPositions, savedOnlyPositions, fallbacks = new Map(), openers = new Set(), onSelect, comboMode }) {
   const [focusedPosition, setFocusedPosition] = useState(selectedPosition);
   const keyRefs = useRef(new Map());
   useEffect(() => { setFocusedPosition(selectedPosition); }, [selectedPosition]);
@@ -2031,10 +2306,14 @@ function KeyboardSvg({ keys, bindings, layerNames, changes, selectedPosition, hi
       <text className="trackballText" x={TRACKBALL.x * UNIT + KEY_SIZE / 2} y={TRACKBALL.y * UNIT + KEY_SIZE / 2 + 3}>trackball</text>
       {keys.map((key) => {
         const parsed = describeBinding(bindings[key.position], layerNames);
+        const fallback = fallbacks.get(key.position);
         return (
           <KeyCap
             key={key.position}
             keyDef={key}
+            face={describeKeyFace(bindings[key.position], layerNames)}
+            fallback={fallback && { raw: fallback, face: describeKeyFace(fallback, layerNames) }}
+            opener={openers.has(key.position)}
             tabIndex={focusedPosition === key.position ? 0 : -1}
             keyRef={(node) => { if (node) keyRefs.current.set(key.position, node); else keyRefs.current.delete(key.position); }}
             onFocus={() => setFocusedPosition(key.position)}
@@ -2053,26 +2332,33 @@ function KeyboardSvg({ keys, bindings, layerNames, changes, selectedPosition, hi
   );
 }
 
-function KeyCap({ keyDef, parsed, changes, selected, highlighted, savedOnly, onSelect, tabIndex, keyRef, onFocus, onNavigate, comboMode }) {
+function KeyCap({ keyDef, parsed, face, fallback, opener, changes, selected, highlighted, savedOnly, onSelect, tabIndex, keyRef, onFocus, onNavigate, comboMode }) {
   const x = keyDef.x * UNIT;
   const y = keyDef.y * UNIT;
   const rotate = keyDef.r ? ` rotate(${keyDef.r}, ${(keyDef.rx - keyDef.x) * UNIT}, ${(keyDef.ry - keyDef.y) * UNIT})` : "";
-  const className = ["keyCap", changes ? "changedKey" : "", highlighted ? "comboHighlighted" : "", savedOnly ? "comboSavedOnly" : "", selected ? "selected" : "", keyDef.thumb ? "thumb" : "", parsed.kind].filter(Boolean).join(" ");
+  const className = ["keyCap", `tone-${face.tone}`, changes ? "changedKey" : "", highlighted ? "comboHighlighted" : "", savedOnly ? "comboSavedOnly" : "", selected ? "selected" : "", keyDef.thumb ? "thumb" : "", opener ? "layerOpener" : "", parsed.kind].filter(Boolean).join(" ");
+  const top = fallback ? fallback.face.top : face.top;
+  const bottom = opener ? "開くキー" : face.bottom;
+  const notes = [
+    fallback && `透過: ${fallback.raw} が効きます`,
+    opener && "このレイヤーを開くキー（押している間）",
+    changes && `変更: ${changes.join(" / ")}`,
+  ].filter(Boolean);
 
   return (
     <g ref={keyRef} role="button" tabIndex={tabIndex} onFocus={onFocus}
-      aria-label={`キー ${keyDef.position}: ${parsed.display}${changes ? ` / 変更: ${changes.join(" / ")}` : ""}${comboMode ? " / コンボ対象を切り替え" : ""}`}
+      aria-label={`キー ${keyDef.position}: ${parsed.display}${notes.length ? ` / ${notes.join(" / ")}` : ""}${comboMode ? " / コンボ対象を切り替え" : ""}`}
       aria-pressed={comboMode ? highlighted : selected}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (!event.repeat) onSelect(keyDef.position); }
         else onNavigate(event, keyDef.position);
       }} className={className} transform={`translate(${x}, ${y})${rotate}`} onClick={() => onSelect(keyDef.position)}>
-      {changes && <title>{changes.join(" / ")}</title>}
+      <title>{[`${parsed.raw || parsed.display}`, ...notes].join("\n")}</title>
       <rect width={KEY_SIZE} height={KEY_SIZE} rx="6" />
-      <text className="keyDisplay" x={KEY_SIZE / 2} y="18">{shorten(parsed.display, 6)}</text>
-      <text className="keyRaw" x={KEY_SIZE / 2} y="35">{parsed.behavior.replace("&", "") || parsed.kind}</text>
+      <text className={fallback ? "keyDisplay keyFallback" : "keyDisplay"} x={KEY_SIZE / 2} y="21">{shorten(top, 6)}</text>
+      {bottom && <text className="keySub" x={KEY_SIZE / 2} y="36">{shorten(bottom, 8)}</text>}
       {changes && <text className="keyChangeMark" x="4" y="10" aria-hidden="true">◆</text>}
-      <text className="keyIndex" x={KEY_SIZE - 4} y={KEY_SIZE - 4}>{keyDef.position}</text>
+      <text className="keyIndex" x={KEY_SIZE - 4} y="9">{keyDef.position}</text>
     </g>
   );
 }
@@ -2102,6 +2388,11 @@ function PanelContent({
   onSavePendingChanges,
   onRefreshBackups,
   onRestoreBackup,
+  backupPreview,
+  onPreviewBackup,
+  onCancelBackupPreview,
+  keymapIssues,
+  guide,
   canUndo,
   canRedo,
   onUndo,
@@ -2163,7 +2454,7 @@ function PanelContent({
           <button type="button" onClick={onNewMacro}>マクロを作成</button>
         </div>
         <Table
-          columns={["Name", "Compatible", "Binding cells", "Bindings"]}
+          columns={["名前", "種類（compatible）", "引数の数", "割り当て"]}
           rows={document.macros}
           renderRow={(macro) => (
             <tr
@@ -2185,7 +2476,7 @@ function PanelContent({
   if (tab === "Behaviors") {
     return (
       <Table
-        columns={["Name", "Compatible", "Label", "Bindings"]}
+        columns={["名前", "種類（compatible）", "表示名", "割り当て"]}
         rows={document.behaviors}
         renderRow={(behavior) => (
           <tr key={behavior.name}>
@@ -2209,7 +2500,7 @@ function PanelContent({
       <div className="splitPanel">
         <div className="tableSection sensorTableSection">
           <Table
-            columns={["Layer", "Inc", "Dec"]}
+            columns={["レイヤー", "時計回り", "反時計回り"]}
             rows={sensorLayersWithBindings}
             renderRow={(layer) => (
               <tr
@@ -2224,7 +2515,7 @@ function PanelContent({
             )}
           />
           <div className="sensorAddSection">
-            <label className="fieldLabel" htmlFor="sensor-add-layer">Add sensor-binding</label>
+            <label className="fieldLabel" htmlFor="sensor-add-layer">エンコーダーの割り当てをレイヤーに追加</label>
             <div className="fieldRow">
               <select
                 id="sensor-add-layer"
@@ -2241,13 +2532,14 @@ function PanelContent({
                 value={sensorInsertBehavior}
                 onChange={(event) => onSelectSensorInsertBehavior(event.target.value)}
                 disabled={!sensorLayersWithoutBindings.length}
-                title="behavior"
+                title="送る内容の種類"
+                aria-label="送る内容の種類"
               >
-                <option value="&inc_dec_kp">kp (HID key)</option>
-                <option value="&inc_dec_cp">cp (Consumer)</option>
+                <option value="&inc_dec_kp">キー入力（&inc_dec_kp）</option>
+                <option value="&inc_dec_cp">メディア操作（&inc_dec_cp）</option>
               </select>
               <button type="button" disabled={!sensorLayersWithoutBindings.length} onClick={onAddSensorLayerDraft}>
-                Add layer
+                追加
               </button>
             </div>
           </div>
@@ -2305,6 +2597,10 @@ function PanelContent({
         onSavePendingChanges={onSavePendingChanges}
         onRefreshBackups={onRefreshBackups}
         onRestoreBackup={onRestoreBackup}
+        backupPreview={backupPreview}
+        onPreviewBackup={onPreviewBackup}
+        onCancelBackupPreview={onCancelBackupPreview}
+        guide={guide}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={onUndo}
@@ -2315,15 +2611,57 @@ function PanelContent({
   }
 
   return (
-    <div className="diagnosticsGrid">
-      {diagnostics.map((item) => (
-        <div className={`diagnostic ${item.ok ? "ok" : "fail"}`} key={item.label}>
-          <span>{item.label}</span>
-          <strong>{item.value}</strong>
-          <small>{item.ok ? "OK" : "Check needed"}</small>
-        </div>
-      ))}
+    <div className="diagnosticsPanel">
+      <KeymapCheckPanel issues={keymapIssues} layerNames={layerNames} onSelectBinding={onSelectBinding} />
+      <h3>ファイル構成の確認</h3>
+      <div className="diagnosticsGrid">
+        {diagnostics.map((item) => (
+          <div className={`diagnostic ${item.ok ? "ok" : "fail"}`} key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <small>{item.ok ? "OK" : "要確認"}</small>
+          </div>
+        ))}
+      </div>
     </div>
+  );
+}
+
+function KeymapCheckPanel({ issues, layerNames, onSelectBinding }) {
+  const main = issues.filter((issue) => issue.level !== "info");
+  const info = issues.filter((issue) => issue.level === "info");
+  const renderIssue = (issue, index) => (
+    <li className={`checkIssue ${issue.level}`} key={`${issue.code}-${index}`}>
+      <span className="issueLevel">{ISSUE_LEVEL_LABELS[issue.level]}</span>
+      <div>
+        <strong>{issue.title}</strong>
+        <p>{issue.detail}</p>
+        {issue.targets.length > 0 && (
+          <div className="issueTargets">
+            {issue.targets.slice(0, 8).map((target) => (
+              <button type="button" key={`${target.layer}-${target.position}`} onClick={() => onSelectBinding(target.layer, target.position)}>
+                {layerNames[target.layer]} キー {target.position} を表示
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+  return (
+    <section className="keymapCheck" aria-labelledby="keymap-check-heading">
+      <h3 id="keymap-check-heading">書き込み前の設定チェック</h3>
+      <p className="keyboardHelp">編集中の配置（追加済み・未追加の入力を含む）を、ファイルの内容だけで確認します。実機の状態は確認していません。保存は止めません。</p>
+      {main.length === 0
+        ? <p className="checkOk">エラー・注意はありません。</p>
+        : <ul className="checkList">{main.map(renderIssue)}</ul>}
+      {info.length > 0 && (
+        <details>
+          <summary>参考（{info.length} 件）: 意図した配置なら問題ない項目</summary>
+          <ul className="checkList">{info.map(renderIssue)}</ul>
+        </details>
+      )}
+    </section>
   );
 }
 
@@ -2334,7 +2672,7 @@ function CombosTable({ combos, selectedComboName, onSelectCombo, onNewCombo }) {
         <button type="button" onClick={onNewCombo}>コンボを作成</button>
       </div>
       <Table
-        columns={["Name", "Positions", "Binding", "Layers", "Timeout"]}
+        columns={["名前", "対象キー", "割り当てコード", "対象レイヤー", "判定時間"]}
         rows={combos}
         renderRow={(combo) => (
           <tr
@@ -2345,7 +2683,7 @@ function CombosTable({ combos, selectedComboName, onSelectCombo, onNewCombo }) {
             <td><button type="button" className="rowSelect" aria-pressed={combo.name === selectedComboName} onClick={(event) => { event.stopPropagation(); onSelectCombo(combo); }} aria-label={`コンボ ${combo.name} を選択`}>{combo.name}</button></td>
             <td>{combo.positions.join(" + ")}</td>
             <td><code>{combo.binding}</code></td>
-            <td>{combo.layers.join(", ") || "all"}</td>
+            <td>{combo.layers.join(", ") || "すべて"}</td>
             <td>{combo.timeoutMs}ms</td>
           </tr>
         )}
@@ -2374,7 +2712,7 @@ function BindingsTable({ document, activeLayer, layerNames, search, selectedPosi
     <div className="tableWrap">
       <table>
         <thead>
-          <tr>{["Pos", "Layer", "Display", "Binding", "Kind", "Editability", "Notes"].map((column) => <th key={column}>{column}</th>)}</tr>
+          <tr>{["キー", "レイヤー", "表示", "割り当てコード", "種類", "変更方法", "メモ"].map((column) => <th key={column}>{column}</th>)}</tr>
         </thead>
         <tbody>
           {filtered.map((row) => {
@@ -2389,8 +2727,8 @@ function BindingsTable({ document, activeLayer, layerNames, search, selectedPosi
                 <td>{row.layer.name}</td>
                 <td><strong>{row.parsed.display}</strong></td>
                 <td><code>{row.binding}</code></td>
-                <td>{row.parsed.kind}</td>
-                <td>{row.parsed.editability}</td>
+                <td>{KIND_LABELS_JA[row.parsed.kind] || row.parsed.kind}</td>
+                <td>{EDITABILITY_LABELS_JA[row.parsed.editability] || row.parsed.editability}</td>
                 <td>{row.parsed.note}</td>
               </tr>
             );
@@ -2412,6 +2750,10 @@ function PreviewPanel({
   onSavePendingChanges,
   onRefreshBackups,
   onRestoreBackup,
+  backupPreview,
+  onPreviewBackup,
+  onCancelBackupPreview,
+  guide,
   canUndo,
   canRedo,
   onUndo,
@@ -2422,6 +2764,7 @@ function PreviewPanel({
 
   return (
     <div className={saveStatus.message ? "previewPanel hasStatus" : "previewPanel"}>
+      {guide}
       <div className="diffGrid">
         <div>
           <div className="previewHeader">
@@ -2436,8 +2779,8 @@ function PreviewPanel({
                 {saveStatus.tone === "saving" ? "保存中…" : "追加済みの変更をローカルへ保存"}
               </button>
               <button type="button" disabled={!pendingChanges.length} onClick={onClearPendingChanges}>変更をすべて取り除く</button>
-              <button type="button" disabled={!canUndo} onClick={onUndo} title="Undo (Ctrl+Z)">元に戻す</button>
-              <button type="button" disabled={!canRedo} onClick={onRedo} title="Redo (Ctrl+Shift+Z)">やり直す</button>
+              <button type="button" disabled={!canUndo} onClick={onUndo} title="元に戻す（Ctrl+Z）">元に戻す</button>
+              <button type="button" disabled={!canRedo} onClick={onRedo} title="やり直す（Ctrl+Shift+Z / Ctrl+Y）">やり直す</button>
             </div>
           </div>
           <p className="keyboardHelp">Ctrl+S で一覧の変更を保存します。未追加の入力は編集欄に残ります。</p>
@@ -2453,6 +2796,9 @@ function PreviewPanel({
             restoreDisabled={saveStatus.tone === "saving"}
             onRefresh={onRefreshBackups}
             onRestore={onRestoreBackup}
+            preview={backupPreview}
+            onPreview={onPreviewBackup}
+            onCancelPreview={onCancelBackupPreview}
           />
           <h3>変更差分</h3>
           <pre className="diffPreview">{editorMessage(contextDiff)}</pre>
@@ -2501,57 +2847,148 @@ function BackupRestorePanel({
   restoreDisabled,
   onRefresh,
   onRestore,
+  preview,
+  onPreview,
+  onCancelPreview,
 }) {
   return (
-    <section className="backupRestorePanel" aria-label="Keymap backups">
+    <section className="backupRestorePanel" aria-labelledby="backup-heading">
       <div className="backupRestoreHeader">
-        <h3>Backups</h3>
+        <h3 id="backup-heading">バックアップ（保存・復元のたびに自動で作成）</h3>
         <button
           type="button"
           disabled={!saveEndpointAvailable}
           onClick={onRefresh}
-          title="Refresh backup list"
         >
-          Refresh
+          一覧を更新
         </button>
       </div>
       {!saveEndpointAvailable && (
-        <div className="backupEmpty">Backup restore is available only on the local dev server.</div>
+        <div className="backupEmpty">バックアップからの復元は、ローカルで起動した Viewer でだけ使えます。</div>
       )}
       {saveEndpointAvailable && !backups.length && (
-        <div className="backupEmpty">No backups yet. Save all creates the first backup.</div>
+        <div className="backupEmpty">バックアップはまだありません。最初の保存で作成されます。</div>
       )}
       {saveEndpointAvailable && backups.length > 0 && (
         <div className="backupList">
-          {backups.map((backup) => (
-            <div className="backupItem" key={backup.path}>
-              <div className="backupMeta">
-                <strong>{formatBackupName(backup.name)}</strong>
-                <code>{backup.path}</code>
-                <span>{formatBackupTime(backup.mtime)} · {formatBytes(backup.size)}</span>
+          {backups.map((backup) => {
+            const open = preview?.path === backup.path;
+            return (
+              <div className={open ? "backupItem open" : "backupItem"} key={backup.path}>
+                <div className="backupMeta">
+                  <strong>{formatBackupTime(backup.mtime)}</strong>
+                  <code>{backup.path}</code>
+                  <span>{formatBackupName(backup.name)} · {formatBytes(backup.size)}</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={restoreDisabled || (open && preview.loading)}
+                  aria-expanded={open}
+                  onClick={() => (open ? onCancelPreview() : onPreview(backup))}
+                >
+                  {open ? "差分を閉じる" : "この時点に戻す…"}
+                </button>
+                {open && (
+                  <div className="backupPreview" role="region" aria-label="戻した場合の違い">
+                    {preview.loading && <p>今のファイルとの違いを確認しています…</p>}
+                    {preview.error && <p role="alert">読み込めませんでした: {preview.error}</p>}
+                    {preview.items && (
+                      <>
+                        <p>
+                          {preview.items.length
+                            ? `戻すと、今のファイル（ローカル保存済み）から次の ${preview.items.length} 件が変わります。`
+                            : "今のファイルと内容は同じです（書式やコメントだけの違いの可能性があります）。"}
+                        </p>
+                        {preview.items.length > 0 && (
+                          <ul>
+                            {preview.items.slice(0, 40).map((item, index) => <li key={index}>{item.text}</li>)}
+                            {preview.items.length > 40 && <li>ほか {preview.items.length - 40} 件</li>}
+                          </ul>
+                        )}
+                        <div className="editorActions">
+                          <button type="button" className="dangerAction" disabled={restoreDisabled} onClick={() => onRestore(backup)}>この内容に戻す</button>
+                          <button type="button" onClick={onCancelPreview}>やめる</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-              <button
-                type="button"
-                disabled={restoreDisabled}
-                onClick={() => onRestore(backup)}
-                title="Restore this backup"
-              >
-                Restore
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
   );
 }
 
-function SaveStatusPanel({ status, compact = false }) {
+function DeviceSyncGuide({ hasInput, pendingCount, saveStatus, repoStatus, available, issueCounts, onRefresh }) {
+  const unsaved = hasInput || pendingCount > 0;
+  const changed = repoStatus?.ok ? repoStatus.changed : null;
+  const gitState = !available ? { tone: "info", text: "ローカルの Viewer でだけ確認できます。" }
+    : !repoStatus ? { tone: "info", text: "確認中…" }
+      : !repoStatus.ok ? { tone: "warn", text: `Git の状態を読み取れませんでした（${repoStatus.message}）。` }
+        : changed.length ? { tone: "warn", text: `未記録の変更: ${changed.join("、")}` }
+          : repoStatus.ahead > 0 ? { tone: "warn", text: `GitHub へ未送信のコミットが ${repoStatus.ahead} 件あります。` }
+            : { tone: "ok", text: repoStatus.ahead === null ? "対象ファイルに未記録の変更はありません（送信先は確認できませんでした）。" : "対象ファイルは記録・送信済みです。" };
+  const steps = [
+    {
+      title: "ローカルへ保存",
+      tone: unsaved ? "warn" : "ok",
+      text: unsaved ? `未保存があります（${[hasInput && "未追加の入力", pendingCount && `追加済み ${pendingCount} 件`].filter(Boolean).join("・")}）。` : "未保存の変更はありません。",
+    },
+    {
+      title: "書き込み前の設定チェック",
+      tone: issueCounts.error ? "fail" : issueCounts.warn ? "warn" : "ok",
+      text: issueCounts.error ? `エラー ${issueCounts.error} 件。「診断」タブで確認してください。`
+        : issueCounts.warn ? `注意 ${issueCounts.warn} 件。意図どおりか「診断」タブで確認してください。` : "エラー・注意はありません。",
+    },
+    {
+      title: "キーボード図（keymap-drawer）の更新",
+      tone: saveStatus.drawerMessage && /失敗|できません/.test(saveStatus.drawerMessage) ? "warn" : "info",
+      text: saveStatus.drawerMessage || "保存のたびに自動で更新します。",
+    },
+    { title: "Git へ記録して GitHub へ送る", tone: gitState.tone, text: gitState.text, command: "git add config/roBa.keymap keymap-drawer/roBa.yaml keymap-drawer/roBa.svg\ngit commit -m \"キーマップを更新\"\ngit push" },
+    { title: "GitHub Actions のビルド成功を確認し、.uf2 を取得", tone: "info", text: "Viewer では確認できません。GitHub の Actions 画面で確認します。" },
+    { title: "左右へ書き込み", tone: "info", text: "roBa_L と roBa_R に、同じビルドの .uf2 を書き込みます。Viewer では確認できません。" },
+  ];
+  return (
+    <section className="syncGuide" aria-labelledby="sync-guide-heading">
+      <div className="syncGuideHeader">
+        <h3 id="sync-guide-heading">実機へ反映するまで</h3>
+        <button type="button" disabled={!available} onClick={onRefresh}>状況を更新</button>
+      </div>
+      <p className="keyboardHelp">ローカル保存だけでは実機は変わりません。実機の現在の状態は取得していません。詳しい手順: docs/viewer-to-device-guide.md</p>
+      <ol>
+        {steps.map((step) => (
+          <li key={step.title} className={`syncStep ${step.tone}`}>
+            <strong>{step.title}</strong>
+            <span>{step.text}</span>
+            {step.command && (
+              <details>
+                <summary>コマンドの例（PowerShell）</summary>
+                <pre>{step.command}</pre>
+              </details>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function SaveStatusPanel({ status, compact = false, onShowGuide }) {
   const className = `${compact ? "saveStatus" : "previewSaveStatus"} ${status.tone}`;
   return (
     <div className={className} role={status.tone === "error" ? "alert" : "status"} aria-atomic="true" hidden={!status.message}>
       <strong>{status.title}</strong>
       <span>{status.message}</span>
+      {status.tone === "ok" && status.backupPath && onShowGuide && (
+        <span className="deviceNote">
+          実機にはまだ反映されていません。
+          <button type="button" className="linkButton" onClick={onShowGuide}>実機へ反映するまでの手順を見る</button>
+        </span>
+      )}
       {(status.backupPath || status.drawerMessage) && (
         <details className="saveDetails">
           <summary>保存処理の詳細</summary>
@@ -2563,7 +3000,7 @@ function SaveStatusPanel({ status, compact = false }) {
           )}
           {status.drawerMessage && (
             <div className="drawerStatusLine">
-              <span className="drawerStatusLabel">keymap-drawer</span>
+              <span className="drawerStatusLabel">キーボード図</span>
               <span>{status.drawerMessage}</span>
             </div>
           )}
@@ -2601,12 +3038,57 @@ function Table({ columns, rows, renderRow }) {
   );
 }
 
-function StatusPill({ label, value, tone }) {
+function StatusPill({ label, value, tone, onClick, title }) {
+  if (onClick) {
+    return (
+      <button type="button" className={`statusPill ${tone}`} onClick={onClick} title={title}>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </button>
+    );
+  }
   return (
     <div className={`statusPill ${tone}`}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function LayerCheckboxes({ layerNames, value, onChange }) {
+  const tokens = String(value ?? "").trim().split(/\s+/).filter(Boolean);
+  const selected = new Set(tokens.map(Number).filter((id) => Number.isInteger(id) && id >= 0 && id < layerNames.length));
+  const unknown = tokens.filter((token) => !selected.has(Number(token)) || !/^\d+$/.test(token));
+  const update = (next) => onChange([...next].sort((a, b) => a - b).join(" "));
+  return (
+    <fieldset className="layerCheckboxes">
+      <legend>対象レイヤー（すべて外すと全レイヤー）</legend>
+      <label className="allLayers">
+        <input type="checkbox" checked={!tokens.length} onChange={() => onChange("")} disabled={!tokens.length} />
+        すべてのレイヤー
+      </label>
+      {layerNames.map((name, id) => (
+        <label key={id}>
+          <input
+            type="checkbox"
+            checked={selected.has(id)}
+            onChange={(event) => {
+              const next = new Set(selected);
+              if (event.target.checked) next.add(id);
+              else next.delete(id);
+              update(next);
+            }}
+          />
+          {id}: {name}
+        </label>
+      ))}
+      {unknown.length > 0 && (
+        <p className="unknownLayers" role="alert">
+          存在しないレイヤーの指定: {unknown.join(" ")}
+          <button type="button" className="linkButton" onClick={() => update(selected)}>外す</button>
+        </p>
+      )}
+    </fieldset>
   );
 }
 
@@ -2621,13 +3103,13 @@ function getDiagnostics(document) {
   const layerCountsOk = document.layers.every((layer) => layer.bindings.length === document.physicalLayout.length);
   const sensorBindingCount = document.layers.reduce((count, layer) => count + layer.sensorBindings.length, 0);
   return [
-    { label: "config/roBa.json key count", value: document.physicalLayout.length, ok: document.physicalLayout.length === 43 },
-    { label: "DTS physical layout key count", value: document.dtsPhysicalKeyCount, ok: document.dtsPhysicalKeyCount === 43 },
-    { label: "Layer count", value: document.layers.length, ok: document.layers.length === 7 },
-    { label: "Every layer binding count", value: layerCountsOk ? "43 each" : "mismatch", ok: layerCountsOk },
-    { label: "Combo count", value: document.combos.length, ok: document.combos.length >= 5 },
-    { label: "Macro count", value: document.macros.length, ok: document.macros.length >= 1 },
-    { label: "Sensor binding count", value: sensorBindingCount, ok: sensorBindingCount === 2 },
+    { label: "配置ファイル（roBa.json）のキー数", value: document.physicalLayout.length, ok: document.physicalLayout.length === 43 },
+    { label: "基板定義（DTS）のキー数", value: document.dtsPhysicalKeyCount, ok: document.dtsPhysicalKeyCount === 43 },
+    { label: "レイヤー数", value: document.layers.length, ok: document.layers.length === 7 },
+    { label: "各レイヤーの割り当て数", value: layerCountsOk ? "すべて 43" : "不一致", ok: layerCountsOk },
+    { label: "コンボ数", value: document.combos.length, ok: document.combos.length >= 5 },
+    { label: "マクロ数", value: document.macros.length, ok: document.macros.length >= 1 },
+    { label: "エンコーダー割り当て数", value: sensorBindingCount, ok: sensorBindingCount === 2 },
   ];
 }
 
@@ -2642,44 +3124,45 @@ function SensorDetailPanel({ layer, draft, pending, changed, onBehaviorChange, o
   const previewRaw = `${effectiveBehavior} ${draft.incKey || "?"} ${draft.decKey || "?"}`;
   const pendingRemove = pending?.kind === "sensor-binding-remove";
   return (
-    <section className="sensorDetailPanel" aria-label="sensor binding editor">
+    <section className="sensorDetailPanel" aria-label="エンコーダーの割り当ての編集">
       <div className="editorHeader">
         <strong>{layer.name}</strong>
-        <span className="eyebrow">sensor-binding</span>
+        <span className="eyebrow">エンコーダー</span>
       </div>
       <div className="fieldGroup">
-        <span className="fieldLabel">Behavior</span>
+        <span className="fieldLabel">送る内容の種類</span>
         <div className="fieldRow">
           <select
+            aria-label="送る内容の種類"
             value={effectiveBehavior}
             onChange={(event) => onBehaviorChange(event.target.value)}
           >
-            <option value="&inc_dec_kp">kp (HID key)</option>
-            <option value="&inc_dec_cp">cp (Consumer)</option>
+            <option value="&inc_dec_kp">キー入力（&inc_dec_kp）</option>
+            <option value="&inc_dec_cp">メディア操作（&inc_dec_cp）</option>
           </select>
         </div>
       </div>
       <div className="fieldGroup">
-        <span className="fieldLabel">Inc (時計回り)</span>
+        <span className="fieldLabel">時計回り（inc）</span>
         <div className="fieldRow">
           <code className="fieldValue">{draft.incKey || "(未設定)"}</code>
           <button type="button" onClick={onPickInc}>キーを選ぶ</button>
         </div>
       </div>
       <div className="fieldGroup">
-        <span className="fieldLabel">Dec (反時計回り)</span>
+        <span className="fieldLabel">反時計回り（dec）</span>
         <div className="fieldRow">
           <code className="fieldValue">{draft.decKey || "(未設定)"}</code>
           <button type="button" onClick={onPickDec}>キーを選ぶ</button>
         </div>
       </div>
       <div className="fieldGroup">
-        <button type="button" onClick={onSwap} title="inc と dec を入れ替え">⇄ Swap inc/dec</button>
+        <button type="button" onClick={onSwap} title="inc と dec を入れ替え">⇄ 回転方向を入れ替え</button>
       </div>
       <div className="comboPreviewBox">
-        <span className="fieldLabel">Preview</span>
+        <span className="fieldLabel">変更後</span>
         <code>{previewRaw}</code>
-        {pending && <span className="pendingBadge">draft</span>}
+        {pending && <span className="pendingBadge">追加済み</span>}
       </div>
       <p className="trackballDisabledHint">
         全レイヤー方向反転は <code>boards/shields/roBa/roBa.overlay</code> の編集が必要です。
@@ -2692,7 +3175,7 @@ function SensorDetailPanel({ layer, draft, pending, changed, onBehaviorChange, o
           変更を取り除く
         </button>
         <button type="button" disabled={pendingRemove} onClick={onDeleteBinding}>
-          Remove sensor-binding
+          このレイヤーから割り当てを削除
         </button>
       </div>
       <div className="fieldLabel">保存済み: <code>{sb.raw}</code></div>
@@ -2713,8 +3196,8 @@ function TrackballSettingsPanel({
   if (!trackballSettings) {
     return (
       <div className="tableSection">
-        <div className="editorHeader"><strong>Settings</strong></div>
-        <div className="pendingEmpty">Trackball settings are not available in this keymap.</div>
+        <div className="editorHeader"><strong>設定</strong></div>
+        <div className="pendingEmpty">このキーマップにはトラックボールの設定がありません。</div>
       </div>
     );
   }
@@ -2753,28 +3236,28 @@ function TrackballSettingsPanel({
 
   return (
     <div className="tableSection">
-      <div className="editorHeader"><strong>Settings</strong><span>Trackball</span></div>
+      <div className="editorHeader"><strong>設定</strong><span>トラックボール</span></div>
       <div className="trackballSettingsScroll">
         {!automouseLayer && (
-          <div className="pendingEmpty">automouse-layer property not found (read-only).</div>
+          <div className="pendingEmpty">automouse-layer の設定が見つかりません（変更できません）。</div>
         )}
         {automouseLayer && (
           <div className="comboPreviewBox active">
             <label>
               <span>
-                automouse-layer
+                動かすと自動で有効になるレイヤー（automouse-layer）
                 {Number(draft.automouseLayerRaw) === 0 && (
-                  <span className="trackballDisabledHint"> — automouse disabled (value 0)</span>
+                  <span className="trackballDisabledHint"> — 0 は自動切替なし</span>
                 )}
               </span>
               <select
-                aria-label="automouse-layer"
+                aria-label="動かすと自動で有効になるレイヤー"
                 value={draft.automouseLayerRaw}
                 onChange={(event) => onDraftChange({ ...draft, automouseLayerRaw: event.target.value })}
               >
                 {automouseOptions.map(({ index, name }) => (
                   <option key={index} value={String(index)}>
-                    {index}: {name}{index === 0 ? " (disabled)" : ""}
+                    {index}: {name}{index === 0 ? "（自動切替なし）" : ""}
                   </option>
                 ))}
               </select>
@@ -2782,12 +3265,12 @@ function TrackballSettingsPanel({
           </div>
         )}
         {!scrollLayers && (
-          <div className="pendingEmpty">scroll-layers property not found (read-only).</div>
+          <div className="pendingEmpty">scroll-layers の設定が見つかりません（変更できません）。</div>
         )}
         {scrollLayers && (
           <div className="comboPreviewBox active">
-            <span className="fieldLabel">scroll-layers</span>
-            <div className="scrollLayerCheckboxList" role="group" aria-label="scroll-layers">
+            <span className="fieldLabel">トラックボールでスクロールするレイヤー（scroll-layers）</span>
+            <div className="scrollLayerCheckboxList" role="group" aria-label="トラックボールでスクロールするレイヤー">
               {Array.from({ length: layerCount }, (_, index) => (
                 <label key={index} className="scrollLayerCheckbox">
                   <input
@@ -2807,14 +3290,14 @@ function TrackballSettingsPanel({
             disabled={!anyChanged}
             onClick={onAddDraft}
           >
-            {pendingCount ? "Update trackball draft" : "Add trackball draft"}
+            {pendingCount ? "変更を更新" : "変更に追加"}
           </button>
           <button
             type="button"
             disabled={!pendingCount && !anyChanged}
             onClick={onRemoveDraft}
           >
-            Remove trackball draft
+            変更を取り除く
           </button>
         </div>
       </div>
@@ -2823,7 +3306,7 @@ function TrackballSettingsPanel({
 }
 
 function formatRange(range) {
-  return range ? `${range.start}..${range.end}` : "Unavailable";
+  return range ? `${range.start}..${range.end}` : "取得できません";
 }
 
 function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose, onDirtyChange, restrictTo = null, initialCategory = "" }) {
@@ -2863,6 +3346,7 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
   };
 
   const results = searchCatalog(search, category);
+  const jisResults = findBindingsForCharacter(search);
   const structuredState = validateStructuredBinding(draft, layerNames.length);
 
   const chooseKeycode = (keycode) => {
@@ -2892,7 +3376,7 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
           <button type="button" ref={closeRef} className="pickerClose" onClick={onClose} aria-label="閉じる">✕</button>
         </div>
         <div className="structuredPicker">
-          <div className="behaviorPicker" role="group" aria-label="Behavior">
+          <div className="behaviorPicker" role="group" aria-label="動作の種類">
             {STRUCTURED_BEHAVIORS.filter((b) => !restrictTo || restrictTo.includes(b)).map((behavior) => {
               const label = STRUCTURED_BEHAVIOR_LABELS[behavior];
               return (
@@ -2937,7 +3421,7 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
           )}
           {draft.behavior === "&mkp" && (
             <label>
-              <span>Mouse button</span>
+              <span>マウスボタン</span>
               <select
                 value={draft.mouseButton ?? "MB1"}
                 onChange={(event) => setDraft((prev) => ({ ...prev, mouseButton: event.target.value }))}
@@ -2950,7 +3434,7 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
           )}
           {draft.behavior === "&bt" && (
             <label>
-              <span>BT command</span>
+              <span>Bluetooth の操作</span>
               <select
                 value={draft.btCommand ?? BT_COMMANDS[0].id}
                 onChange={(event) => setDraft((prev) => ({ ...prev, btCommand: event.target.value }))}
@@ -2968,10 +3452,10 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
                 <input
                   value={draft.keycode}
                   onChange={(event) => setDraft((prev) => ({ ...prev, keycode: event.target.value }))}
-                  aria-label="Structured picker keycode"
+                  aria-label="短押し時のキー"
                 />
               </label>
-              <div className="keypressModifierGroup" role="group" aria-label="Tap keycode modifiers">
+              <div className="keypressModifierGroup" role="group" aria-label="同時に押す修飾キー">
                 {KEY_PRESS_MODIFIERS.map((modifier) => {
                   const active = (draft.keypressModifiers || []).includes(modifier.code);
                   return (
@@ -3005,14 +3489,14 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
             <input
               ref={searchRef}
               className="pickerSearch"
-              placeholder="キーコード・名前で検索…"
+              placeholder="キーコード・名前、または出したい文字 1 字で検索…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="キーを検索"
             />
             <div className="pickerCategories">
               <button type="button" className={!category ? "active" : ""} onClick={() => setCategory("")}>
-                All
+                すべて
               </button>
               {CATEGORIES.map((cat) => (
                 <button
@@ -3021,10 +3505,23 @@ function KeycodePicker({ initialBinding = "", layerNames = [], onSelect, onClose
                   className={category === cat ? "active" : ""}
                   onClick={() => setCategory(cat)}
                 >
-                  {cat}
+                  {CATEGORY_LABELS_JA[cat] || cat}
                 </button>
               ))}
             </div>
+            {jisResults.length > 0 && (
+              <div className="jisResults" role="group" aria-label="出したい文字から選ぶ">
+                <strong>「{search.trim()}」を Windows の日本語配列で入力する割り当て</strong>
+                {jisResults.map((item) => (
+                  <button type="button" key={item.binding} className="pickerItem jisItem" onClick={() => chooseKeycode(item.keycode)}>
+                    <span className="pickerItemLabel">{item.keycode}</span>
+                    <code className="pickerItemCode">{item.binding}</code>
+                    <span className="pickerItemNote">{item.note}</span>
+                  </button>
+                ))}
+                <span className="pickerItemNote">下の一覧は US 配列での表記です。記号は日本語配列だと別の文字になる場合があります。</span>
+              </div>
+            )}
             <div className="pickerList">
               {results.map((item) => (
                 <button

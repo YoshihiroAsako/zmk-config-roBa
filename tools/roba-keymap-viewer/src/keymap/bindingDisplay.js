@@ -239,6 +239,87 @@ export function describeBinding(raw, layerNames = []) {
   return fallback(value.replace(/^&/, "").slice(0, 10), "custom", value, "source-only");
 }
 
+const MODIFIER_SHORT = {
+  LEFT_SHIFT: "LSFT", LSHIFT: "LSFT", LSHFT: "LSFT", RIGHT_SHIFT: "RSFT", RSHIFT: "RSFT", RSHFT: "RSFT",
+  LEFT_CONTROL: "LCTL", LCTRL: "LCTL", LCTL: "LCTL", RIGHT_CONTROL: "RCTL", RCTRL: "RCTL", RCTL: "RCTL",
+  LEFT_ALT: "LALT", LALT: "LALT", RIGHT_ALT: "RALT", RALT: "RALT",
+  LEFT_GUI: "LWIN", LGUI: "LWIN", LEFT_WIN: "LWIN", LWIN: "LWIN", LEFT_COMMAND: "LCMD", LCMD: "LCMD",
+  RIGHT_GUI: "RWIN", RGUI: "RWIN", RIGHT_WIN: "RWIN", RWIN: "RWIN", RIGHT_COMMAND: "RCMD", RCMD: "RCMD",
+};
+
+/** キーボード図のキー表面に出す 2 段の文字と、色分け用の種類を返す。 */
+export function describeKeyFace(raw, layerNames = []) {
+  const parsed = describeBinding(raw, layerNames);
+  const layerName = (index) => layerNames[Number(index)] || `L${index}`;
+  switch (parsed.kind) {
+    case "keypress":
+      if (MODIFIER_SHORT[parsed.params[0]]) return { top: MODIFIER_SHORT[parsed.params[0]], bottom: "", tone: "modifier" };
+      return { top: parsed.params[0] === "QMARK" ? "?" : parsed.display, bottom: "", tone: "key" };
+    case "mod-tap":
+      return { top: parsed.display, bottom: MODIFIER_SHORT[parsed.params[0]] || parsed.params[0], tone: "hold-modifier" };
+    case "layer-tap":
+      return { top: displayKeycode(parsed.params[1]), bottom: layerName(parsed.params[0]), tone: "layer" };
+    case "momentary":
+      return { top: layerName(parsed.params[0]), bottom: "押す間", tone: "layer" };
+    case "mouse-button":
+      return { top: parsed.display, bottom: "マウス", tone: "mouse" };
+    case "bluetooth":
+      return { top: parsed.display, bottom: "BT", tone: "system" };
+    case "bootloader":
+      return { top: "BOOT", bottom: "書込", tone: "system" };
+    case "macro":
+      return { top: parsed.display, bottom: "→L0", tone: "layer" };
+    case "transparent":
+      return { top: "", bottom: "透過", tone: "transparent" };
+    case "none":
+      return { top: "—", bottom: "無効", tone: "none" };
+    default: {
+      const to = /^&(to|tog|sl) (\d+)$/.exec(parsed.raw || "");
+      if (to) return { top: layerName(to[2]), bottom: { to: "切替", tog: "切替/戻", sl: "1回" }[to[1]], tone: "layer" };
+      return { top: parsed.display, bottom: parsed.behavior.replace("&", ""), tone: "custom" };
+    }
+  }
+}
+
+// Windows 日本語配列でも US 配列と同じ文字が出るキー(Shift 位置が変わらないもの)。
+const SAME_AS_US = {
+  "!": "EXCLAMATION", "#": "HASH", "$": "DOLLAR", "%": "PERCENT", "-": "MINUS", "/": "SLASH",
+  ",": "COMMA", ".": "DOT", ";": "SEMICOLON", "?": "QMARK", "<": "LESS_THAN", ">": "GREATER_THAN",
+};
+
+function jisKeycode(code) {
+  return code.replace(/^LS_INT_RO$/, "LS(INT_RO)").replace(/^LS_INT_YEN$/, "LS(INT_YEN)");
+}
+
+/**
+ * Windows 日本語配列で char を入力する割り当てを返す。
+ * 全角の英数記号は半角として扱う。未検証の記号は返さない。
+ */
+export function findBindingsForCharacter(input) {
+  const char = [...String(input ?? "").trim()].length === 1
+    ? String(input).trim().replace(/[！-～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace("￥", "¥")
+    : "";
+  if (!char) return [];
+  const results = [];
+  for (const [code, output] of Object.entries(WINDOWS_JIS_OUTPUT)) {
+    if (output === char || (char === "¥" && output === "\\")) {
+      const keycode = jisKeycode(code);
+      results.push({ keycode, binding: `&kp ${keycode}`, note: "Windows 日本語配列での出力（検証シートの対応表）" });
+    }
+  }
+  if (SAME_AS_US[char]) {
+    results.push({ keycode: SAME_AS_US[char], binding: `&kp ${SAME_AS_US[char]}`, note: "US 配列と同じ文字" });
+  }
+  if (/^[a-z]$/i.test(char)) {
+    const keycode = char.toUpperCase();
+    results.push({ keycode, binding: `&kp ${keycode}`, note: "英字" });
+  }
+  if (/^[0-9]$/.test(char)) {
+    results.push({ keycode: `N${char}`, binding: `&kp N${char}`, note: "数字" });
+  }
+  return results;
+}
+
 function fallback(display, kind, raw, editability = "unknown") {
   return {
     raw,
